@@ -1,2 +1,3 @@
 # SetNewWinProps
-Change properties for a choice of opening windows
+#  Change window properties for selected opening windows
+

@@ -1,0 +1,10 @@
+setnewwinprops (0.1) unstable; urgency=low
+
+  * Change window properties for selected opening windows
+  * Initial Release.
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 30 Aug 2022 10:37:40 +0200
+
+Local variables:
+mode: debian-changelog
+End:
