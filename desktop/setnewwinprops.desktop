@@ -1,7 +1,12 @@
 [Desktop Entry]
 Comment=Set New Window Properties
 Exec=/usr/bin/setnewwinprops-daemon.sh start
+GenericName=SetNewWinProps
 Name=SetNewWinProps
 StartupNotify=true
+NoDisplay=true
 Terminal=false
 Type=Application
+X-DBUS-StartupType=wait
+X-GNOME-Autostart-Phase=Initialization
+X-KDE-autostart-phase=1

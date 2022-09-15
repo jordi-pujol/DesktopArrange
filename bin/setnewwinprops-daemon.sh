@@ -256,6 +256,9 @@ Main() {
 	echo "${$}" > "${PIDFILE}"
 	[ -e "${PIPE}" ] || \
 		mkfifo "${PIPE}"
+
+	! grep -qswF 'xtrace' <<<"${@}" || \
+		set -o xtrace
 	exec > "${LOGFILE}" 2>&1
 
 	_log "Start"
@@ -263,16 +266,20 @@ Main() {
 	Ids="$(awk '$2 == -1 {printf $1 " "}' < <(wmctrl -l))"
 	LoadConfig "${@}"
 
-	((exec xprop -root -spy "_NET_CLIENT_LIST_STACKING" >> "${PIPE}")& )
+	((exec xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}")& )
 	while :; do
 		if read -r txt < "${PIPE}"; then
 			case "${txt}" in
-			_NET_CLIENT_LIST_STACKING*)
+			_NET_CLIENT_LIST*)
 				WindowsUpdate $(cut -f 2- -s -d '#' <<< "${txt}" | \
 					tr -s ' ,' ' ')
 				;;
 			reload)
 				LoadConfig "${@}"
+				;;
+			*)
+				xprop -root "_NET_CLIENT_LIST" || \
+					exit
 				;;
 			esac
 		fi
