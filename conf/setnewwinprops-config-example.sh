@@ -7,7 +7,7 @@ LogRotate=3
 window_get_delay=30
 # Get the title of the new window.
 window_get_title="QEMU (BlissOS9-overlay)"
-# Set the X coordinate of a window and leave Y.
+# Set the X coordinate of a window and leave Y untouched.
 window_set_position='500,y'
 # Set the width/height of a window.
 window_set_size='1400,y'

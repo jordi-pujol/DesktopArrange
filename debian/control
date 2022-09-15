@@ -1,0 +1,14 @@
+Source: setnewwinprops
+Section: X11
+Priority: optional
+Maintainer: Jordi Pujol <jordi-pujol@telefonica.net>
+Build-Depends-Indep: debhelper (>= 9),
+ devscripts,
+ bash, dash,
+
+Package: setnewwinprops
+Architecture: all
+Description: Change window properties for selected opening windows
+Depends: ${misc:Depends},
+ gawk, xprop, wmctrl, xdotool,
+ bash,
