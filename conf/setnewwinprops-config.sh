@@ -1,4 +1,4 @@
-#
+#!/bin/bash
 
 #************************************************************************
 #  SetNewWinProps
@@ -25,81 +25,73 @@
 #************************************************************************
 
 # Daemon setup
-#
 Debug=""
-LogRotate=3
 
 # A window definition
 #
-# Get the title of the new window.
-window_get_title=
-# Get the type of the window.
+# Title of the window.
+window_get_title="title"
+# Type of the window.
 window_get_type="WINDOW_NORMAL", "WINDOW_TOOLBAR", etc.
-# Get the application which created the window.
-window_get_application=
-# Get the class of the new window.
-window_get_class=
-# Get the ID of the new window. This may be empty.
-window_get_id=
-# Get the XID of the new window. This may be empty.
-window_get_xid=
-# Get the PID of the new window. This may be zero on error.
-window_get_pid=
+# Application which created the window.
+window_get_application="/usr/bin/qemu"
+# Class of the window.
+window_get_class="QEMU"
 # Get the role of the new window, via WM_WINDOW_ROLE.
 # This may return an empty string.
-window_get_role=
+window_get_role=""
 # Get the workspace the window is active on.
 # The return value may be -1 if the window is pinned, or invisible.
-window_get_workspace=
+window_get_workspace="0 .. (desktops_num-1)"
 # Is the window focussed?
-window_is_focussed=
+window_get_is_focussed=
 # Is the window maximized?
-window_is_maximized=
+window_get_is_maximized=
 # Is the window fullscreen?
-window_is_fullscreen=
+window_get_is_fullscreen=
 ## Get the position of the mouse pointer.
 #get_pointer=
 ## Depth ##
 # Make the window appear in the foreground and give focus.
-window_set_active=
+window_set_active="y|yes|enable|true|1"
 # Make the window "always on top" when value is "y".
 # Remove the "always on top" flag when value is "n".
-window_set_above=
+window_set_above="y|yes|enable|true|1  n|no|disable|false|0"
 # Make the window "always below" when value is "y".
 # Remove the "always below" flag when value is "n".
 window_set_bottom=
 ## Max/Min ##
 # Maximize the window.
-window_set_maximized=
+window_set_maximized="y|yes|enable|true|1  n|no|disable|false|0"
 # Maximize horizontally.
-window_set_maximized_horizontally=
+window_set_maximized_horizontally="y|yes|enable|true|1  n|no|disable|false|0"
 # Maximize vertically.
-window_set_maximized_vertically=
+window_set_maximized_vertically="y|yes|enable|true|1  n|no|disable|false|0"
 # Make the window "fullscreen".
-window_set_fullscreen=
-# Focus the window.
-window_set_focus=
+window_set_fullscreen="y|yes|enable|true|1  n|no|disable|false|0"
+# Focus the window and change to the desktop that contains this window.
+window_set_focus="y|yes|enable|true|1"
 # Minimize the window.
-window_set_minimized=
+window_set_minimized="y|yes|enable|true|1"
 ## Workspace ##
 # Pin on all workspaces when value is "y".
 # Don't pin on all workspaces when value is "n".
-window_set_pin=
+window_set_pin="y|yes|enable|true|1  n|no|disable|false|0"
 ## Movement ##
 # Set the X/Y coordinates of a window.
-window_set_position=
+window_set_position="400|20%|x,200|10%|y"
 # Set the width/height of a window.
-window_set_size=
+window_set_size="400|20%|x,200|10%|y"
 ## Workspaces ##
 # Change to the given workspace/virtual-desktop.
-window_set_active_desktop=
+window_set_active_desktop="0 .. (desktops_num-1)"
 # Set the workspace the window is active on.
-window_set_desktop=
+window_set_desktop="0 .. (desktops_num-1)"
 ## Misc ##
 # Set/Unset the decorations for the window.
-window_set_decoration=
+window_set_decoration="y|yes|enable|true|1  n|no|disable|false|0"
 # Close the window, forcibly.
-window_set_killed=
+window_set_killed="y|yes|enable|true|1"
 # Set the position of the mouse pointer.
-window_set_pointer=
+window_set_pointer="400|20%|x,200|10%|y"
 AddWindow

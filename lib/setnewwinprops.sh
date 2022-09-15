@@ -110,24 +110,23 @@ _log() {
 }
 
 GetTitle() {
-	local id="${1}"
-	xprop -id "${id}" _NET_WM_NAME | \
-		sed -nre '\|.*[=] "(.*)"$|!{q1};s//\1/p'
-	# xdotool getwindowname "${id}"
+	local id="${1}" name
+	name="$(xdotool getwindowname "${id}")"
+	[ -n "${name}" ] && \
+		printf '%s\n' "${name}" || \
+		return ${ERR}
 }
 
 GetType() {
 	local id="${1}"
 	xprop -id "${id}" _NET_WM_WINDOW_TYPE | \
-		awk '$NF ~ "[[:digit:]]+" {print $NF}'
+		sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p'
 }
 
 GetApplication() {
 	local id="${1}"
-	ps -ho cmd "$(xprop -id "${id}" _NET_WM_PID | \
-		awk '$NF ~ "[[:digit:]]+" {print $NF;rc=-1}
-		END{exit rc+1}')"
-	# xdotool getwindowpid "${id}"
+	2> /dev/null ps -ho cmd "$(xdotool getwindowpid "${id}")" || \
+		return ${ERR}
 }
 
 GetClass() {
@@ -140,8 +139,56 @@ GetRole() {
 	local id="${1}"
 	xprop -id "${id}" WM_WINDOW_ROLE | \
 		sed -nre '\|.*[=] "(.*)"$| s//\1/p'
-	# $ xprop -id 0x2200003 | grep -i role
-	# WM_WINDOW_ROLE(STRING) = "xfce4-terminal-1663170190-2467579532"
+}
+
+GetIsMaximized() {
+	local id="${1}"
+	xprop -id "${id}" _NET_WM_STATE | \
+		sed -nre '\|.*[=] "(.*)"$| s//\1/p' | \
+		grep -swF '_NET_WM_STATE_MAXIMIZED_HORZ' | \
+		grep -swF '_NET_WM_STATE_MAXIMIZED_VERT' || :
+}
+
+GetIsMaximizedHorz() {
+	local id="${1}"
+	xprop -id "${id}" _NET_WM_STATE | \
+		sed -nre '\|.*[=] "(.*)"$| s//\1/p' | \
+		grep -swF '_NET_WM_STATE_MAXIMIZED_HORZ' || :
+}
+
+GetIsMaximizedVert() {
+	local id="${1}"
+	xprop -id "${id}" _NET_WM_STATE | \
+		sed -nre '\|.*[=] "(.*)"$| s//\1/p' | \
+		grep -swF '_NET_WM_STATE_MAXIMIZED_VERT' || :
+}
+
+GetDesktop() {
+	local id="${1}"
+	get_desktop_for_window "${id}"
+}
+
+DesktopStatus() {
+	local WIDTH HEIGHT
+	eval $(xdotool getdisplaygeometry --shell)
+	desktopWidth="${WIDTH}"
+	desktopHeight="${HEIGHT}"
+	desktopCurrent="$(xdotool get_desktop)"
+	desktops="$(xdotool get_num_desktops)"
+	#$ $ xprop -root _NET_WORKAREA
+	#_NET_WORKAREA(CARDINAL) = 0, 0, 1920, 1080, 0, 0, 1920, 1080, 0, 0, 1920, 1080, 0, 0, 1920, 1080
+	#$ $ xprop -root _NET_WORKAREA
+	#_NET_WORKAREA(CARDINAL) = 200, 0, 1720, 1080, 200, 0, 1720, 1080, 200, 0, 1720, 1080, 200, 0, 1720, 1080
+}
+
+WindowStatus() {
+	local WIDTH HEIGHT X Y SCREEN
+	eval $(xdotool getwindowgeometry --shell "${id}")
+	windowWidth="${WIDTH}"
+	windowHeight="${HEIGHT}"
+	windowX="${X}"
+	windowY="${Y}"
+	windowDesktop="${SCREEN}"
 }
 
 WindowAppend() {
@@ -258,13 +305,15 @@ AddWindow() {
 				:
 			;;
 			*)
+				LogPrio="warn" _log "Error in config: Property \"${prop}\"" \
+					"has not been implemented yet"
 				rc=0
 				break
 			;;
 		esac
 	done < <(set | grep -se "^window_get_" | sort)
 	if [ ${rc} -eq 0 ]; then
-		_log "Error in config. Can't add a new window"
+		LogPrio="warn" _log "Error in config. Can't add a new window"
 	else
 		WindowAppend
 	fi
@@ -338,7 +387,7 @@ LoadConfig() {
 	if [ ${Windows} -eq ${NONE} ]; then
 		LogPrio="warn" _log "Have not configured any window"
 	else
-		local window=${NONE}
+		window=${NONE}
 		while [ $((window++)) -lt ${Windows} ]; do
 			echo
 			set | grep -se "^window${window}_.*=" | sort
@@ -349,29 +398,6 @@ LoadConfig() {
 	msg="Configuration reloaded"
 	_log "${msg}"
 	return ${OK}
-}
-
-DesktopStatus() {
-	local WIDTH HEIGHT
-	eval $(xdotool getdisplaygeometry --shell)
-	desktopWidth="${WIDTH}"
-	desktopHeight="${HEIGHT}"
-	desktopCurrent="$(xdotool get_desktop)"
-	desktops="$(xdotool get_num_desktops)"
-	#$ $ xprop -root _NET_WORKAREA
-	#_NET_WORKAREA(CARDINAL) = 0, 0, 1920, 1080, 0, 0, 1920, 1080, 0, 0, 1920, 1080, 0, 0, 1920, 1080
-	#$ $ xprop -root _NET_WORKAREA
-	#_NET_WORKAREA(CARDINAL) = 200, 0, 1720, 1080, 200, 0, 1720, 1080, 200, 0, 1720, 1080, 200, 0, 1720, 1080
-}
-
-WindowStatus() {
-	local WIDTH HEIGHT X Y SCREEN
-	eval $(xdotool getwindowgeometry --shell "${id}")
-	windowWidth="${WIDTH}"
-	windowHeight="${HEIGHT}"
-	windowX="${X}"
-	windowY="${Y}"
-	windowDesktop="${SCREEN}"
 }
 
 :

@@ -135,10 +135,7 @@ WindowSet() {
 				#xdotool windowraise "${id}"
 			;;
 			window${window}_set_focus)
-				WindowStatus
-				[ ${windowDesktop} -eq ${desktopCurrent} ] || \
-					xdotool set_desktop "${windowDesktop}"
-				xdotool windowfocus --sync "${id}"
+				xdotool windowactivate --sync "${id}"
 				;;
 			window${window}_set_desktop)
 				WindowStatus
@@ -169,6 +166,10 @@ WindowNew() {
 		window_get_class \
 		window_get_role \
 		window delay=""
+		#window_get_is_maximized \
+		#window_get_is_maximized_horz \
+		#window_get_is_maximized_vert \
+		#window_get_desktop
 
 	window_get_title="$(GetTitle "${id}")" || \
 		return ${OK}
@@ -180,7 +181,16 @@ WindowNew() {
 		return ${OK}
 	window_get_role="$(GetRole "${id}")" || \
 		return ${OK}
+	#window_get_is_maximized="$(GetIsMaximized "${id}")" || \
+	#	return ${OK}
+	#window_get_is_maximized_horz="$(GetIsMaximizedHorz "${id}")" || \
+	#	return ${OK}
+	#window_get_is_maximized_vert="$(GetIsMaximizedVert "${id}")" || \
+	#	return ${OK}
+	#window_get_desktop="$(GetDesktop "${id}")" || \
+	#	return ${OK}
 
+	# We'll set only the first window matching
 	window=${NONE}
 	while [ $((window++)) -lt ${Windows} ]; do
 		local rc="y" prop val
@@ -217,24 +227,21 @@ WindowNew() {
 			esac
 		done < <(set | grep -se "^window${window}_get_" | sort)
 		if [ -n "${rc}" ]; then
-			# process only the first match
 			((WindowSet "${id}" "${window}" ${delay})& )
 			return ${OK}
 		fi
 	done
-	# get out when no window matches
+	# get out when not any window matches
 	return ${OK}
 }
 
 WindowsUpdate() {
-	local id newIds
-	if newIds="$(grep -svwF "$(printf '%s\n' ${Ids})" \
-	< <(printf '%s\n' "${@}"))"; then
-		for id in ${newIds}; do
-			WindowNew "${id}" || :
-		done
-		Ids="${@}"
-	fi
+	local id
+	for id in $(grep -svwF "$(printf '%s\n' ${Ids})" \
+	< <(printf '%s\n' "${@}")); do
+		WindowNew "${id}" || :
+	done
+	Ids="${@}"
 	return ${OK}
 }
 
@@ -267,7 +274,7 @@ Main() {
 	exec > "${LOGFILE}" 2>&1
 
 	_log "Start"
-	# initialize Ids with sticky window ids
+	# initialize Ids of current sticky windows
 	Ids="$(awk '$2 == -1 {printf $1 " "}' < <(wmctrl -l))"
 	LoadConfig "${@}"
 
