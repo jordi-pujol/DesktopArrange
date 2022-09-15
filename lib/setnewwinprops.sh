@@ -112,35 +112,34 @@ _log() {
 GetTitle() {
 	local id="${1}"
 	xprop -id "${id}" _NET_WM_NAME | \
-		sed -re '\|.*[=] "(.*)"$| s//\1/'
+		sed -nre '\|.*[=] "(.*)"$|!{q1};s//\1/p'
 	# xdotool getwindowname "${id}"
 }
 
 GetType() {
 	local id="${1}"
 	xprop -id "${id}" _NET_WM_WINDOW_TYPE | \
-		awk '{print $NF}'
+		awk '$NF ~ "[[:digit:]]+" {print $NF}'
 }
 
 GetApplication() {
-	local id="${1}" pid
-	pid="$(xprop -id "${id}" _NET_WM_PID | \
-		awk '{print $NF}')"
-	ps -ho cmd "${pid}"
+	local id="${1}"
+	ps -ho cmd "$(xprop -id "${id}" _NET_WM_PID | \
+		awk '$NF ~ "[[:digit:]]+" {print $NF;rc=-1}
+		END{exit rc+1}')"
 	# xdotool getwindowpid "${id}"
 }
 
 GetClass() {
 	local id="${1}"
 	xprop -id "${id}" WM_CLASS | \
-		sed -re '\|.*[=] (.*)$| s//\1/'
+		sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p'
 }
 
 GetRole() {
 	local id="${1}"
 	xprop -id "${id}" WM_WINDOW_ROLE | \
-		sed -re '\|.*[=] "(.*)"$| s//\1/' | \
-		grep -svF "WM_WINDOW_ROLE:  not found." || :
+		sed -nre '\|.*[=] "(.*)"$| s//\1/p'
 	# $ xprop -id 0x2200003 | grep -i role
 	# WM_WINDOW_ROLE(STRING) = "xfce4-terminal-1663170190-2467579532"
 }

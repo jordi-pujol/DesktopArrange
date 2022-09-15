@@ -170,11 +170,16 @@ WindowNew() {
 		window_get_role \
 		window delay=""
 
-	window_get_title="$(GetTitle "${id}")"
-	window_get_type="$(GetType "${id}")"
-	window_get_application="$(GetApplication "${id}")"
-	window_get_class="$(GetClass "${id}")"
-	window_get_role="$(GetRole "${id}")"
+	window_get_title="$(GetTitle "${id}")" || \
+		return ${OK}
+	window_get_type="$(GetType "${id}")" || \
+		return ${OK}
+	window_get_application="$(GetApplication "${id}")" || \
+		return ${OK}
+	window_get_class="$(GetClass "${id}")" || \
+		return ${OK}
+	window_get_role="$(GetRole "${id}")" || \
+		return ${OK}
 
 	window=${NONE}
 	while [ $((window++)) -lt ${Windows} ]; do
@@ -277,11 +282,10 @@ Main() {
 			reload)
 				LoadConfig "${@}"
 				;;
-			*)
-				xprop -root "_NET_CLIENT_LIST" || \
-					exit
-				;;
 			esac
+		else
+			xprop -root "_NET_CLIENT_LIST" > /dev/null 2>&1 || \
+				exit ${OK}
 		fi
 	done
 }
