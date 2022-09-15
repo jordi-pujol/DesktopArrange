@@ -24,7 +24,6 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
 
-. /usr/lib/setnewwinprops/setnewwinprops
 _unquote() {
 	printf '%s\n' "${@}" | \
 		sed -re "s/^([\"](.*)[\"]|['](.*)['])$/\2\3/"

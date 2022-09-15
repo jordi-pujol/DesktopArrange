@@ -77,7 +77,7 @@ WindowSet() {
 			;;
 			window${window}_set_maximized)
 				case "${val}" in
-				${ENABLE})
+				y*|true|on|1|enable*)
 					wmctrl -i -r "${id}" -b add,maximized_horz,maximized_vert
 				;;
 				*)
@@ -89,7 +89,7 @@ WindowSet() {
 			;;
 			window${window}_set_maximized_horizontally)
 				case "${val}" in
-				${ENABLE})
+				y*|true|on|1|enable*)
 					wmctrl -i -r "${id}" -b add,maximized_horz
 				;;
 				*)
@@ -101,7 +101,7 @@ WindowSet() {
 			;;
 			window${window}_set_maximized_vertically)
 				case "${val}" in
-				${ENABLE})
+				y*|true|on|1|enable*)
 					wmctrl -i -r "${id}" -b add,maximized_vert
 				;;
 				*)
@@ -113,7 +113,7 @@ WindowSet() {
 			;;
 			window${window}_set_fullscreen)
 				case "${val}" in
-				${ENABLE})
+				y*|true|on|1|enable*)
 					wmctrl -i -r "${id}" -b add,fullscreen
 				;;
 				*)
@@ -123,7 +123,7 @@ WindowSet() {
 			;;
 			window${window}_set_above)
 				case "${val}" in
-				${ENABLE})
+				y*|true|on|1|enable*)
 					wmctrl -i -r "${id}" -b remove,below
 					wmctrl -i -r "${id}" -b add,above
 				;;
@@ -237,7 +237,6 @@ Main() {
 	# constants
 	readonly NAME \
 		TAB=$'\t' OK=0 ERR=1 NONE=0 \
-		ENABLE="y|yes|true|on|1" \
 		XROOT="$(xprop -root _NET_SUPPORTING_WM_CHECK | \
 			awk '{print $NF; exit}')"
 	readonly LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \

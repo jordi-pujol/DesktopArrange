@@ -10,5 +10,5 @@ Package: setnewwinprops
 Architecture: all
 Description: Change window properties for selected opening windows
 Depends: ${misc:Depends},
- gawk, xprop, wmctrl, xdotool,
+ gawk, x11-utils, wmctrl, xdotool,
  bash,
