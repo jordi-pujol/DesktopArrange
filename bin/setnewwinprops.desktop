@@ -1,19 +1,7 @@
 [Desktop Entry]
-Comment[ca]=
-Comment=
+Comment=Set New Window Properties
 Exec=/usr/bin/setnewwinprops-daemon.sh start
-GenericName[ca]=
-GenericName=
-MimeType=
-Name[ca]=SetNewWinProps
-Name=Set New Window Properties
-Path=
+Name=SetNewWinProps
 StartupNotify=true
 Terminal=false
-TerminalOptions=
 Type=Application
-X-DBUS-ServiceName=
-X-DBUS-StartupType=wait
-X-KDE-SubstituteUID=false
-X-KDE-Username=
-X-KDE-autostart-phase=0

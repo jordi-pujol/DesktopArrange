@@ -1,43 +1,29 @@
-#
-
-#************************************************************************
-#  SetNewWinProps
-#
-#  Change window properties for selected opening windows
-#
-#  $Revision: 0.1 $
-#
-#  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
-#
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 3, or (at your option)
-#  any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-#************************************************************************
-
-# Daemon setup
-#
 Debug=""
 LogRotate=3
 
 # A window definition
 #
+# When the window is created wait 30 seconds to apply these properties
 window_get_delay=30
 # Get the title of the new window.
 window_get_title="QEMU (BlissOS9-overlay)"
-# Set the X/Y coordinates of a window.
-# $ xdotool windowmove 0x1e00009 500 0
-window_set_position='500,0'
+# Set the X coordinate of a window and leave Y.
+window_set_position='500,y'
 # Set the width/height of a window.
-# $ xdotool windowsize 0x1e00009 1400 1000
-window_set_size='1400,1010'
+window_set_size='1400,y'
+#window_set_maximized="y"
+#window_set_maximized_horizontally="y"
+window_set_maximized_vertically="y"
+# add this window definition to the list of windows
 AddWindow
+
+# Another window definition
+window_get_delay=30
+# Get the title of the new window.
+window_get_title="QEMU (BlissOS9-persistent)"
+# Set the X/Y coordinates of a window.
+window_set_position='50,0'
+# Set the width/height of a window.
+window_set_size='1400,1050'
+AddWindow
+
