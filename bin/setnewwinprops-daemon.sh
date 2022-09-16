@@ -170,40 +170,40 @@ WindowSetup() {
 
 WindowNew() {
 	local windowId="${1}" \
-		rule_met_title \
-		rule_met_type \
-		rule_met_application \
-		rule_met_class \
-		rule_met_role \
-		rule_met_desktop_size \
-		rule_met_desktop_workarea \
+		window_title \
+		window_type \
+		window_application \
+		window_class \
+		window_role \
+		window_desktop_size \
+		window_desktop_workarea \
 		rule delay=""
-		#rule_met_is_maximized \
-		#rule_met_is_maximized_horz \
-		#rule_met_is_maximized_vert \
-		#rule_met_desktop
+		#window_is_maximized \
+		#window_is_maximized_horz \
+		#window_is_maximized_vert \
+		#window_desktop
 
-	rule_met_title="$(GetWindowTitle "${windowId}")" || \
+	window_title="$(GetWindowTitle "${windowId}")" || \
 		return ${OK}
-	rule_met_type="$(GetWindowType "${windowId}")" || \
+	window_type="$(GetWindowType "${windowId}")" || \
 		return ${OK}
-	rule_met_application="$(GetWindowApplication "${windowId}")" || \
+	window_application="$(GetWindowApplication "${windowId}")" || \
 		return ${OK}
-	rule_met_class="$(GetWindowClass "${windowId}")" || \
+	window_class="$(GetWindowClass "${windowId}")" || \
 		return ${OK}
-	rule_met_role="$(GetWindowRole "${windowId}")" || \
+	window_role="$(GetWindowRole "${windowId}")" || \
 		return ${OK}
-	rule_met_desktop_size="$(GetDesktopSize)" || \
+	window_desktop_size="$(GetDesktopSize)" || \
 		return ${OK}
-	rule_met_desktop_workarea="$(GetDesktopWorkarea)" || \
+	window_desktop_workarea="$(GetDesktopWorkarea)" || \
 		return ${OK}
-	#rule_met_is_maximized="$(GetWindowIsMaximized "${windowId}")" || \
+	#window_is_maximized="$(GetWindowIsMaximized "${windowId}")" || \
 	#	return ${OK}
-	#rule_met_is_maximized_horz="$(GetWindowIsMaximizedHorz "${windowId}")" || \
+	#window_is_maximized_horz="$(GetWindowIsMaximizedHorz "${windowId}")" || \
 	#	return ${OK}
-	#rule_met_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
+	#window_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
 	#	return ${OK}
-	#rule_met_desktop="$(GetWindowDesktop "${windowId}")" || \
+	#window_desktop="$(GetWindowDesktop "${windowId}")" || \
 	#	return ${OK}
 
 	# We'll set up only the first rule that match this window
@@ -215,31 +215,31 @@ WindowNew() {
 			val="$(_unquote "${val}")"
 			case "${prop}" in
 				rule${rule}_met_title)
-					[ "${val}" = "${rule_met_title}" ] || \
+					[ "${val}" = "${window_title}" ] || \
 						rc=""
 				;;
 				rule${rule}_met_type)
-					grep -qs -iF "${rule_met_type}" <<< "${val}" || \
+					grep -qs -iwF "${window_type}" <<< "${val}" || \
 						rc=""
 				;;
 				rule${rule}_met_application)
-					[ "${val}" = "${rule_met_application}" ] || \
+					grep -qs -iF "${window_application}" <<< "${val}" || \
 						rc=""
 				;;
 				rule${rule}_met_class)
-					grep -qs -iF "${rule_met_class}" <<< "${val}" || \
+					grep -qs -iwF "${window_class}" <<< "${val}" || \
 						rc=""
 				;;
 				rule${rule}_met_role)
-					grep -qs -iF "${rule_met_role}" <<< "${val}" || \
+					grep -qs -iwF "${window_role}" <<< "${val}" || \
 						rc=""
 				;;
 				rule${rule}_met_desktop_size)
-					[ "${val}" = "${rule_met_desktop_size}" ] || \
+					[ "${val}" = "${window_desktop_size}" ] || \
 						rc=""
 				;;
 				rule${rule}_met_desktop_workarea)
-					[ "${val}" = "${rule_met_desktop_workarea}" ] || \
+					[ "${val}" = "${window_desktop_workarea}" ] || \
 						rc=""
 				;;
 				rule${rule}_met_delay)
@@ -255,7 +255,7 @@ WindowNew() {
 			return ${OK}
 		fi
 	done
-	# get out when not any rule matches
+	# get out when any rule doesn't match
 	return ${OK}
 }
 
