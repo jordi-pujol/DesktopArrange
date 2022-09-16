@@ -272,9 +272,16 @@ WindowsUpdate() {
 Main() {
 	# constants
 	readonly NAME \
-		TAB=$'\t' OK=0 ERR=1 NONE=0 \
-		XROOT="$(xprop -root _NET_SUPPORTING_WM_CHECK | \
-			awk '{print $NF; exit}')"
+		TAB=$'\t' OK=0 ERR=1 NONE=0
+	local XROOT t=0
+	while ! XROOT="$(xprop -root _NET_SUPPORTING_WM_CHECK | \
+	awk '$NF ~ "^0x[0-9A-Fa-f]+$" {print $NF; rc=-1; exit}
+	END{exit rc+1}')" && \
+	[ $((t++)) -lt 5 ]; do
+		sleep 1
+	done
+	[ -n "${XROOT}" ] || \
+		exit ${ERR}
 	readonly LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
 		PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid"
 		PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe"

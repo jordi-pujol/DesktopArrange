@@ -377,7 +377,8 @@ LoadConfig() {
 	Rules=${NONE}
 	[ -s "${HOME}/.config/${APPNAME}/config.txt" ] && \
 		. "${HOME}/.config/${APPNAME}/config.txt" || {
-			LogPrio="err" _log "Invalid config file."
+			LogPrio="err" _log "Invalid config file:" \
+				"\"${HOME}/.config/${APPNAME}/config.txt\""
 			exit ${ERR}
 		}
 
