@@ -8,7 +8,8 @@ Build-Depends-Indep: debhelper (>= 9),
 
 Package: setnewwinprops
 Architecture: all
-Description: Change window properties for selected opening windows
+Description: Change window properties for opening windows
+ according to a set of configurable rules.
 Depends: ${misc:Depends},
  gawk, x11-utils, wmctrl, xdotool,
  bash,

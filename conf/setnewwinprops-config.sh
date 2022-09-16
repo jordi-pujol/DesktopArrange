@@ -3,9 +3,10 @@
 #************************************************************************
 #  SetNewWinProps
 #
-#  Change window properties for selected opening windows
+#  Change window properties for opening windows
+#  according to a set of configurable rules.
 #
-#  $Revision: 0.1 $
+#  $Revision: 0.2 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -30,68 +31,75 @@ Debug=""
 # A window definition
 #
 # Title of the window.
-window_get_title="title"
+rule_met_title="title"
 # Type of the window.
-window_get_type="WINDOW_NORMAL", "WINDOW_TOOLBAR", etc.
+rule_met_type="WINDOW_NORMAL", "WINDOW_TOOLBAR", etc.
 # Application which created the window.
-window_get_application="/usr/bin/qemu"
+rule_met_application="/usr/bin/qemu"
 # Class of the window.
-window_get_class="QEMU"
+rule_met_class="QEMU"
 # Get the role of the new window, via WM_WINDOW_ROLE.
 # This may return an empty string.
-window_get_role=""
+rule_met_role=""
 # Get the workspace the window is active on.
 # The return value may be -1 if the window is pinned, or invisible.
-window_get_workspace="0 .. (desktops_num-1)"
+rule_met_workspace="0 .. (desktops_num-1)"
 # Is the window focussed?
-window_get_is_focussed=
+rule_met_is_focussed=
 # Is the window maximized?
-window_get_is_maximized=
+rule_met_is_maximized=
 # Is the window fullscreen?
-window_get_is_fullscreen=
+rule_met_is_fullscreen=
+# Check size for current desktop
+rule_met_desktop_size="1920x1080"
+# Check workarea for current desktop
+rule_met_desktop_workarea="1920x1080"
+
 ## Get the position of the mouse pointer.
 #get_pointer=
 ## Depth ##
+
 # Make the window appear in the foreground and give focus.
-window_set_active="y|yes|enable|true|1"
+rule_set_active="y|yes|enable|true|1"
 # Make the window "always on top" when value is "y".
 # Remove the "always on top" flag when value is "n".
-window_set_above="y|yes|enable|true|1  n|no|disable|false|0"
+rule_set_above="y|yes|enable|true|1  n|no|disable|false|0"
 # Make the window "always below" when value is "y".
 # Remove the "always below" flag when value is "n".
-window_set_bottom=
+rule_set_bottom=
 ## Max/Min ##
 # Maximize the window.
-window_set_maximized="y|yes|enable|true|1  n|no|disable|false|0"
+rule_set_maximized="y|yes|enable|true|1  n|no|disable|false|0"
 # Maximize horizontally.
-window_set_maximized_horizontally="y|yes|enable|true|1  n|no|disable|false|0"
+rule_set_maximized_horizontally="y|yes|enable|true|1  n|no|disable|false|0"
 # Maximize vertically.
-window_set_maximized_vertically="y|yes|enable|true|1  n|no|disable|false|0"
+rule_set_maximized_vertically="y|yes|enable|true|1  n|no|disable|false|0"
 # Make the window "fullscreen".
-window_set_fullscreen="y|yes|enable|true|1  n|no|disable|false|0"
+rule_set_fullscreen="y|yes|enable|true|1  n|no|disable|false|0"
 # Focus the window and change to the desktop that contains this window.
-window_set_focus="y|yes|enable|true|1"
+rule_set_focus="y|yes|enable|true|1"
 # Minimize the window.
-window_set_minimized="y|yes|enable|true|1"
+rule_set_minimized="y|yes|enable|true|1"
 ## Workspace ##
 # Pin on all workspaces when value is "y".
 # Don't pin on all workspaces when value is "n".
-window_set_pin="y|yes|enable|true|1  n|no|disable|false|0"
+rule_set_pin="y|yes|enable|true|1  n|no|disable|false|0"
 ## Movement ##
 # Set the X/Y coordinates of a window.
-window_set_position="400|20%|x,200|10%|y"
+rule_set_position="400|20%|x,200|10%|y"
 # Set the width/height of a window.
-window_set_size="400|20%|x,200|10%|y"
+rule_set_size="400|20%|x,200|10%|y"
 ## Workspaces ##
 # Change to the given workspace/virtual-desktop.
-window_set_active_desktop="0 .. (desktops_num-1)"
+rule_set_active_desktop="0 .. (desktops_num-1)"
 # Set the workspace the window is active on.
-window_set_desktop="0 .. (desktops_num-1)"
+rule_set_desktop="0 .. (desktops_num-1)"
 ## Misc ##
 # Set/Unset the decorations for the window.
-window_set_decoration="y|yes|enable|true|1  n|no|disable|false|0"
+rule_set_decoration="y|yes|enable|true|1  n|no|disable|false|0"
 # Close the window, forcibly.
-window_set_killed="y|yes|enable|true|1"
+rule_set_killed="y|yes|enable|true|1"
 # Set the position of the mouse pointer.
-window_set_pointer="400|20%|x,200|10%|y"
-AddWindow
+rule_set_pointer="400|20%|x,200|10%|y"
+# add this rule to the list of rules
+AddRule

@@ -1,6 +1,15 @@
+setnewwinprops (0.2) unstable; urgency=low
+
+  * Define objects:
+    Rules and Windows
+  * Rename variables and functions according to the name of the related objects.
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Fri, 16 Sep 2022 10:37:40 +0200
+
 setnewwinprops (0.1) unstable; urgency=low
 
-  * Change window properties for selected opening windows
+  * Change window properties for opening windows
+    according to a set of configurable rules.
   * Initial Release.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 30 Aug 2022 10:37:40 +0200

@@ -3,9 +3,10 @@
 #************************************************************************
 #  SetNewWinProps
 #
-#  Change window properties for selected opening windows
+#  Change window properties for opening windows
+#  according to a set of configurable rules.
 #
-#  $Revision: 0.1 $
+#  $Revision: 0.2 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -38,9 +39,9 @@ _exit() {
 	wait || :
 }
 
-WindowSet() {
-	local id="${1}" \
-		window="${2}" \
+WindowSetup() {
+	local windowId="${1}" \
+		rule="${2}" \
 		delay="${3:-}" \
 		desktopCurrent desktops x y \
 		desktopWidth desktopHeight \
@@ -52,196 +53,219 @@ WindowSet() {
 		wait ${!} || :
 	fi
 
-	DesktopStatus
+	GetDesktopStatus
 
 	#$ xprop -id 0x1e00009 | grep  _NET_WM_ALLOWED_ACTIONS
 	# _NET_WM_ALLOWED_ACTIONS(ATOM) = _NET_WM_ACTION_CLOSE, _NET_WM_ACTION_ABOVE, 
 	# _NET_WM_ACTION_BELOW, _NET_WM_ACTION_MINIMIZE, _NET_WM_ACTION_CHANGE_DESKTOP, 
 	# _NET_WM_ACTION_STICK
 	#
-	# wmctrl -i -r "${id}" -b [add/remove],fullscreen,above,...
+	# wmctrl -i -r "${windowId}" -b [add/remove],fullscreen,above,...
 	# modal, sticky, maximized_vert, maximized_horz, shaded, skip_taskbar,
 	# skip_pager, hidden, fullscreen, above and below
 
 	while IFS="=" read -r prop val; do
 		val="$(_unquote "${val}")"
 		case "${prop}" in
-			window${window}_set_position)
-				xdotool windowmove --sync "${id}" ${val}
+			rule${rule}_set_position)
+				xdotool windowmove --sync "${windowId}" ${val}
 			;;
-			window${window}_set_size)
-				xdotool windowsize --sync "${id}" ${val}
+			rule${rule}_set_size)
+				xdotool windowsize --sync "${windowId}" ${val}
 			;;
-			window${window}_set_minimized)
-				xdotool windowminimize --sync "${id}"
-			;;
-			window${window}_set_maximized)
+			rule${rule}_set_minimized)
 				case "${val}" in
 				y*|true|on|1|enable*)
-					wmctrl -i -r "${id}" -b add,maximized_horz,maximized_vert
+					xdotool windowminimize --sync "${windowId}"
 				;;
 				*)
-					wmctrl -i -r "${id}" -b remove,maximized_horz,maximized_vert
-				;;
-				esac
-				#xdotool windowmove --sync "${id}" 0 0
-				#xdotool windowsize --sync "${id}" "99%" "97%"
-			;;
-			window${window}_set_maximized_horizontally)
-				case "${val}" in
-				y*|true|on|1|enable*)
-					wmctrl -i -r "${id}" -b add,maximized_horz
-				;;
-				*)
-					wmctrl -i -r "${id}" -b remove,maximized_horz
-				;;
-				esac
-				#xdotool windowmove --sync "${id}" 0 "y"
-				#xdotool windowsize --sync "${id}" "99%" "y"
-			;;
-			window${window}_set_maximized_vertically)
-				case "${val}" in
-				y*|true|on|1|enable*)
-					wmctrl -i -r "${id}" -b add,maximized_vert
-				;;
-				*)
-					wmctrl -i -r "${id}" -b remove,maximized_vert
-				;;
-				esac
-				#xdotool windowmove --sync "${id}" "x" 0
-				#xdotool windowsize --sync "${id}" "x" "97%"
-			;;
-			window${window}_set_fullscreen)
-				case "${val}" in
-				y*|true|on|1|enable*)
-					wmctrl -i -r "${id}" -b add,fullscreen
-				;;
-				*)
-					wmctrl -i -r "${id}" -b remove,fullscreen
+					wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert
+					sleep 0.1
+					wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert
 				;;
 				esac
 			;;
-			window${window}_set_above)
+			rule${rule}_set_maximized)
 				case "${val}" in
 				y*|true|on|1|enable*)
-					wmctrl -i -r "${id}" -b remove,below
-					wmctrl -i -r "${id}" -b add,above
+					wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert
 				;;
 				*)
-					wmctrl -i -r "${id}" -b remove,above
-					wmctrl -i -r "${id}" -b add,below
+					wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert
 				;;
 				esac
-				#xdotool windowraise "${id}"
+				#xdotool windowmove --sync "${windowId}" 0 0
+				#xdotool windowsize --sync "${windowId}" "99%" "97%"
 			;;
-			window${window}_set_focus)
-				xdotool windowactivate --sync "${id}"
+			rule${rule}_set_maximized_horizontally)
+				case "${val}" in
+				y*|true|on|1|enable*)
+					wmctrl -i -r "${windowId}" -b add,maximized_horz
 				;;
-			window${window}_set_desktop)
-				WindowStatus
+				*)
+					wmctrl -i -r "${windowId}" -b remove,maximized_horz
+				;;
+				esac
+				#xdotool windowmove --sync "${windowId}" 0 "y"
+				#xdotool windowsize --sync "${windowId}" "99%" "y"
+			;;
+			rule${rule}_set_maximized_vertically)
+				case "${val}" in
+				y*|true|on|1|enable*)
+					wmctrl -i -r "${windowId}" -b add,maximized_vert
+				;;
+				*)
+					wmctrl -i -r "${windowId}" -b remove,maximized_vert
+				;;
+				esac
+				#xdotool windowmove --sync "${windowId}" "x" 0
+				#xdotool windowsize --sync "${windowId}" "x" "97%"
+			;;
+			rule${rule}_set_fullscreen)
+				case "${val}" in
+				y*|true|on|1|enable*)
+					wmctrl -i -r "${windowId}" -b add,fullscreen
+				;;
+				*)
+					wmctrl -i -r "${windowId}" -b remove,fullscreen
+				;;
+				esac
+			;;
+			rule${rule}_set_above)
+				case "${val}" in
+				y*|true|on|1|enable*)
+					wmctrl -i -r "${windowId}" -b remove,below
+					wmctrl -i -r "${windowId}" -b add,above
+				;;
+				*)
+					wmctrl -i -r "${windowId}" -b remove,above
+					wmctrl -i -r "${windowId}" -b add,below
+				;;
+				esac
+				#xdotool windowraise "${windowId}"
+			;;
+			rule${rule}_set_focus)
+				xdotool windowactivate --sync "${windowId}"
+				;;
+			rule${rule}_set_desktop)
+				GetWindowGeometry
 				if [ ${val} -lt ${desktops} -a \
 				${val} -ne ${windowDesktop} ]; then
-					xdotool set_desktop_for_window "${id}" ${val}
+					xdotool set_desktop_for_window "${windowId}" ${val}
 				fi
 			;;
-			window${window}_set_active_desktop)
+			rule${rule}_set_active_desktop)
 				if [ ${val} -lt ${desktops} -a \
 				{val} -ne ${desktopCurrent} ]; then
 					xdotool set_desktop ${val}
 				fi
 			;;
-			window${window}_set_killed)
-				xdotool windowclose "${id}"
+			rule${rule}_set_killed)
+				xdotool windowclose "${windowId}"
 			;;
 		esac
-	done < <(set | grep -se "^window${window}_set_" | sort)
+	done < <(set | grep -se "^rule${rule}_set_" | sort)
 	return ${OK}
 }
 
 WindowNew() {
-	local id="${1}" \
-		window_get_title \
-		window_get_type \
-		window_get_application \
-		window_get_class \
-		window_get_role \
-		window delay=""
-		#window_get_is_maximized \
-		#window_get_is_maximized_horz \
-		#window_get_is_maximized_vert \
-		#window_get_desktop
+	local windowId="${1}" \
+		rule_met_title \
+		rule_met_type \
+		rule_met_application \
+		rule_met_class \
+		rule_met_role \
+		rule_met_desktop_size \
+		rule_met_desktop_workarea \
+		rule delay=""
+		#rule_met_is_maximized \
+		#rule_met_is_maximized_horz \
+		#rule_met_is_maximized_vert \
+		#rule_met_desktop
 
-	window_get_title="$(GetTitle "${id}")" || \
+	rule_met_title="$(GetWindowTitle "${windowId}")" || \
 		return ${OK}
-	window_get_type="$(GetType "${id}")" || \
+	rule_met_type="$(GetWindowType "${windowId}")" || \
 		return ${OK}
-	window_get_application="$(GetApplication "${id}")" || \
+	rule_met_application="$(GetWindowApplication "${windowId}")" || \
 		return ${OK}
-	window_get_class="$(GetClass "${id}")" || \
+	rule_met_class="$(GetWindowClass "${windowId}")" || \
 		return ${OK}
-	window_get_role="$(GetRole "${id}")" || \
+	rule_met_role="$(GetWindowRole "${windowId}")" || \
 		return ${OK}
-	#window_get_is_maximized="$(GetIsMaximized "${id}")" || \
+	rule_met_desktop_size="$(GetDesktopSize)" || \
+		return ${OK}
+	rule_met_desktop_workarea="$(GetDesktopWorkarea)" || \
+		return ${OK}
+	#rule_met_is_maximized="$(GetWindowIsMaximized "${windowId}")" || \
 	#	return ${OK}
-	#window_get_is_maximized_horz="$(GetIsMaximizedHorz "${id}")" || \
+	#rule_met_is_maximized_horz="$(GetWindowIsMaximizedHorz "${windowId}")" || \
 	#	return ${OK}
-	#window_get_is_maximized_vert="$(GetIsMaximizedVert "${id}")" || \
+	#rule_met_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
 	#	return ${OK}
-	#window_get_desktop="$(GetDesktop "${id}")" || \
+	#rule_met_desktop="$(GetWindowDesktop "${windowId}")" || \
 	#	return ${OK}
 
-	# We'll set only the first window matching
-	window=${NONE}
-	while [ $((window++)) -lt ${Windows} ]; do
+	# We'll set up only the first rule that match this window
+	rule=${NONE}
+	while [ $((rule++)) -lt ${Rules} ]; do
 		local rc="y" prop val
 		while [ -n "${rc}" ] && \
 		IFS="=" read -r prop val; do
 			val="$(_unquote "${val}")"
 			case "${prop}" in
-				window${window}_get_title)
-					[ "${val}" = "${window_get_title}" ] || \
+				rule${rule}_met_title)
+					[ "${val}" = "${rule_met_title}" ] || \
 						rc=""
 				;;
-				window${window}_get_type)
-					grep -qs -iF "${window_get_type}" <<< "${val}" || \
+				rule${rule}_met_type)
+					grep -qs -iF "${rule_met_type}" <<< "${val}" || \
 						rc=""
 				;;
-				window${window}_get_application)
-					[ "${val}" = "${window_get_application}" ] || \
+				rule${rule}_met_application)
+					[ "${val}" = "${rule_met_application}" ] || \
 						rc=""
 				;;
-				window${window}_get_class)
-					grep -qs -iF "${window_get_class}" <<< "${val}" || \
+				rule${rule}_met_class)
+					grep -qs -iF "${rule_met_class}" <<< "${val}" || \
 						rc=""
 				;;
-				window${window}_get_role)
-					grep -qs -iF "${window_get_role}" <<< "${val}" || \
+				rule${rule}_met_role)
+					grep -qs -iF "${rule_met_role}" <<< "${val}" || \
 						rc=""
 				;;
-				window${window}_get_delay)
+				rule${rule}_met_desktop_size)
+					[ "${val}" = "${rule_met_desktop_size}" ] || \
+						rc=""
+				;;
+				rule${rule}_met_desktop_workarea)
+					[ "${val}" = "${rule_met_desktop_workarea}" ] || \
+						rc=""
+				;;
+				rule${rule}_met_delay)
 					delay="${val}"
 				;;
 				*)
 					rc=""
 				;;
 			esac
-		done < <(set | grep -se "^window${window}_get_" | sort)
+		done < <(set | grep -se "^rule${rule}_met_" | sort)
 		if [ -n "${rc}" ]; then
-			((WindowSet "${id}" "${window}" ${delay})& )
+			((WindowSetup "${windowId}" "${rule}" ${delay})& )
 			return ${OK}
 		fi
 	done
-	# get out when not any window matches
+	# get out when not any rule matches
 	return ${OK}
 }
 
 WindowsUpdate() {
-	local id
-	for id in $(grep -svwF "$(printf '%s\n' ${Ids})" \
+	local windowId
+	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
 	< <(printf '%s\n' "${@}")); do
-		WindowNew "${id}" || :
+		WindowNew "${windowId}" || :
 	done
-	Ids="${@}"
+	WindowIds="${@}"
 	return ${OK}
 }
 
@@ -255,8 +279,8 @@ Main() {
 		PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid"
 		PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe"
 	# internal variables, daemon scope
-	local Windows Debug LogPrio txt \
-		Ids pidsChildren pid \
+	local Rules Debug LogPrio txt \
+		WindowIds pidsChildren pid \
 		LogOutput="/dev/null"
 
 	trap '_exit' EXIT
@@ -274,8 +298,8 @@ Main() {
 	exec > "${LOGFILE}" 2>&1
 
 	_log "Start"
-	# initialize Ids of current sticky windows
-	Ids="$(awk '$2 == -1 {printf $1 " "}' < <(wmctrl -l))"
+	# initialize WindowIds with ids of current sticky windows
+	WindowIds="$(awk '$2 == -1 {printf $1 " "}' < <(wmctrl -l))"
 	LoadConfig "${@}"
 
 	((exec xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}")& )
@@ -291,7 +315,7 @@ Main() {
 				;;
 			esac
 		else
-			xprop -root "_NET_CLIENT_LIST" > /dev/null 2>&1 || \
+			xprop -root "_NET_SUPPORTING_WM_CHECK" || \
 				exit ${OK}
 		fi
 	done
@@ -299,7 +323,7 @@ Main() {
 
 set -o errexit -o nounset -o pipefail +o noglob +o noclobber
 NAME="$(basename "${0}")"
-APPNAME="SetNewWinProps"
+APPNAME="setnewwinprops"
 case "${1:-}" in
 start)
 	shift
