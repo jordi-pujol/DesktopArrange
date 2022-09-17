@@ -101,6 +101,38 @@ _check_natural() {
 	return ${OK}
 }
 
+_check_yn() {
+	local var="${1}" \
+		val="${2}"
+	if [[ "${val,,}" =~ ${PATTERN_YES} ]]; then
+		eval ${var}=\'y\'
+	elif [[ "${val,,}" =~ ${PATTERN_NO} ]]; then
+		eval ${var}=\'n\'
+	else
+		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\""
+	fi
+}
+
+_check_y() {
+	local var="${1}" \
+		val="${2}"
+	if [[ "${val,,}" =~ ${PATTERN_YES} ]]; then
+		eval ${var}=\'y\'
+	else
+		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\""
+	fi
+}
+
+_check_fixedsize() {
+	local var="${1}" \
+		val="${2}"
+	if [[ "${val,,}" =~ ${PATTERN_FIXEDSIZE} ]]; then
+		eval ${var}=\'${val,,}\'
+	else
+		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\""
+	fi
+}
+
 # priority: info notice warn err debug
 _log() {
 	local msg="${@}" \
@@ -208,31 +240,31 @@ RuleAppend() {
 		[ -n "${val}" ] || \
 			continue
 		case "${prop}" in
-		rule_met_title)
-			eval rule${Rules}_met_title=\'${val}\'
+		rule_check_title)
+			eval rule${Rules}_check_title=\'${val}\'
 		;;
-		rule_met_type)
-			eval rule${Rules}_met_type=\'${val}\'
+		rule_check_type)
+			eval rule${Rules}_check_type=\'${val}\'
 		;;
-		rule_met_application)
-			eval rule${Rules}_met_application=\'${val}\'
+		rule_check_application)
+			eval rule${Rules}_check_application=\'${val}\'
 		;;
-		rule_met_class)
-			eval rule${Rules}_met_class=\'${val}\'
+		rule_check_class)
+			eval rule${Rules}_check_class=\'${val}\'
 		;;
-		rule_met_role)
-			eval rule${Rules}_met_role=\'${val}\'
+		rule_check_role)
+			eval rule${Rules}_check_role=\'${val}\'
 		;;
-		rule_met_desktop_size)
-			eval rule${Rules}_met_desktop_size=\'${val,,}\'
+		rule_check_desktop_size)
+			_check_fixedsize "rule${Rules}_check_desktop_size" "${val}"
 		;;
-		rule_met_desktop_workarea)
-			eval rule${Rules}_met_desktop_workarea=\'${val,,}\'
+		rule_check_desktop_workarea)
+			_check_fixedsize "rule${Rules}_check_desktop_workarea" "${val}"
 		;;
-		rule_met_delay)
+		rule_check_delay)
 			_check_natural val 0
 			[ "${val}" -eq 0 ] || \
-				eval rule${Rules}_met_delay=\'${val}\'
+				eval rule${Rules}_check_delay=\'${val}\'
 		;;
 		rule_set_position)
 			val="$(tr -s ' ,' ' ' <<< "${val,,}")"
@@ -253,28 +285,34 @@ RuleAppend() {
 			fi
 		;;
 		rule_set_minimized)
-			eval rule${Rules}_set_minimized=\'${val,,}\'
+			_check_yn "rule${Rules}_set_minimized" "${val}"
 		;;
 		rule_set_maximized)
-			eval rule${Rules}_set_maximized=\'${val,,}\'
+			_check_yn "rule${Rules}_set_maximized" "${val}"
 		;;
 		rule_set_maximized_horizontally)
-			eval rule${Rules}_set_maximized_horizontally=\'${val,,}\'
+			_check_yn "rule${Rules}_set_maximized_horizontally" "${val}"
 		;;
 		rule_set_maximized_vertically)
-			eval rule${Rules}_set_maximized_vertically=\'${val,,}\'
+			_check_yn "rule${Rules}_set_maximized_vertically" "${val}"
 		;;
 		rule_set_fullscreen)
-			eval rule${Rules}_set_fullscreen=\'${val,,}\'
+			_check_yn "rule${Rules}_set_fullscreen" "${val}"
 		;;
 		rule_set_focus)
-			eval rule${Rules}_set_focus=\'${val,,}\'
+			_check_y "rule${Rules}_set_focus" "${val}"
 		;;
 		rule_set_above)
-			eval rule${Rules}_set_above=\'${val,,}\'
+			_check_yn "rule${Rules}_set_above" "${val}"
+		;;
+		rule_set_below)
+			_check_yn "rule${Rules}_set_below" "${val}"
+		;;
+		rule_set_closed)
+			_check_y "rule${Rules}_set_closed" "${val}"
 		;;
 		rule_set_killed)
-			eval rule${Rules}_set_killed=\'${val,,}\'
+			_check_y "rule${Rules}_set_killed" "${val}"
 		;;
 		rule_set_desktop)
 			_check_natural val 0
@@ -290,9 +328,9 @@ RuleAppend() {
 		# 	_check_yn_val "rule_set_bottom" ""
 		# 	_check_ind_val "rule_set_decoration" ""
 		# 	_check_int_pair_val "rule_set_pointer" ""
-				;;
+		;;
 		esac
-	done < <(set | grep -se "^rule_[ms]et_" | sort)
+	done < <(set | grep -sEe "^rule_(check|set)_" | sort)
 	# 
 	# 	if [ -n "${Debug}" ]; then
 	# 		local msg="Adding new rule $( \
@@ -310,16 +348,16 @@ AddRule() {
 		[ -n "${val}" ] || \
 			continue
 		case "${prop}" in
-			rule_met_title | \
-			rule_met_type | \
-			rule_met_application | \
-			rule_met_class | \
-			rule_met_role | \
-			rule_met_desktop_size | \
-			rule_met_desktop_workarea)
+			rule_check_title | \
+			rule_check_type | \
+			rule_check_application | \
+			rule_check_class | \
+			rule_check_role | \
+			rule_check_desktop_size | \
+			rule_check_desktop_workarea)
 				let rc++,1
 			;;
-			rule_met_delay)
+			rule_check_delay)
 				:
 			;;
 			*)
@@ -329,7 +367,7 @@ AddRule() {
 				break
 			;;
 		esac
-	done < <(set | grep -se "^rule_met_" | sort)
+	done < <(set | grep -se "^rule_check_" | sort)
 	if [ ${rc} -eq 0 ]; then
 		LogPrio="warn" _log "Error in config. Can't add a new rule"
 	else
@@ -341,15 +379,16 @@ AddRule() {
 }
 
 LoadConfig() {
-	local rule_met_title \
-		rule_met_type \
-		rule_met_application \
-		rule_met_class \
-		rule_met_role \
-		rule_met_desktop_size \
-		rule_met_desktop_workarea \
-		rule_met_delay \
+	local rule_check_title \
+		rule_check_type \
+		rule_check_application \
+		rule_check_class \
+		rule_check_role \
+		rule_check_desktop_size \
+		rule_check_desktop_workarea \
+		rule_check_delay \
 		rule_set_above \
+		rule_set_below \
 		rule_set_maximized \
 		rule_set_maximized_horizontally \
 		rule_set_maximized_vertically \
@@ -362,6 +401,7 @@ LoadConfig() {
 		rule_set_active_desktop \
 		rule_set_desktop \
 		rule_set_decoration \
+		rule_set_closed \
 		rule_set_killed \
 		rule_set_pointer \
 		bash_xtracefd \
@@ -389,7 +429,7 @@ LoadConfig() {
 		Debug="xtrace"
 	if [ "${Debug}" = "xtrace" ]; then
 		export PS4='+\t ${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
-		exec {bash_xtracefd}> "${LOGFILE}.xtrace"
+		exec {bash_xtracefd}>> "${LOGFILE}.xtrace"
 		BASH_XTRACEFD=${bash_xtracefd}
 		set -o xtrace
 	else
@@ -412,14 +452,21 @@ LoadConfig() {
 		rule=${NONE}
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
-			set | grep -se "^rule${rule}_.*=" | sort
+			set | grep -se "^rule${rule}_.*=" | sort || {
+				LogPrio="err" _log "can't find any condition for rule ${rule}" 
+				exit ${ERR}
+			}
 		done
 		echo
 	fi
 
-	msg="Configuration reloaded"
-	_log "${msg}"
+	_log "Configuration reloaded"
 	return ${OK}
 }
+
+readonly TAB=$'\t' OK=0 ERR=1 NONE=0 \
+	PATTERN_YES="^(y.*|true|on|1|enable.*)$" \
+	PATTERN_NO="^(n.*|false|off|0|disable.*)$" \
+	PATTERN_FIXEDSIZE="^[0-9]+x[0-9]+$"
 
 :

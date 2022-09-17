@@ -31,29 +31,29 @@ Debug=""
 # A window definition
 #
 # Title of the window.
-rule_met_title="title"
+rule_check_title="title"
 # Type of the window.
-rule_met_type="WINDOW_NORMAL", "WINDOW_TOOLBAR", etc.
+rule_check_type="WINDOW_NORMAL", "WINDOW_TOOLBAR", etc.
 # Application which created the window.
-rule_met_application="/usr/bin/qemu"
+rule_check_application="/usr/bin/qemu"
 # Class of the window.
-rule_met_class="QEMU"
+rule_check_class="QEMU"
 # Get the role of the new window, via WM_WINDOW_ROLE.
 # This may return an empty string.
-rule_met_role=""
+rule_check_role=""
 # Get the workspace the window is active on.
 # The return value may be -1 if the window is pinned, or invisible.
-rule_met_workspace="0 .. (desktops_num-1)"
+rule_check_workspace="0 .. (desktops_num-1)"
 # Is the window focussed?
-rule_met_is_focussed=
+rule_check_is_focussed=
 # Is the window maximized?
-rule_met_is_maximized=
+rule_check_is_maximized=
 # Is the window fullscreen?
-rule_met_is_fullscreen=
+rule_check_is_fullscreen=
 # Check size for current desktop
-rule_met_desktop_size="1920x1080"
+rule_check_desktop_size="1920x1080"
 # Check workarea for current desktop
-rule_met_desktop_workarea="1920x1080"
+rule_check_desktop_workarea="1920x1080"
 
 ## Get the position of the mouse pointer.
 #get_pointer=
