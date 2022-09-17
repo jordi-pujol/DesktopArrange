@@ -198,7 +198,7 @@ GetWindowIsMaximizedVert() {
 
 GetWindowDesktop() {
 	local windowId="${1}"
-	get_desktop_for_window "${windowId}"
+	xdotool get_desktop_for_window "${windowId}"
 }
 
 
@@ -211,10 +211,9 @@ GetDesktopWorkarea() {
 }
 
 GetDesktopStatus() {
-	local WIDTH HEIGHT
-	eval $(xdotool getdisplaygeometry --shell)
-	desktopWidth="${WIDTH}"
-	desktopHeight="${HEIGHT}"
+	eval $(xdotool getdisplaygeometry --shell | \
+		sed -e '/^WIDTH=/s//desktopWidth=/' \
+			-e '/^HEIGHT=/s//desktopHeight=/')
 	desktopCurrent="$(xdotool get_desktop)"
 	desktops="$(xdotool get_num_desktops)"
 	#$ $ xprop -root _NET_WORKAREA
@@ -224,13 +223,12 @@ GetDesktopStatus() {
 }
 
 GetWindowGeometry() {
-	local WIDTH HEIGHT X Y SCREEN
-	eval $(xdotool getwindowgeometry --shell "${windowId}")
-	windowWidth="${WIDTH}"
-	windowHeight="${HEIGHT}"
-	windowX="${X}"
-	windowY="${Y}"
-	windowDesktop="${SCREEN}"
+	eval $(xdotool getwindowgeometry --shell "${windowId}" | \
+		sed -e '/^WIDTH=/s//windowWidth=/' \
+			-e '/^HEIGHT=/s//windowHeight=/' \
+			-e '/^X=/s//windowX=/' \
+			-e '/^Y=/s//windowY=/' \
+			-e '/^SCREEN=/s//windowScreen=/')
 }
 
 RuleAppend() {
@@ -452,10 +450,15 @@ LoadConfig() {
 		rule=${NONE}
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
-			set | grep -se "^rule${rule}_.*=" | sort || {
-				LogPrio="err" _log "can't find any condition for rule ${rule}" 
-				exit ${ERR}
-			}
+			if set | grep -se "^rule${rule}_.*=" | sort; then
+				set | grep -se "^rule${rule}_check_.*=" | \
+				grep -qsve "^rule${rule}_check_delay=" || \
+					LogPrio="err" _log "hasn't defined any check property for rule ${rule}"
+				set | cat - | grep -qse "^rule${rule}_set_.*=" || \
+					LogPrio="err" _log "hasn't defined any set property for rule ${rule}"
+			else
+				LogPrio="err" _log "can't find any property for rule ${rule}"
+			fi
 		done
 		echo
 	fi

@@ -45,7 +45,7 @@ WindowSetup() {
 		delay="${3:-}" \
 		desktopCurrent desktops x y \
 		desktopWidth desktopHeight \
-		windowWidth windowHeight windowX windowY windowDesktop \
+		windowDesktop windowWidth windowHeight windowX windowY windowScreen \
 		prop val
 
 	if [ -n "${delay}" ]; then
@@ -137,23 +137,26 @@ WindowSetup() {
 				fi
 			;;
 			rule${rule}_set_desktop)
-				GetWindowGeometry
+				GetWindowDesktop
 				if [ ${val} -lt ${desktops} -a \
 				${val} -ne ${windowDesktop} ]; then
-					xdotool set_desktop_for_window "${windowId}" ${val}
+					xdotool set_desktop_for_window "${windowId}" ${val} || :
 				fi
 			;;
 			rule${rule}_set_active_desktop)
 				if [ ${val} -lt ${desktops} -a \
 				{val} -ne ${desktopCurrent} ]; then
-					xdotool set_desktop ${val}
+					xdotool set_desktop ${val} || :
 				fi
 			;;
 			rule${rule}_set_closed)
-				xdotool windowclose "${windowId}"
+				xdotool windowclose "${windowId}" || :
 			;;
 			rule${rule}_set_killed)
-				xdotool windowkill "${windowId}"
+				xdotool windowkill "${windowId}" || :
+			;;
+			*)
+				LogPrio="err" _log "WindowSetup: Invalid property ${prop}='${val}'"
 			;;
 		esac
 	done < <(set | grep -se "^rule${rule}_set_" | sort)
@@ -269,13 +272,13 @@ Main() {
 	END{exit rc+1}')" && \
 	[ $((t++)) -lt 5 ]; do
 		sleep 1
-	done
+	done 2> /dev/null
 	[ -n "${XROOT}" ] || \
 		exit ${ERR}
 	readonly NAME="$(basename "${0}")" \
 		APPNAME="setnewwinprops" \
-		XROOT \
-		LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
+		XROOT
+	readonly LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
 		PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid" \
 		PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe"
 	# internal variables, daemon scope
