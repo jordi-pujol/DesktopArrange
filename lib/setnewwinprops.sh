@@ -105,9 +105,9 @@ _check_yn() {
 	local var="${1}" \
 		val="${2}"
 	if [[ "${val,,}" =~ ${PATTERN_YES} ]]; then
-		eval ${var}=\'y\'
+		eval ${var}=\'${AFFIRMATIVE}\'
 	elif [[ "${val,,}" =~ ${PATTERN_NO} ]]; then
-		eval ${var}=\'n\'
+		eval ${var}=\'${NEGATIVE}\'
 	else
 		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\""
 	fi
@@ -117,7 +117,7 @@ _check_y() {
 	local var="${1}" \
 		val="${2}"
 	if [[ "${val,,}" =~ ${PATTERN_YES} ]]; then
-		eval ${var}=\'y\'
+		eval ${var}=\'${AFFIRMATIVE}\'
 	else
 		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\""
 	fi
@@ -142,6 +142,30 @@ _log() {
 	return ${OK}
 }
 
+GetWindowState() {
+	local windowId="${1}"
+	awk '$0 ~ "window state:" {print $NF}' \
+		< <(xprop -id "${windowId}"-len 256 "WM_STATE")
+}
+
+GetWindowWMState() {
+	local windowId="${1}"
+	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
+		< <(xprop -id "${windowId}" -len 256 "_NET_WM_STATE")
+}
+
+IsWindowWMStateActive() {
+	local windowId="${1}" wmstate
+	wmstate="$(GetWindowWMState "${windowId}")" || \
+		return ${ERR}
+	shift
+	while [ -n "${1:-}" ]; do
+		grep -qswF "${1}" <<< "${wmstate}" || \
+			return ${ERR}
+		shift
+	done
+}
+
 GetWindowTitle() {
 	local windowId="${1}" name
 	name="$(xdotool getwindowname "${windowId}")"
@@ -152,8 +176,8 @@ GetWindowTitle() {
 
 GetWindowType() {
 	local windowId="${1}"
-	xprop -id "${windowId}" _NET_WM_WINDOW_TYPE | \
-		sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p'
+	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
+		< <(xprop -id "${windowId}" -len 256 "_NET_WM_WINDOW_TYPE")
 }
 
 GetWindowApplication() {
@@ -164,36 +188,39 @@ GetWindowApplication() {
 
 GetWindowClass() {
 	local windowId="${1}"
-	xprop -id "${windowId}" WM_CLASS | \
-		sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p'
+	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
+		< <(xprop -id "${windowId}" -len 256 "WM_CLASS")
 }
 
 GetWindowRole() {
 	local windowId="${1}"
-	xprop -id "${windowId}" WM_WINDOW_ROLE | \
-		sed -nre '\|.*[=] "(.*)"$| s//\1/p'
+	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
+		< <(xprop -id "${windowId}" -len 256 "WM_WINDOW_ROLE") || :
 }
 
 GetWindowIsMaximized() {
 	local windowId="${1}"
-	xprop -id "${windowId}" _NET_WM_STATE | \
-		sed -nre '\|.*[=] "(.*)"$| s//\1/p' | \
-		grep -swF '_NET_WM_STATE_MAXIMIZED_HORZ' | \
-		grep -swF '_NET_WM_STATE_MAXIMIZED_VERT' || :
+	IsWindowWMStateActive "${windowId}" \
+	'_NET_WM_STATE_MAXIMIZED_HORZ' \
+	'_NET_WM_STATE_MAXIMIZED_VERT' && \
+		echo "${AFFIRMATIVE}" || \
+		echo "${NEGATIVE}"
 }
 
 GetWindowIsMaximizedHorz() {
 	local windowId="${1}"
-	xprop -id "${windowId}" _NET_WM_STATE | \
-		sed -nre '\|.*[=] "(.*)"$| s//\1/p' | \
-		grep -swF '_NET_WM_STATE_MAXIMIZED_HORZ' || :
+	IsWindowWMStateActive "${windowId}" \
+	'_NET_WM_STATE_MAXIMIZED_HORZ' && \
+		echo "${AFFIRMATIVE}" || \
+		echo "${NEGATIVE}"
 }
 
 GetWindowIsMaximizedVert() {
 	local windowId="${1}"
-	xprop -id "${windowId}" _NET_WM_STATE | \
-		sed -nre '\|.*[=] "(.*)"$| s//\1/p' | \
-		grep -swF '_NET_WM_STATE_MAXIMIZED_VERT' || :
+	IsWindowWMStateActive "${windowId}" \
+	'_NET_WM_STATE_MAXIMIZED_VERT' && \
+		echo "${AFFIRMATIVE}" || \
+		echo "${NEGATIVE}"
 }
 
 GetWindowDesktop() {
@@ -211,9 +238,9 @@ GetDesktopWorkarea() {
 }
 
 GetDesktopStatus() {
-	eval $(xdotool getdisplaygeometry --shell | \
-		sed -e '/^WIDTH=/s//desktopWidth=/' \
-			-e '/^HEIGHT=/s//desktopHeight=/')
+	eval $(sed -e '/^WIDTH=/s//desktopWidth=/' \
+			-e '/^HEIGHT=/s//desktopHeight=/' \
+			< <(xdotool getdisplaygeometry --shell))
 	desktopCurrent="$(xdotool get_desktop)"
 	desktops="$(xdotool get_num_desktops)"
 	#$ $ xprop -root _NET_WORKAREA
@@ -223,12 +250,12 @@ GetDesktopStatus() {
 }
 
 GetWindowGeometry() {
-	eval $(xdotool getwindowgeometry --shell "${windowId}" | \
-		sed -e '/^WIDTH=/s//windowWidth=/' \
+	eval $(sed -e '/^WIDTH=/s//windowWidth=/' \
 			-e '/^HEIGHT=/s//windowHeight=/' \
 			-e '/^X=/s//windowX=/' \
 			-e '/^Y=/s//windowY=/' \
-			-e '/^SCREEN=/s//windowScreen=/')
+			-e '/^SCREEN=/s//windowScreen=/' \
+			< <(xdotool getwindowgeometry --shell "${windowId}"))
 }
 
 RuleAppend() {
@@ -257,6 +284,15 @@ RuleAppend() {
 			_check_natural val 0
 			eval rule${Rules}_check_desktop=\'${val}\'
 			;;
+		rule_check_is_maximized)
+			_check_yn "rule${Rules}_check_is_maximized" "${val}"
+			;;
+		rule_check_is_maximized_horz)
+			_check_yn "rule${Rules}_check_is_maximized_horz" "${val}"
+			;;
+		rule_check_is_maximized_vert)
+			_check_yn "rule${Rules}_check_is_maximized_vert" "${val}"
+			;;
 		rule_check_desktop_size)
 			_check_fixedsize "rule${Rules}_check_desktop_size" "${val}"
 			;;
@@ -273,7 +309,7 @@ RuleAppend() {
 			if [ "$(wc -w <<< "${val}")" != 2 ]; then
 				_log "Property \"${prop}\" invalid value \"${val}\""
 			else
-				_check_integer_pair val x y
+				_check_integer_pair val "x" "y"
 				eval rule${Rules}_set_position=\'${val}\'
 			fi
 			;;
@@ -282,7 +318,7 @@ RuleAppend() {
 			if [ "$(wc -w <<< "${val}")" != 2 ]; then
 				_log "Property \"${prop}\" invalid value \"${val}\""
 			else
-				_check_integer_pair val x y
+				_check_integer_pair val "x" "y"
 				eval rule${Rules}_set_size=\'${val}\'
 			fi
 			;;
@@ -327,7 +363,6 @@ RuleAppend() {
 		*)
 			_log "Property \"${prop}\" is not implemented yet"
 		# 	_check_yn_val "rule_set_pin" ""
-		# 	_check_yn_val "rule_set_bottom" ""
 		# 	_check_ind_val "rule_set_decoration" ""
 		# 	_check_int_pair_val "rule_set_pointer" ""
 			;;
@@ -359,7 +394,10 @@ AddRule() {
 			rule_check_role | \
 			rule_check_desktop | \
 			rule_check_desktop_size | \
-			rule_check_desktop_workarea)
+			rule_check_desktop_workarea | \
+			rule_check_is_maximized | \
+			rule_check_is_maximized_horz | \
+			rule_check_is_maximized_vert)
 				let rc++,1
 			;;
 			*)
@@ -390,6 +428,9 @@ LoadConfig() {
 		rule_check_class \
 		rule_check_role \
 		rule_check_desktop \
+		rule_check_is_maximized \
+		rule_check_is_maximized_horz \
+		rule_check_is_maximized_vert \
 		rule_check_desktop_size \
 		rule_check_desktop_workarea \
 		rule_set_delay \
@@ -431,7 +472,7 @@ LoadConfig() {
 
 	Debug="${Debug:-}"
 	! printf '%s\n' "${@}" | grep -qsxiF 'debug' || \
-		Debug="y"
+		Debug="${AFFIRMATIVE}"
 	! printf '%s\n' "${@}" | grep -qsxiF 'xtrace' || \
 		Debug="xtrace"
 	if [ "${Debug}" = "xtrace" ]; then
@@ -482,6 +523,8 @@ LoadConfig() {
 readonly TAB=$'\t' OK=0 ERR=1 NONE=0 \
 	PATTERN_YES="^(y.*|true|on|1|enable.*)$" \
 	PATTERN_NO="^(n.*|false|off|0|disable.*)$" \
-	PATTERN_FIXEDSIZE="^[0-9]+x[0-9]+$"
+	PATTERN_FIXEDSIZE="^[0-9]+x[0-9]+$" \
+	AFFIRMATIVE="y" \
+	NEGATIVE="n"
 
 :

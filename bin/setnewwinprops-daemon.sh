@@ -42,7 +42,7 @@ _exit() {
 WindowSetup() {
 	local windowId="${1}" \
 		rule="${2}" \
-		desktopCurrent desktops x y \
+		desktopCurrent desktops \
 		desktopWidth desktopHeight \
 		windowDesktop windowWidth windowHeight windowX windowY windowScreen \
 		prop val
@@ -69,7 +69,7 @@ WindowSetup() {
 			xdotool windowsize --sync "${windowId}" ${val} || :
 			;;
 		rule${rule}_set_minimized)
-			if [ "${val}" = "y" ]; then
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				xdotool windowminimize --sync "${windowId}" || :
 			else
 				wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || :
@@ -78,55 +78,80 @@ WindowSetup() {
 			fi
 			;;
 		rule${rule}_set_maximized)
-			if [ "${val}" = "y" ]; then
-				wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || :
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_MAXIMIZED_HORZ' \
+				'_NET_WM_STATE_MAXIMIZED_VERT' || \
+					wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || :
 			else
-				wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || :
+				! IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_MAXIMIZED_HORZ' \
+				'_NET_WM_STATE_MAXIMIZED_VERT' || \
+					wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || :
 			fi
 			;;
 		rule${rule}_set_maximized_horizontally)
-			if [ "${val}" = "y" ]; then
-				wmctrl -i -r "${windowId}" -b add,maximized_horz || :
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_MAXIMIZED_HORZ' || \
+					wmctrl -i -r "${windowId}" -b add,maximized_horz || :
 			else
-				wmctrl -i -r "${windowId}" -b remove,maximized_horz || :
+				! IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_MAXIMIZED_HORZ' || \
+					wmctrl -i -r "${windowId}" -b remove,maximized_horz || :
 			fi
-			#xdotool windowmove --sync "${windowId}" 0 "y" || :
-			#xdotool windowsize --sync "${windowId}" "99%" "y" || :
 			;;
 		rule${rule}_set_maximized_vertically)
-			if [ "${val}" = "y" ]; then
-				wmctrl -i -r "${windowId}" -b add,maximized_vert || :
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_MAXIMIZED_VERT' || \
+					wmctrl -i -r "${windowId}" -b add,maximized_vert || :
 			else
-				wmctrl -i -r "${windowId}" -b remove,maximized_vert || :
+				! IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_MAXIMIZED_VERT' || \
+					wmctrl -i -r "${windowId}" -b remove,maximized_vert || :
 			fi
-			#xdotool windowmove --sync "${windowId}" "x" 0 || :
-			#xdotool windowsize --sync "${windowId}" "x" "97%" || :
 			;;
 		rule${rule}_set_fullscreen)
-			if [ "${val}" = "y" ]; then
-				wmctrl -i -r "${windowId}" -b add,fullscreen || :
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_FULLSCREEN' || \
+					wmctrl -i -r "${windowId}" -b add,fullscreen || :
 			else
-				wmctrl -i -r "${windowId}" -b remove,fullscreen || :
+				! IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_FULLSCREEN' || \
+					wmctrl -i -r "${windowId}" -b remove,fullscreen || :
 			fi
 			;;
 		rule${rule}_set_focus)
 			xdotool windowactivate --sync "${windowId}" || :
 				;;
 		rule${rule}_set_above)
-			if [ "${val}" = "y" ]; then
-				wmctrl -i -r "${windowId}" -b remove,below || :
-				wmctrl -i -r "${windowId}" -b add,above || :
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				! IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_BELOW' || \
+					wmctrl -i -r "${windowId}" -b remove,below || :
+				IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_ABOVE' || \
+					wmctrl -i -r "${windowId}" -b add,above || :
 			else
-				wmctrl -i -r "${windowId}" -b remove,above || :
+				! IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_ABOVE' || \
+					wmctrl -i -r "${windowId}" -b remove,above || :
 			fi
-			#xdotool windowraise "${windowId}"
 			;;
 		rule${rule}_set_below)
-			if [ "${val}" = "y" ]; then
-				wmctrl -i -r "${windowId}" -b remove,above || :
-				wmctrl -i -r "${windowId}" -b add,below || :
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				! IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_ABOVE' || \
+					wmctrl -i -r "${windowId}" -b remove,above || :
+				IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_BELOW' || \
+					wmctrl -i -r "${windowId}" -b add,below || :
 			else
-				wmctrl -i -r "${windowId}" -b remove,below || :
+				! IsWindowWMStateActive "${windowId}" \
+				'_NET_WM_STATE_BELOW' || \
+					wmctrl -i -r "${windowId}" -b remove,below || :
 			fi
 			;;
 		rule${rule}_set_desktop)
@@ -168,13 +193,13 @@ WindowNew() {
 		window_application \
 		window_class \
 		window_role \
+		window_desktop \
 		window_desktop_size \
 		window_desktop_workarea \
+		window_is_maximized \
+		window_is_maximized_horz \
+		window_is_maximized_vert \
 		rule
-		#window_is_maximized \
-		#window_is_maximized_horz \
-		#window_is_maximized_vert \
-		#window_desktop
 
 	window_title="$(GetWindowTitle "${windowId}")" || \
 		return ${OK}
@@ -186,23 +211,23 @@ WindowNew() {
 		return ${OK}
 	window_role="$(GetWindowRole "${windowId}")" || \
 		return ${OK}
+	window_desktop="$(GetWindowDesktop "${windowId}")" || \
+		return ${OK}
 	window_desktop_size="$(GetDesktopSize)" || \
 		return ${OK}
 	window_desktop_workarea="$(GetDesktopWorkarea)" || \
 		return ${OK}
-	window_desktop="$(GetWindowDesktop "${windowId}")" || \
+	window_is_maximized="$(GetWindowIsMaximized "${windowId}")" || \
 		return ${OK}
-	#window_is_maximized="$(GetWindowIsMaximized "${windowId}")" || \
-	#	return ${OK}
-	#window_is_maximized_horz="$(GetWindowIsMaximizedHorz "${windowId}")" || \
-	#	return ${OK}
-	#window_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
-	#	return ${OK}
+	window_is_maximized_horz="$(GetWindowIsMaximizedHorz "${windowId}")" || \
+		return ${OK}
+	window_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
+		return ${OK}
 
-	# We'll set up only the first rule that match properties of this window
+	# We'll set up only the first rule that matches properties of this window
 	rule=${NONE}
 	while [ $((rule++)) -lt ${Rules} ]; do
-		local rc="y" prop val
+		local rc="${AFFIRMATIVE}" prop val
 		while [ -n "${rc}" ] && \
 		IFS="=" read -r prop val; do
 			val="$(_unquote "${val}")"
@@ -281,10 +306,11 @@ Main() {
 		XROOT
 	readonly LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
 		PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid" \
-		PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe"
+		PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe" \
+		PID="${$}"
 	# internal variables, daemon scope
 	local Rules Debug LogPrio txt \
-		WindowIds pidsChildren pid
+		WindowIds pidsChildren
 
 	trap '_exit' EXIT
 	trap 'exit' INT
@@ -294,7 +320,7 @@ Main() {
 	mkdir -p "/tmp/${APPNAME}/${USER}"
 	rm -f "${LOGFILE}"*
 
-	echo "${$}" > "${PIDFILE}"
+	echo "${PID}" > "${PIDFILE}"
 
 	[ -e "${PIPE}" ] || \
 		mkfifo "${PIPE}"
@@ -312,8 +338,10 @@ Main() {
 	WindowIds="$(awk '$2 == -1 {printf $1 " "}' < <(wmctrl -l))"
 	LoadConfig "${@}"
 
-	((xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}" || \
-	kill -INT ${$})& )
+	# this subprocess warns the main process when a window is added or removed
+	(xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}" || \
+	kill -INT ${PID})&
+
 	while :; do
 		if read -r txt < "${PIPE}"; then
 			case "${txt}" in
