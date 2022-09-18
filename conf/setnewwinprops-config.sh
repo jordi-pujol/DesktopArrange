@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.2 $
+#  $Revision: 0.3 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -43,7 +43,7 @@ rule_check_class="QEMU"
 rule_check_role=""
 # Get the workspace the window is active on.
 # The return value may be -1 if the window is pinned, or invisible.
-rule_check_workspace="0 .. (desktops_num-1)"
+rule_check_desktop="0..(n-1)"
 # Is the window focussed?
 rule_check_is_focussed=
 # Is the window maximized?
@@ -59,6 +59,8 @@ rule_check_desktop_workarea="1920x1080"
 #get_pointer=
 ## Depth ##
 
+# When the window is created wait 30 seconds to apply these properties
+rule_set_delay=30
 # Make the window appear in the foreground and give focus.
 rule_set_active="y|yes|enable|true|1"
 # Make the window "always on top" when value is "y".
@@ -91,9 +93,9 @@ rule_set_position="400|20%|x,200|10%|y"
 rule_set_size="400|20%|x,200|10%|y"
 ## Workspaces ##
 # Change to the given workspace/virtual-desktop.
-rule_set_active_desktop="0 .. (desktops_num-1)"
+rule_set_active_desktop="0..(n-1)"
 # Set the workspace the window is active on.
-rule_set_desktop="0 .. (desktops_num-1)"
+rule_set_desktop="0..(n-1)"
 ## Misc ##
 # Set/Unset the decorations for the window.
 rule_set_decoration="y|yes|enable|true|1  n|no|disable|false|0"

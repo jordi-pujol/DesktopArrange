@@ -1,3 +1,9 @@
+setnewwinprops (0.3) unstable; urgency=low
+
+  * .
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 17 Sep 2022 20:37:40 +0200
+
 setnewwinprops (0.2) unstable; urgency=low
 
   * Define objects:

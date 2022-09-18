@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.2 $
+#  $Revision: 0.3 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -198,7 +198,7 @@ GetWindowIsMaximizedVert() {
 
 GetWindowDesktop() {
 	local windowId="${1}"
-	xdotool get_desktop_for_window "${windowId}"
+	xdotool get_desktop_for_window "${windowId}" 2> /dev/null || :
 }
 
 
@@ -240,30 +240,34 @@ RuleAppend() {
 		case "${prop}" in
 		rule_check_title)
 			eval rule${Rules}_check_title=\'${val}\'
-		;;
+			;;
 		rule_check_type)
 			eval rule${Rules}_check_type=\'${val}\'
-		;;
+			;;
 		rule_check_application)
 			eval rule${Rules}_check_application=\'${val}\'
-		;;
+			;;
 		rule_check_class)
 			eval rule${Rules}_check_class=\'${val}\'
-		;;
+			;;
 		rule_check_role)
 			eval rule${Rules}_check_role=\'${val}\'
-		;;
+			;;
+		rule_check_desktop)
+			_check_natural val 0
+			eval rule${Rules}_check_desktop=\'${val}\'
+			;;
 		rule_check_desktop_size)
 			_check_fixedsize "rule${Rules}_check_desktop_size" "${val}"
-		;;
+			;;
 		rule_check_desktop_workarea)
 			_check_fixedsize "rule${Rules}_check_desktop_workarea" "${val}"
-		;;
-		rule_check_delay)
+			;;
+		rule_set_delay)
 			_check_natural val 0
 			[ "${val}" -eq 0 ] || \
-				eval rule${Rules}_check_delay=\'${val}\'
-		;;
+				eval rule${Rules}_set_delay=\'${val}\'
+			;;
 		rule_set_position)
 			val="$(tr -s ' ,' ' ' <<< "${val,,}")"
 			if [ "$(wc -w <<< "${val}")" != 2 ]; then
@@ -272,7 +276,7 @@ RuleAppend() {
 				_check_integer_pair val x y
 				eval rule${Rules}_set_position=\'${val}\'
 			fi
-		;;
+			;;
 		rule_set_size)
 			val="$(tr -s ' ,' ' ' <<< "${val,,}")"
 			if [ "$(wc -w <<< "${val}")" != 2 ]; then
@@ -281,54 +285,56 @@ RuleAppend() {
 				_check_integer_pair val x y
 				eval rule${Rules}_set_size=\'${val}\'
 			fi
-		;;
+			;;
 		rule_set_minimized)
 			_check_yn "rule${Rules}_set_minimized" "${val}"
-		;;
+			;;
 		rule_set_maximized)
 			_check_yn "rule${Rules}_set_maximized" "${val}"
-		;;
+			;;
 		rule_set_maximized_horizontally)
 			_check_yn "rule${Rules}_set_maximized_horizontally" "${val}"
-		;;
+			;;
 		rule_set_maximized_vertically)
 			_check_yn "rule${Rules}_set_maximized_vertically" "${val}"
-		;;
+			;;
 		rule_set_fullscreen)
 			_check_yn "rule${Rules}_set_fullscreen" "${val}"
-		;;
+			;;
 		rule_set_focus)
 			_check_y "rule${Rules}_set_focus" "${val}"
-		;;
+			;;
 		rule_set_above)
 			_check_yn "rule${Rules}_set_above" "${val}"
-		;;
+			;;
 		rule_set_below)
 			_check_yn "rule${Rules}_set_below" "${val}"
-		;;
+			;;
 		rule_set_closed)
 			_check_y "rule${Rules}_set_closed" "${val}"
-		;;
+			;;
 		rule_set_killed)
 			_check_y "rule${Rules}_set_killed" "${val}"
-		;;
+			;;
 		rule_set_desktop)
 			_check_natural val 0
 			eval rule${Rules}_set_desktop=\'${val}\'
-		;;
+			;;
 		rule_set_active_desktop)
 			_check_natural val 0
 			eval rule${Rules}_set_active_desktop=\'${val}\'
-		;;
+			;;
 		*)
 			_log "Property \"${prop}\" is not implemented yet"
 		# 	_check_yn_val "rule_set_pin" ""
 		# 	_check_yn_val "rule_set_bottom" ""
 		# 	_check_ind_val "rule_set_decoration" ""
 		# 	_check_int_pair_val "rule_set_pointer" ""
-		;;
+			;;
 		esac
-	done < <(set | grep -sEe "^rule_(check|set)_" | sort)
+	done < <(sort \
+	< <(grep -sEe "^rule_(check|set)_" \
+	< <(set)))
 	# 
 	# 	if [ -n "${Debug}" ]; then
 	# 		local msg="Adding new rule $( \
@@ -351,12 +357,10 @@ AddRule() {
 			rule_check_application | \
 			rule_check_class | \
 			rule_check_role | \
+			rule_check_desktop | \
 			rule_check_desktop_size | \
 			rule_check_desktop_workarea)
 				let rc++,1
-			;;
-			rule_check_delay)
-				:
 			;;
 			*)
 				LogPrio="warn" _log "Error in config: Property \"${prop}\"" \
@@ -365,14 +369,17 @@ AddRule() {
 				break
 			;;
 		esac
-	done < <(set | grep -se "^rule_check_" | sort)
+	done < <(sort \
+	< <(grep -se "^rule_check_" \
+	< <(set)))
 	if [ ${rc} -eq 0 ]; then
 		LogPrio="warn" _log "Error in config. Can't add a new rule"
 	else
 		RuleAppend
 	fi
-	unset $(set | awk -F '=' \
-		'$1 ~ "^rule_" {print $1}') 2> /dev/null || :
+	unset $(awk -F '=' \
+		'$1 ~ "^rule_" {print $1}' \
+		< <(set)) 2> /dev/null || :
 	return ${OK}
 }
 
@@ -382,9 +389,10 @@ LoadConfig() {
 		rule_check_application \
 		rule_check_class \
 		rule_check_role \
+		rule_check_desktop \
 		rule_check_desktop_size \
 		rule_check_desktop_workarea \
-		rule_check_delay \
+		rule_set_delay \
 		rule_set_above \
 		rule_set_below \
 		rule_set_maximized \
@@ -407,8 +415,9 @@ LoadConfig() {
 
 	# config variables, default values
 	Debug=""
-	unset $(set | awk -F '=' \
-		'$1 ~ "^rule[[:digit:]]*_" {print $1}') 2> /dev/null || :
+	unset $(awk -F '=' \
+		'$1 ~ "^rule[[:digit:]]*_" {print $1}' \
+		< <(set)) 2> /dev/null || :
 
 	_log "${msg}"
 
@@ -450,11 +459,14 @@ LoadConfig() {
 		rule=${NONE}
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
-			if set | grep -se "^rule${rule}_.*=" | sort; then
-				set | grep -se "^rule${rule}_check_.*=" | \
-				grep -qsve "^rule${rule}_check_delay=" || \
+			if sort < <(grep -se "^rule${rule}_.*=" \
+			< <(set)); then
+				grep -qse "^rule${rule}_check_.*=" \
+				< <(set) || \
 					LogPrio="err" _log "hasn't defined any check property for rule ${rule}"
-				set | cat - | grep -qse "^rule${rule}_set_.*=" || \
+				grep -qsve "^rule${rule}_set_delay=" \
+				< <(grep -se "^rule${rule}_set_.*=" \
+				< <(set)) || \
 					LogPrio="err" _log "hasn't defined any set property for rule ${rule}"
 			else
 				LogPrio="err" _log "can't find any property for rule ${rule}"
