@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.3 $
+#  $Revision: 0.4 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -47,9 +47,13 @@ WindowSetup() {
 		windowDesktop windowWidth windowHeight windowX windowY windowScreen \
 		prop val
 
+	[ -z "${Debug}" ] || \
+		_log "Setting up window ${windowId} using rule num. ${rule}"
 	while IFS="=" read -r prop val; do
 		_check_natural val 0
 		[ ${val} -le 0 ] || {
+			[ -z "${Debug}" ] || \
+				_log "Waiting ${val} seconds to set up window ${windowId}"
 			sleep ${val} &
 			wait ${!} || :
 		}
@@ -63,15 +67,23 @@ WindowSetup() {
 		val="$(_unquote "${val}")"
 		case "${prop}" in
 		rule${rule}_set_position)
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Moving to ${val}"
 			xdotool windowmove --sync "${windowId}" ${val} || :
 			;;
 		rule${rule}_set_size)
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Setting size to ${val}"
 			xdotool windowsize --sync "${windowId}" ${val} || :
 			;;
 		rule${rule}_set_minimized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Minimizing"
 				xdotool windowminimize --sync "${windowId}" || :
 			else
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Un-minimizing"
 				wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || :
 				sleep 0.1
 				wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || :
@@ -81,96 +93,148 @@ WindowSetup() {
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_MAXIMIZED_HORZ' \
-				'_NET_WM_STATE_MAXIMIZED_VERT' || \
+				'_NET_WM_STATE_MAXIMIZED_VERT' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Maximizing"
 					wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || :
+				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_MAXIMIZED_HORZ' \
-				'_NET_WM_STATE_MAXIMIZED_VERT' || \
+				'_NET_WM_STATE_MAXIMIZED_VERT' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Un-maximizing"
 					wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || :
+				}
 			fi
 			;;
 		rule${rule}_set_maximized_horizontally)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_MAXIMIZED_HORZ' || \
+				'_NET_WM_STATE_MAXIMIZED_HORZ' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Maximizing horizontally"
 					wmctrl -i -r "${windowId}" -b add,maximized_horz || :
+				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_MAXIMIZED_HORZ' || \
+				'_NET_WM_STATE_MAXIMIZED_HORZ' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Un-maximizing horizontally"
 					wmctrl -i -r "${windowId}" -b remove,maximized_horz || :
+				}
 			fi
 			;;
 		rule${rule}_set_maximized_vertically)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_MAXIMIZED_VERT' || \
+				'_NET_WM_STATE_MAXIMIZED_VERT' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Maximizing vertically"
 					wmctrl -i -r "${windowId}" -b add,maximized_vert || :
+				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_MAXIMIZED_VERT' || \
+				'_NET_WM_STATE_MAXIMIZED_VERT' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Un-maximizing vertically "
 					wmctrl -i -r "${windowId}" -b remove,maximized_vert || :
+				}
 			fi
 			;;
 		rule${rule}_set_fullscreen)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_FULLSCREEN' || \
+				'_NET_WM_STATE_FULLSCREEN' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Setting fullscreen"
 					wmctrl -i -r "${windowId}" -b add,fullscreen || :
+				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_FULLSCREEN' || \
+				'_NET_WM_STATE_FULLSCREEN' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Disabling fullscreen"
 					wmctrl -i -r "${windowId}" -b remove,fullscreen || :
+				}
 			fi
 			;;
 		rule${rule}_set_focus)
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Setting focus"
 			xdotool windowactivate --sync "${windowId}" || :
-				;;
+			;;
 		rule${rule}_set_above)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				! IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_BELOW' || \
+				'_NET_WM_STATE_BELOW' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Disabling below"
 					wmctrl -i -r "${windowId}" -b remove,below || :
+				}
 				IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_ABOVE' || \
+				'_NET_WM_STATE_ABOVE' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Setting above"
 					wmctrl -i -r "${windowId}" -b add,above || :
+				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_ABOVE' || \
+				'_NET_WM_STATE_ABOVE' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Disabling above"
 					wmctrl -i -r "${windowId}" -b remove,above || :
+				}
 			fi
 			;;
 		rule${rule}_set_below)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				! IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_ABOVE' || \
+				'_NET_WM_STATE_ABOVE' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Disabling above"
 					wmctrl -i -r "${windowId}" -b remove,above || :
+				}
 				IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_BELOW' || \
+				'_NET_WM_STATE_BELOW' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Setting below"
 					wmctrl -i -r "${windowId}" -b add,below || :
+				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
-				'_NET_WM_STATE_BELOW' || \
+				'_NET_WM_STATE_BELOW' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Disabling below"
 					wmctrl -i -r "${windowId}" -b remove,below || :
+				}
 			fi
 			;;
 		rule${rule}_set_desktop)
 			GetWindowDesktop
 			if [ ${val} -lt ${desktops} -a \
 			${val} -ne ${windowDesktop} ]; then
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Setting desktop to ${val}"
 				xdotool set_desktop_for_window "${windowId}" ${val} || :
 			fi
 			;;
 		rule${rule}_set_active_desktop)
 			if [ ${val} -lt ${desktops} -a \
 			{val} -ne ${desktopCurrent} ]; then
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Setting active desktop to ${val}"
 				xdotool set_desktop ${val} || :
 			fi
 			;;
 		rule${rule}_set_closed)
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Closing window"
 			xdotool windowclose "${windowId}" || :
 			;;
 		rule${rule}_set_killed)
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Killing window"
 			xdotool windowkill "${windowId}" || :
 			;;
 		rule${rule}_set_delay)
@@ -209,8 +273,7 @@ WindowNew() {
 		return ${OK}
 	window_class="$(GetWindowClass "${windowId}")" || \
 		return ${OK}
-	window_role="$(GetWindowRole "${windowId}")" || \
-		return ${OK}
+	window_role="$(GetWindowRole "${windowId}")" || :
 	window_desktop="$(GetWindowDesktop "${windowId}")" || \
 		return ${OK}
 	window_desktop_size="$(GetDesktopSize)" || \
@@ -224,45 +287,96 @@ WindowNew() {
 	window_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
 		return ${OK}
 
-	# We'll set up only the first rule that matches properties of this window
+	# checking properties of this window
+	# we'll set up only the first rule that matches
 	rule=${NONE}
 	while [ $((rule++)) -lt ${Rules} ]; do
 		local rc="${AFFIRMATIVE}" prop val
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}: checking rule num. ${rule}"
 		while [ -n "${rc}" ] && \
 		IFS="=" read -r prop val; do
 			val="$(_unquote "${val}")"
 			case "${prop}" in
 			rule${rule}_check_title)
-				[ "${val}" = "${window_title}" ] || \
+				if [ "${val}" = "${window_title}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_title \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_title \"${val}\""
 					rc=""
+				fi
 				;;
 			rule${rule}_check_type)
-				grep -qs -iwF "${window_type}" <<< "${val}" || \
+				if grep -qs -iwF "${window_type}" <<< "${val}" ; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_type \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_type \"${val}\""
 					rc=""
+				fi
 				;;
 			rule${rule}_check_application)
-				grep -qs -iF "${window_application}" <<< "${val}" || \
+				if grep -qs -iF "${window_application}" <<< "${val}" ; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_application \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_application \"${val}\""
 					rc=""
+				fi
 				;;
 			rule${rule}_check_class)
-				grep -qs -iwF "${window_class}" <<< "${val}" || \
+				if grep -qs -iwF "${window_class}" <<< "${val}" ; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_class \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_class \"${val}\""
 					rc=""
+				fi
 				;;
 			rule${rule}_check_role)
-				grep -qs -iwF "${window_role}" <<< "${val}" || \
+				if grep -qs -iwF "${window_role}" <<< "${val}"; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_role \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_role \"${val}\""
 					rc=""
+				fi
 				;;
 			rule${rule}_check_desktop)
-				[ "${val}" = "${window_desktop}" ] || \
+				if [ "${val}" = "${window_desktop}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_desktop \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_desktop \"${val}\""
 					rc=""
+				fi
 				;;
 			rule${rule}_check_desktop_size)
-				[ "${val}" = "${window_desktop_size}" ] || \
+				if [ "${val}" = "${window_desktop_size}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_desktop_size \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_desktop_size \"${val}\""
 					rc=""
+				fi
 				;;
 			rule${rule}_check_desktop_workarea)
-				[ "${val}" = "${window_desktop_workarea}" ] || \
+				if [ "${val}" = "${window_desktop_workarea}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_desktop_workarea \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_desktop_workarea \"${val}\""
 					rc=""
+				fi
 				;;
 			*)
 				rc=""
@@ -277,15 +391,34 @@ WindowNew() {
 			return ${OK}
 		fi
 	done
+	[ -z "${Debug}" ] || \
+		_log "window ${windowId}: doesn't match any rule"
 	return ${OK}
 }
 
 WindowsUpdate() {
 	local windowId
+	[ -z "${Debug}" ] || \
+		_log "current window count ${#}"
 	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
 	< <(printf '%s\n' "${@}")); do
+		! grep -qswEe "_NET_WM_WINDOW_TYPE_DESKTOP|_NET_WM_WINDOW_TYPE_DOCK" \
+		< <(GetWindowProp "${windowId}" "_NET_WM_WINDOW_TYPE") || \
+			continue
+		[ -z "${Debug}" ] || \
+			while read -r line; do
+				if [[ $(cut -f 1 -s -d ' ' <<< "${line}") -eq ${windowId} ]]; then
+					_log "new window ${windowId}: $(cut -f 2- -s -d ' ' <<< "${line}")"
+					break
+				fi
+			done < <(wmctrl -l -x)
 		WindowNew "${windowId}" || :
 	done
+	[ -z "${Debug}" ] || \
+		for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
+		< <(printf '%s\n' ${WindowIds})); do
+			_log "window ${windowId}: has been closed"
+		done
 	WindowIds="${@}"
 	return ${OK}
 }
@@ -310,7 +443,7 @@ Main() {
 		PID="${$}"
 	# internal variables, daemon scope
 	local Rules Debug LogPrio txt \
-		WindowIds pidsChildren
+		WindowIds="" pidsChildren
 
 	trap '_exit' EXIT
 	trap 'exit' INT
@@ -334,11 +467,8 @@ Main() {
 	exec > "${LOGFILE}" 2>&1
 
 	_log "Start"
-	# initialize WindowIds with ids of current sticky windows
-	WindowIds="$(awk '$2 == -1 {printf $1 " "}' < <(wmctrl -l))"
 	LoadConfig "${@}"
 
-	# this subprocess warns the main process when a window is added or removed
 	(xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}" || \
 	kill -INT ${PID})&
 
@@ -353,9 +483,8 @@ Main() {
 				LoadConfig "${@}"
 				;;
 			esac
-		else
-			xprop -root "_NET_SUPPORTING_WM_CHECK" || \
-				exit ${OK}
+		elif ! xprop -root "_NET_SUPPORTING_WM_CHECK"; then
+			exit ${OK}
 		fi
 	done
 }

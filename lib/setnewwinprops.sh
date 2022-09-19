@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.3 $
+#  $Revision: 0.4 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -43,6 +43,15 @@ _ps_children() {
 		_ps_children ${pid} "${excl}"
 		pidsChildren="${pidsChildren}${pid}${TAB}"
 	done
+}
+
+# priority: info notice warn err debug
+_log() {
+	local msg="${@}" \
+		p="daemon.${LogPrio:-"notice"}"
+	LogPrio=""
+	printf '%s\n' "$(_datetime) ${p}: ${@}" >> "${LOGFILE}"
+	return ${OK}
 }
 
 _check_integer() {
@@ -133,25 +142,20 @@ _check_fixedsize() {
 	fi
 }
 
-# priority: info notice warn err debug
-_log() {
-	local msg="${@}" \
-		p="daemon.${LogPrio:-"notice"}"
-	LogPrio=""
-	printf '%s\n' "$(_datetime) ${p}: ${@}" >> "${LOGFILE}"
-	return ${OK}
+GetWindowProp() {
+	xprop -len 256 -id "${@}"
 }
 
 GetWindowState() {
 	local windowId="${1}"
 	awk '$0 ~ "window state:" {print $NF}' \
-		< <(xprop -id "${windowId}"-len 256 "WM_STATE")
+		< <(GetWindowProp "${windowId}" "WM_STATE")
 }
 
 GetWindowWMState() {
 	local windowId="${1}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(xprop -id "${windowId}" -len 256 "_NET_WM_STATE")
+		< <(GetWindowProp "${windowId}" "_NET_WM_STATE")
 }
 
 IsWindowWMStateActive() {
@@ -159,11 +163,8 @@ IsWindowWMStateActive() {
 	wmstate="$(GetWindowWMState "${windowId}")" || \
 		return ${ERR}
 	shift
-	while [ -n "${1:-}" ]; do
-		grep -qswF "${1}" <<< "${wmstate}" || \
-			return ${ERR}
-		shift
-	done
+	[ $(grep -s --count -wF "$(printf '%s\n' "${@}")" \
+	< <(printf '%s\n' ${wmstate})) -eq ${#} ]
 }
 
 GetWindowTitle() {
@@ -177,7 +178,7 @@ GetWindowTitle() {
 GetWindowType() {
 	local windowId="${1}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(xprop -id "${windowId}" -len 256 "_NET_WM_WINDOW_TYPE")
+		< <(GetWindowProp "${windowId}" "_NET_WM_WINDOW_TYPE")
 }
 
 GetWindowApplication() {
@@ -189,13 +190,13 @@ GetWindowApplication() {
 GetWindowClass() {
 	local windowId="${1}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(xprop -id "${windowId}" -len 256 "WM_CLASS")
+		< <(GetWindowProp "${windowId}" "WM_CLASS")
 }
 
 GetWindowRole() {
 	local windowId="${1}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(xprop -id "${windowId}" -len 256 "WM_WINDOW_ROLE") || :
+		< <(GetWindowProp "${windowId}" "WM_WINDOW_ROLE")
 }
 
 GetWindowIsMaximized() {
@@ -243,10 +244,6 @@ GetDesktopStatus() {
 			< <(xdotool getdisplaygeometry --shell))
 	desktopCurrent="$(xdotool get_desktop)"
 	desktops="$(xdotool get_num_desktops)"
-	#$ $ xprop -root _NET_WORKAREA
-	#_NET_WORKAREA(CARDINAL) = 0, 0, 1920, 1080, 0, 0, 1920, 1080, 0, 0, 1920, 1080, 0, 0, 1920, 1080
-	#$ $ xprop -root _NET_WORKAREA
-	#_NET_WORKAREA(CARDINAL) = 200, 0, 1720, 1080, 200, 0, 1720, 1080, 200, 0, 1720, 1080, 200, 0, 1720, 1080
 }
 
 GetWindowGeometry() {
@@ -483,8 +480,11 @@ LoadConfig() {
 	else
 		set +o xtrace
 	fi
-
-	LogPrio="info" _log "${msg}"
+	if [ "${Debug}" = "xtrace" ]; then
+		_log "debug level is xtrace"
+	elif [ -n "${Debug}" ]; then
+		_log "debug level is verbose"
+	fi
 
 	if [ -n "${Debug}" -o ${#} -gt ${NONE} ]; then
 		msg="daemon's command line"

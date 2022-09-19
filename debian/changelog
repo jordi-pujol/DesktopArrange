@@ -1,6 +1,13 @@
+setnewwinprops (0.4) unstable; urgency=low
+
+  * write debug messages in verbose level.
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sun, 18 Sep 2022 17:37:40 +0200
+
 setnewwinprops (0.3) unstable; urgency=low
 
-  * .
+  * implement more window properties.
+  * some code improvements.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 17 Sep 2022 20:37:40 +0200
 
