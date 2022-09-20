@@ -41,6 +41,14 @@ _exit() {
 	wait || :
 }
 
+CheckWindowExists() {
+	local windowId="${1}"
+	WindowExists "${windowId}" || {
+		_log "window ${windowId}: error setting up this window, has been closed"
+		return ${ERR}
+	}
+}
+
 WindowSetup() {
 	local windowId="${1}" \
 		rule="${2}" \
@@ -67,16 +75,15 @@ WindowSetup() {
 
 	while IFS="=" read -r prop val; do
 		val="$(_unquote "${val}")"
-		WindowExists "${windowId}" || {
-			_log "window ${windowId}: error setting up this window, has been closed"
+		CheckWindowExists "${windowId}" || \
 			return ${OK}
-		}
 		case "${prop}" in
 		rule${rule}_set_position)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Moving to ${val}"
 			xdotool windowmove --sync "${windowId}" ${val} || {
-				_log "window ${windowId}: error, may be this window has been closed ?"
+				! CheckWindowExists "${windowId}" || \
+					_log "window ${windowId}: setup error"
 				return ${OK}
 			}
 			;;
@@ -84,7 +91,8 @@ WindowSetup() {
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting size to ${val}"
 			xdotool windowsize --sync "${windowId}" ${val} || {
-				_log "window ${windowId}: error, may be this window has been closed ?"
+				! CheckWindowExists "${windowId}" || \
+					_log "window ${windowId}: setup error"
 				return ${OK}
 			}
 			;;
@@ -93,19 +101,22 @@ WindowSetup() {
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Minimizing"
 				xdotool windowminimize --sync "${windowId}" || {
-				_log "window ${windowId}: error, may be this window has been closed ?"
+				! CheckWindowExists "${windowId}" || \
+					_log "window ${windowId}: setup error"
 				return ${OK}
 			}
 			else
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Un-minimizing"
 				wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || {
-					_log "window ${windowId}: error, may be this window has been closed ?"
+					! CheckWindowExists "${windowId}" || \
+						_log "window ${windowId}: setup error"
 					return ${OK}
 				}
 				sleep 0.1
 				wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || {
-					_log "window ${windowId}: error, may be this window has been closed ?"
+					! CheckWindowExists "${windowId}" || \
+						_log "window ${windowId}: setup error"
 					return ${OK}
 				}
 			fi
@@ -118,7 +129,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing"
 					wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -129,7 +141,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing"
 					wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -142,7 +155,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing horizontally"
 					wmctrl -i -r "${windowId}" -b add,maximized_horz || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -152,7 +166,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing horizontally"
 					wmctrl -i -r "${windowId}" -b remove,maximized_horz || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -165,7 +180,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing vertically"
 					wmctrl -i -r "${windowId}" -b add,maximized_vert || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -175,7 +191,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing vertically "
 					wmctrl -i -r "${windowId}" -b remove,maximized_vert || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -188,7 +205,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Setting fullscreen"
 					wmctrl -i -r "${windowId}" -b add,fullscreen || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -198,7 +216,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling fullscreen"
 					wmctrl -i -r "${windowId}" -b remove,fullscreen || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -208,7 +227,8 @@ WindowSetup() {
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting focus"
 			xdotool windowactivate --sync "${windowId}" || {
-				_log "window ${windowId}: error, may be this window has been closed ?"
+				! CheckWindowExists "${windowId}" || \
+					_log "window ${windowId}: setup error"
 				return ${OK}
 			}
 			;;
@@ -219,7 +239,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling below"
 					wmctrl -i -r "${windowId}" -b remove,below || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -228,7 +249,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Setting above"
 					wmctrl -i -r "${windowId}" -b add,above || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -238,7 +260,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling above"
 					wmctrl -i -r "${windowId}" -b remove,above || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -251,7 +274,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling above"
 					wmctrl -i -r "${windowId}" -b remove,above || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -260,7 +284,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Setting below"
 					wmctrl -i -r "${windowId}" -b add,below || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -270,7 +295,8 @@ WindowSetup() {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling below"
 					wmctrl -i -r "${windowId}" -b remove,below || {
-						_log "window ${windowId}: error, may be this window has been closed ?"
+						! CheckWindowExists "${windowId}" || \
+							_log "window ${windowId}: setup error"
 						return ${OK}
 					}
 				}
@@ -283,7 +309,8 @@ WindowSetup() {
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Setting desktop to ${val}"
 				xdotool set_desktop_for_window "${windowId}" ${val} || {
-					_log "window ${windowId}: error, may be this window has been closed ?"
+					! CheckWindowExists "${windowId}" || \
+						_log "window ${windowId}: setup error"
 					return ${OK}
 				}
 			fi
@@ -294,7 +321,8 @@ WindowSetup() {
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Setting active desktop to ${val}"
 				xdotool set_desktop ${val} || {
-					_log "window ${windowId}: error setting active desktop"
+					! CheckWindowExists "${windowId}" || \
+						_log "window ${windowId}: setup error"
 					return ${OK}
 				}
 			fi
@@ -303,7 +331,8 @@ WindowSetup() {
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Closing window"
 			xdotool windowclose "${windowId}" || {
-				_log "window ${windowId}: error, may be this window has been already closed ?"
+				! CheckWindowExists "${windowId}" || \
+					_log "window ${windowId}: setup error"
 				return ${OK}
 			}
 			;;
@@ -311,7 +340,8 @@ WindowSetup() {
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Killing window"
 			xdotool windowkill "${windowId}" || {
-				_log "window ${windowId}: error, may be this window has been closed ?"
+				! CheckWindowExists "${windowId}" || \
+					_log "window ${windowId}: setup error"
 				return ${OK}
 			}
 			;;
@@ -569,9 +599,8 @@ Main() {
 		if read -r txt < "${PIPE}"; then
 			case "${txt}" in
 			_NET_CLIENT_LIST*)
-				WindowsUpdate $(printf '0x%x\n' \
-					$(tr -s ' ,' ' ' \
-					< <(cut -f 2- -s -d '#' <<< "${txt}")))
+				WindowsUpdate $(tr -s ' ,' ' ' \
+					< <(cut -f 2- -s -d '#' <<< "${txt}"))
 				;;
 			reload)
 				LoadConfig "${@}"
