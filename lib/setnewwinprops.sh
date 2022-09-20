@@ -25,6 +25,20 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
 
+_ppid() {
+	local pid="${1}"
+	awk '$1 == "PPid:" {ppid=$2; exit}
+		END{print ppid+0}' "/proc/${pid}/status" 2> /dev/null || \
+	echo $(ps -ho ppid "${pid}")
+}
+
+_my_pid() {
+	local pidw
+	sleep 5 &
+	pidw="${!}"; mypid=$(_ppid "${pidw}")
+	kill "${pidw}" && wait "${pidw}" || :
+}
+
 _unquote() {
 	printf '%s\n' "${@}" | \
 		sed -re "s/^([\"](.*)[\"]|['](.*)['])$/\2\3/"

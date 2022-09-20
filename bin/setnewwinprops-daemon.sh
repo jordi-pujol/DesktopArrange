@@ -49,13 +49,22 @@ CheckWindowExists() {
 	}
 }
 
+CleaningWindowSetup() {
+	local windowId="${1}"
+	sleep 1
+	pids="$(ps -u ${USER} -o pid= -o cmd= | \
+		awk '$0 ~ "[[:digit:]]+ xdotool behave ${windowId}" {print $1}')"
+	[ -z "${pids}" ] || \
+		kill ${pids} > /dev/null 2>&1
+}
+
 WindowSetup() {
 	local windowId="${1}" \
 		rule="${2}" \
 		desktopCurrent desktops \
 		desktopWidth desktopHeight \
 		windowDesktop windowWidth windowHeight windowX windowY windowScreen \
-		prop val
+		prop val pids
 
 	[ -z "${Debug}" ] || \
 		_log "Setting up window ${windowId} using rule num. ${rule}"
@@ -79,22 +88,70 @@ WindowSetup() {
 			return ${OK}
 		case "${prop}" in
 		rule${rule}_set_position)
+# wmctrl -e <MVARG>
+# Resize and move a window that has been specified with a -r action according to the <MVARG> argument.
+# <MVARG>
+# A  move  and resize argument has the format 'g,x,y,w,h'.  All five components are integers. The first value, g, is the gravity of the window, with 0 being
+# the most common value (the default value for the window). Please see the EWMH specification for other values.
+# 
+# The four remaining values are a standard geometry specification: x,y is the position of the top left corner of the window, and w,h is the width and height
+# of the window, with the exception that the value of -1 in any position is interpreted to mean that the current geometry value should not be modified.
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Moving to ${val}"
-			xdotool windowmove --sync "${windowId}" ${val} || {
+#			local valX valY g=0 x=-1 y=-1 w=-1 h=-1
+#			valX="$(cut -f 1 -s -d ' ' <<< "${val}")"
+#			valY="$(cut -f 2 -s -d ' ' <<< "${val}")"
+#			if [ "${valX}" = "x" ]; then
+#				x=-1
+#			elif [ "${valX: -1}" = "%" ]; then
+#				let x=${valX::-1}*desktopWidth/100,1
+#			else
+#				x="${valX}"
+#			fi
+#			if [ "${valY}" = "y" ]; then
+#				y=-1
+#			elif [ "${valY: -1}" = "%" ]; then
+#				let y=${valY::-1}*desktopHeight/100,1
+#			else
+#				y="${valY}"
+#			fi
+#			wmctrl -i -r "${windowId}" -e "$g,$x,$y,$w,$h" || {
+#$ xdotool behave 0x1c00009 focus windowsize --sync 73% 96% behave 0x1c00009 blur exec --sync /bin/false
+#Command failed.
+			((xdotool behave "${windowId}" focus windowmove --sync ${val} \
+			exec /usr/bin/setnewwinprops-daemon.sh CleaningWindowSetup "${windowId}" || {
 				! CheckWindowExists "${windowId}" || \
 					_log "window ${windowId}: setup error"
 				return ${OK}
-			}
+			})& )
 			;;
 		rule${rule}_set_size)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting size to ${val}"
-			xdotool windowsize --sync "${windowId}" ${val} || {
+#			local valX valY g=0 x=-1 y=-1 w=-1 h=-1
+#			valW="$(cut -f 1 -s -d ' ' <<< "${val}")"
+#			valH="$(cut -f 2 -s -d ' ' <<< "${val}")"
+#			if [ "${valW}" = "x" ]; then
+#				w=-1
+#			elif [ "${valW: -1}" = "%" ]; then
+#				let w=${valW::-1}*desktopWidth/100,1
+#			else
+#				w="${valW}"
+#			fi
+#			if [ "${valH}" = "y" ]; then
+#				h=-1
+#			elif [ "${valH: -1}" = "%" ]; then
+#				let h=${valH::-1}*desktopHeight/100,1
+#			else
+#				h="${valH}"
+#			fi
+#			wmctrl -i -r "${windowId}" -e "$g,$x,$y,$w,$h" || {
+			((xdotool behave "${windowId}" focus windowsize --sync ${val} \
+			exec /usr/bin/setnewwinprops-daemon.sh CleaningWindowSetup "${windowId}" || {
 				! CheckWindowExists "${windowId}" || \
 					_log "window ${windowId}: setup error"
 				return ${OK}
-			}
+			})& )
 			;;
 		rule${rule}_set_minimized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
@@ -355,6 +412,10 @@ WindowSetup() {
 	done < <(sort \
 	< <(grep -se "^rule${rule}_set_" \
 	< <(set)))
+	pids="$(ps -u ${USER} -o pid= -o cmd= | \
+		awk '$0 ~ "[[:digit:]]+ xdotool behave ${windowId}" {print $1}')"
+	[ -z "${pids}" ] || \
+		((xdotool behave "${windowId}" blur --sync exec kill ${pids})& )
 	return ${OK}
 }
 
@@ -522,7 +583,7 @@ WindowNew() {
 }
 
 WindowsUpdate() {
-	local windowId window_type
+	local windowId window_type pids
 	[ -z "${Debug}" ] || \
 		_log "current window count ${#}"
 	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
@@ -537,11 +598,14 @@ WindowsUpdate() {
 		fi
 		WindowNew "${windowId}" || :
 	done
-	[ -z "${Debug}" ] || \
-		for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
-		< <(printf '%s\n' ${WindowIds})); do
+
+	for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
+	< <(printf '%s\n' ${WindowIds})); do
+		[ -z "${Debug}" ] || \
 			_log "window ${windowId}: has been closed"
-		done
+		CleaningWindowSetup "${windowId}"
+	done
+
 	WindowIds="${@}"
 	return ${OK}
 }
@@ -617,6 +681,10 @@ case "${1:-}" in
 start)
 	shift
 	Main "${@}"
+	;;
+CleaningWindowSetup)
+	shift
+	CleaningWindowSetup "${@}"
 	;;
 *)
 	echo "Wrong arguments" >&2
