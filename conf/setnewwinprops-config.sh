@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.4 $
+#  $Revision: 0.5 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -26,7 +26,10 @@
 #************************************************************************
 
 # Daemon setup
+# empty string (default), y|verbose, xtrace
 Debug=""
+#Debug="verbose"
+#Debug="xtrace"
 
 # A window definition
 #

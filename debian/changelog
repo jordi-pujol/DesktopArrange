@@ -1,3 +1,9 @@
+setnewwinprops (0.5) unstable; urgency=low
+
+  * 
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 19 Sep 2022 14:37:40 +0200
+
 setnewwinprops (0.4) unstable; urgency=low
 
   * write debug messages in verbose level.

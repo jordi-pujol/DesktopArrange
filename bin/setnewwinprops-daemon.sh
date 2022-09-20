@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.4 $
+#  $Revision: 0.5 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -32,10 +32,12 @@ _exit() {
 	trap - EXIT INT HUP
 	set +o xtrace
 	LogPrio="warn" _log "Exit"
-	rm -f "${PIPE}"
+	rm -f "${PIPE}" "${PIDFILE}"
 	pidsChildren=""; _ps_children
 	[ -z "${pidsChildren}" ] || \
 		kill -s TERM ${pidsChildren} 2> /dev/null || :
+	[ -n "${Debug}" ] || \
+		rm -f "${LOGFILE}"*
 	wait || :
 }
 
@@ -65,28 +67,47 @@ WindowSetup() {
 
 	while IFS="=" read -r prop val; do
 		val="$(_unquote "${val}")"
+		WindowExists "${windowId}" || {
+			_log "window ${windowId}: error setting up this window, has been closed"
+			return ${OK}
+		}
 		case "${prop}" in
 		rule${rule}_set_position)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Moving to ${val}"
-			xdotool windowmove --sync "${windowId}" ${val} || :
+			xdotool windowmove --sync "${windowId}" ${val} || {
+				_log "window ${windowId}: error, may be this window has been closed ?"
+				return ${OK}
+			}
 			;;
 		rule${rule}_set_size)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting size to ${val}"
-			xdotool windowsize --sync "${windowId}" ${val} || :
+			xdotool windowsize --sync "${windowId}" ${val} || {
+				_log "window ${windowId}: error, may be this window has been closed ?"
+				return ${OK}
+			}
 			;;
 		rule${rule}_set_minimized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Minimizing"
-				xdotool windowminimize --sync "${windowId}" || :
+				xdotool windowminimize --sync "${windowId}" || {
+				_log "window ${windowId}: error, may be this window has been closed ?"
+				return ${OK}
+			}
 			else
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Un-minimizing"
-				wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || :
+				wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || {
+					_log "window ${windowId}: error, may be this window has been closed ?"
+					return ${OK}
+				}
 				sleep 0.1
-				wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || :
+				wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || {
+					_log "window ${windowId}: error, may be this window has been closed ?"
+					return ${OK}
+				}
 			fi
 			;;
 		rule${rule}_set_maximized)
@@ -96,7 +117,10 @@ WindowSetup() {
 				'_NET_WM_STATE_MAXIMIZED_VERT' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing"
-					wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || :
+					wmctrl -i -r "${windowId}" -b add,maximized_horz,maximized_vert || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
@@ -104,7 +128,10 @@ WindowSetup() {
 				'_NET_WM_STATE_MAXIMIZED_VERT' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing"
-					wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || :
+					wmctrl -i -r "${windowId}" -b remove,maximized_horz,maximized_vert || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			fi
 			;;
@@ -114,14 +141,20 @@ WindowSetup() {
 				'_NET_WM_STATE_MAXIMIZED_HORZ' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing horizontally"
-					wmctrl -i -r "${windowId}" -b add,maximized_horz || :
+					wmctrl -i -r "${windowId}" -b add,maximized_horz || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_MAXIMIZED_HORZ' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing horizontally"
-					wmctrl -i -r "${windowId}" -b remove,maximized_horz || :
+					wmctrl -i -r "${windowId}" -b remove,maximized_horz || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			fi
 			;;
@@ -131,14 +164,20 @@ WindowSetup() {
 				'_NET_WM_STATE_MAXIMIZED_VERT' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing vertically"
-					wmctrl -i -r "${windowId}" -b add,maximized_vert || :
+					wmctrl -i -r "${windowId}" -b add,maximized_vert || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_MAXIMIZED_VERT' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing vertically "
-					wmctrl -i -r "${windowId}" -b remove,maximized_vert || :
+					wmctrl -i -r "${windowId}" -b remove,maximized_vert || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			fi
 			;;
@@ -148,21 +187,30 @@ WindowSetup() {
 				'_NET_WM_STATE_FULLSCREEN' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Setting fullscreen"
-					wmctrl -i -r "${windowId}" -b add,fullscreen || :
+					wmctrl -i -r "${windowId}" -b add,fullscreen || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_FULLSCREEN' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling fullscreen"
-					wmctrl -i -r "${windowId}" -b remove,fullscreen || :
+					wmctrl -i -r "${windowId}" -b remove,fullscreen || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			fi
 			;;
 		rule${rule}_set_focus)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting focus"
-			xdotool windowactivate --sync "${windowId}" || :
+			xdotool windowactivate --sync "${windowId}" || {
+				_log "window ${windowId}: error, may be this window has been closed ?"
+				return ${OK}
+			}
 			;;
 		rule${rule}_set_above)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
@@ -170,20 +218,29 @@ WindowSetup() {
 				'_NET_WM_STATE_BELOW' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling below"
-					wmctrl -i -r "${windowId}" -b remove,below || :
+					wmctrl -i -r "${windowId}" -b remove,below || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 				IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_ABOVE' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Setting above"
-					wmctrl -i -r "${windowId}" -b add,above || :
+					wmctrl -i -r "${windowId}" -b add,above || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_ABOVE' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling above"
-					wmctrl -i -r "${windowId}" -b remove,above || :
+					wmctrl -i -r "${windowId}" -b remove,above || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			fi
 			;;
@@ -193,20 +250,29 @@ WindowSetup() {
 				'_NET_WM_STATE_ABOVE' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling above"
-					wmctrl -i -r "${windowId}" -b remove,above || :
+					wmctrl -i -r "${windowId}" -b remove,above || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 				IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_BELOW' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Setting below"
-					wmctrl -i -r "${windowId}" -b add,below || :
+					wmctrl -i -r "${windowId}" -b add,below || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			else
 				! IsWindowWMStateActive "${windowId}" \
 				'_NET_WM_STATE_BELOW' || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling below"
-					wmctrl -i -r "${windowId}" -b remove,below || :
+					wmctrl -i -r "${windowId}" -b remove,below || {
+						_log "window ${windowId}: error, may be this window has been closed ?"
+						return ${OK}
+					}
 				}
 			fi
 			;;
@@ -216,7 +282,10 @@ WindowSetup() {
 			${val} -ne ${windowDesktop} ]; then
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Setting desktop to ${val}"
-				xdotool set_desktop_for_window "${windowId}" ${val} || :
+				xdotool set_desktop_for_window "${windowId}" ${val} || {
+					_log "window ${windowId}: error, may be this window has been closed ?"
+					return ${OK}
+				}
 			fi
 			;;
 		rule${rule}_set_active_desktop)
@@ -224,18 +293,27 @@ WindowSetup() {
 			{val} -ne ${desktopCurrent} ]; then
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Setting active desktop to ${val}"
-				xdotool set_desktop ${val} || :
+				xdotool set_desktop ${val} || {
+					_log "window ${windowId}: error setting active desktop"
+					return ${OK}
+				}
 			fi
 			;;
 		rule${rule}_set_closed)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Closing window"
-			xdotool windowclose "${windowId}" || :
+			xdotool windowclose "${windowId}" || {
+				_log "window ${windowId}: error, may be this window has been already closed ?"
+				return ${OK}
+			}
 			;;
 		rule${rule}_set_killed)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Killing window"
-			xdotool windowkill "${windowId}" || :
+			xdotool windowkill "${windowId}" || {
+				_log "window ${windowId}: error, may be this window has been closed ?"
+				return ${OK}
+			}
 			;;
 		rule${rule}_set_delay)
 			:
@@ -287,13 +365,30 @@ WindowNew() {
 	window_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
 		return ${OK}
 
+	[ -z "${Debug}" ] || \
+		printf "%s='%s'\n" \
+			"New window id" "${windowId}" \
+			"window_title" "${window_title}" \
+			"window_type" "${window_type}" \
+			"window_application" "${window_application}" \
+			"window_class" "${window_class}" \
+			$(test -z "${window_role}" || \
+				printf '%s\n' "window_role" "${window_role}") \
+			"window_desktop" "${window_desktop}" \
+			"window_desktop_size" "${window_desktop_size}" \
+			"window_desktop_workarea" "${window_desktop_workarea}" \
+			"window_is_maximized" "${window_is_maximized}" \
+			"window_is_maximized_horz" "${window_is_maximized_horz}" \
+			"window_is_maximized_vert" "${window_is_maximized_vert}" \
+			>> "${LOGFILE}"
+
 	# checking properties of this window
 	# we'll set up only the first rule that matches
 	rule=${NONE}
 	while [ $((rule++)) -lt ${Rules} ]; do
 		local rc="${AFFIRMATIVE}" prop val
 		[ -z "${Debug}" ] || \
-			_log "window ${windowId}: checking rule num. ${rule}"
+			_log "window ${windowId}: Checking rule num. ${rule}"
 		while [ -n "${rc}" ] && \
 		IFS="=" read -r prop val; do
 			val="$(_unquote "${val}")"
@@ -319,7 +414,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_application)
-				if grep -qs -iF "${window_application}" <<< "${val}" ; then
+				if grep -qs -iwF "${window_application}" <<< "${val}" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_application \"${val}\""
 				else
@@ -392,26 +487,24 @@ WindowNew() {
 		fi
 	done
 	[ -z "${Debug}" ] || \
-		_log "window ${windowId}: doesn't match any rule"
+		_log "window ${windowId}: Doesn't match any rule"
 	return ${OK}
 }
 
 WindowsUpdate() {
-	local windowId
+	local windowId window_type
 	[ -z "${Debug}" ] || \
 		_log "current window count ${#}"
 	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
 	< <(printf '%s\n' "${@}")); do
-		! grep -qswEe "_NET_WM_WINDOW_TYPE_DESKTOP|_NET_WM_WINDOW_TYPE_DOCK" \
-		< <(GetWindowProp "${windowId}" "_NET_WM_WINDOW_TYPE") || \
+		window_type="$(GetWindowProp "${windowId}" "_NET_WM_WINDOW_TYPE")"
+		if grep -qswF "_NET_WM_WINDOW_TYPE_DESKTOP${LF}_NET_WM_WINDOW_TYPE_DOCK" \
+		<<< "${window_type}"; then
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: discarding win of type" \
+				"\"$(awk -F '_' '{print $NF}' <<< "${window_type}")\""
 			continue
-		[ -z "${Debug}" ] || \
-			while read -r line; do
-				if [[ $(cut -f 1 -s -d ' ' <<< "${line}") -eq ${windowId} ]]; then
-					_log "new window ${windowId}: $(cut -f 2- -s -d ' ' <<< "${line}")"
-					break
-				fi
-			done < <(wmctrl -l -x)
+		fi
 		WindowNew "${windowId}" || :
 	done
 	[ -z "${Debug}" ] || \
@@ -458,7 +551,7 @@ Main() {
 	[ -e "${PIPE}" ] || \
 		mkfifo "${PIPE}"
 
-	! grep -qswF 'xtrace' <<<"${@}" || {
+	! grep -qswF 'xtrace' <<< "${@}" || {
 		export PS4='+\t ${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
 		exec {bash_xtracefd}> "${LOGFILE}.xtrace"
 		BASH_XTRACEFD=${bash_xtracefd}
@@ -476,8 +569,9 @@ Main() {
 		if read -r txt < "${PIPE}"; then
 			case "${txt}" in
 			_NET_CLIENT_LIST*)
-				WindowsUpdate $(cut -f 2- -s -d '#' <<< "${txt}" | \
-					tr -s ' ,' ' ')
+				WindowsUpdate $(printf '0x%x\n' \
+					$(tr -s ' ,' ' ' \
+					< <(cut -f 2- -s -d '#' <<< "${txt}")))
 				;;
 			reload)
 				LoadConfig "${@}"

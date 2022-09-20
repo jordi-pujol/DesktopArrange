@@ -2,8 +2,6 @@
 
 Debug=""
 
-Debug=""
-
 # A rule
 #
 # Get the title of the new window.

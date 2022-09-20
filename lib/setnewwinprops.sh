@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.4 $
+#  $Revision: 0.5 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -47,10 +47,11 @@ _ps_children() {
 
 # priority: info notice warn err debug
 _log() {
-	local msg="${@}" \
+	local msg \
 		p="daemon.${LogPrio:-"notice"}"
 	LogPrio=""
-	printf '%s\n' "$(_datetime) ${p}: ${@}" >> "${LOGFILE}"
+	msg="$(_datetime) ${p}: ${@}"
+	printf '%s\n' "${msg}" >> "${LOGFILE}"
 	return ${OK}
 }
 
@@ -229,6 +230,17 @@ GetWindowDesktop() {
 	xdotool get_desktop_for_window "${windowId}" 2> /dev/null || :
 }
 
+WindowExists() {
+	local windowId="${1}" \
+		win
+	for win in $(tr -s ' ,' ' ' \
+	< <(cut -f 2- -s -d '#' \
+	< <(xprop -root "_NET_CLIENT_LIST"))); do
+		[[ ${windowId} -ne ${win} ]] || \
+			return ${OK}
+	done
+	return ${ERR}
+}
 
 GetDesktopSize() {
 	awk '$2 == "*" {print $4; exit}' < <(wmctrl -d)
@@ -469,7 +481,7 @@ LoadConfig() {
 
 	Debug="${Debug:-}"
 	! printf '%s\n' "${@}" | grep -qsxiF 'debug' || \
-		Debug="${AFFIRMATIVE}"
+		Debug="verbose"
 	! printf '%s\n' "${@}" | grep -qsxiF 'xtrace' || \
 		Debug="xtrace"
 	if [ "${Debug}" = "xtrace" ]; then
@@ -480,11 +492,11 @@ LoadConfig() {
 	else
 		set +o xtrace
 	fi
-	if [ "${Debug}" = "xtrace" ]; then
-		_log "debug level is xtrace"
-	elif [ -n "${Debug}" ]; then
-		_log "debug level is verbose"
-	fi
+	[ -z "${Debug}" ] || {
+		[ "${Debug}" = "xtrace" ] || \
+			Debug="verbose"
+		_log "debug level is \"${Debug}\""
+	}
 
 	if [ -n "${Debug}" -o ${#} -gt ${NONE} ]; then
 		msg="daemon's command line"
@@ -520,7 +532,7 @@ LoadConfig() {
 	return ${OK}
 }
 
-readonly TAB=$'\t' OK=0 ERR=1 NONE=0 \
+readonly LF=$'\n' TAB=$'\t' OK=0 ERR=1 NONE=0 \
 	PATTERN_YES="^(y.*|true|on|1|enable.*)$" \
 	PATTERN_NO="^(n.*|false|off|0|disable.*)$" \
 	PATTERN_FIXEDSIZE="^[0-9]+x[0-9]+$" \
