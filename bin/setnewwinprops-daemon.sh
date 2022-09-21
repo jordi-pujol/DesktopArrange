@@ -58,12 +58,14 @@ WindowSetup() {
 		prop val
 
 	[ -z "${Debug}" ] || \
-		_log "Setting up window ${windowId} using rule num. ${rule}"
+		_log "window ${windowId}:" \
+		"Setting up using rule num. ${rule}"
 	while IFS="=" read -r prop val; do
 		_check_natural val 0
 		[ ${val} -le 0 ] || {
 			[ -z "${Debug}" ] || \
-				_log "Waiting ${val} seconds to set up window ${windowId}"
+				_log "window ${windowId}:" \
+				"Waiting ${val} seconds to set up"
 			sleep ${val} &
 			wait ${!} || :
 		}
@@ -72,8 +74,9 @@ WindowSetup() {
 	< <(set))
 
 	[ -z "${Debug}" ] || \
-		_log "Waiting to get focus in window ${windowId}"
-	(export LOGFILE Debug cmd
+		_log "window ${windowId}:" \
+		"Waiting to get focus"
+	(export windowId LOGFILE Debug cmd
 	cmd="xdotool behave ${windowId} focus exec /usr/bin/SetNewWinProps.sh"
 	${cmd}) &
 	wait ${!} || :
@@ -90,7 +93,8 @@ WindowSetup() {
 				_log "window ${windowId}: Moving to ${val}"
 			xdotool windowmove --sync ${windowId} ${val} || {
 				! CheckWindowExists ${windowId} || \
-					_log "window ${windowId}: setup error"
+					LogPrio="err" _log "window ${windowId}:" \
+					"Error setting up"
 				return ${OK}
 			}
 			;;
@@ -99,7 +103,8 @@ WindowSetup() {
 				_log "window ${windowId}: Setting size to ${val}"
 			xdotool windowsize --sync ${windowId} ${val} || {
 				! CheckWindowExists ${windowId} || \
-					_log "window ${windowId}: setup error"
+					LogPrio="err" _log "window ${windowId}:" \
+					"Error setting up"
 				return ${OK}
 			}
 			;;
@@ -109,7 +114,8 @@ WindowSetup() {
 					_log "window ${windowId}: Minimizing"
 				xdotool windowminimize --sync ${windowId} || {
 				! CheckWindowExists ${windowId} || \
-					_log "window ${windowId}: setup error"
+					LogPrio="err" _log "window ${windowId}:" \
+					"Error setting up"
 				return ${OK}
 			}
 			else
@@ -117,13 +123,15 @@ WindowSetup() {
 					_log "window ${windowId}: Un-minimizing"
 				wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
 					! CheckWindowExists ${windowId} || \
-						_log "window ${windowId}: setup error"
+						LogPrio="err" _log "window ${windowId}:" \
+						"Error setting up"
 					return ${OK}
 				}
 				sleep 0.1
 				wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
 					! CheckWindowExists ${windowId} || \
-						_log "window ${windowId}: setup error"
+						LogPrio="err" _log "window ${windowId}:" \
+						"Error setting up"
 					return ${OK}
 				}
 			fi
@@ -137,7 +145,8 @@ WindowSetup() {
 						_log "window ${windowId}: Maximizing"
 					wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -149,7 +158,8 @@ WindowSetup() {
 						_log "window ${windowId}: Un-maximizing"
 					wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -163,7 +173,8 @@ WindowSetup() {
 						_log "window ${windowId}: Maximizing horizontally"
 					wmctrl -i -r ${windowId} -b add,maximized_horz || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -174,7 +185,8 @@ WindowSetup() {
 						_log "window ${windowId}: Un-maximizing horizontally"
 					wmctrl -i -r ${windowId} -b remove,maximized_horz || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -188,7 +200,8 @@ WindowSetup() {
 						_log "window ${windowId}: Maximizing vertically"
 					wmctrl -i -r ${windowId} -b add,maximized_vert || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -199,7 +212,8 @@ WindowSetup() {
 						_log "window ${windowId}: Un-maximizing vertically "
 					wmctrl -i -r ${windowId} -b remove,maximized_vert || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -213,7 +227,8 @@ WindowSetup() {
 						_log "window ${windowId}: Setting fullscreen"
 					wmctrl -i -r ${windowId} -b add,fullscreen || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -224,7 +239,8 @@ WindowSetup() {
 						_log "window ${windowId}: Disabling fullscreen"
 					wmctrl -i -r ${windowId} -b remove,fullscreen || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -235,7 +251,8 @@ WindowSetup() {
 				_log "window ${windowId}: Setting focus"
 			xdotool windowactivate --sync ${windowId} || {
 				! CheckWindowExists ${windowId} || \
-					_log "window ${windowId}: setup error"
+					LogPrio="err" _log "window ${windowId}:" \
+					"Error setting up"
 				return ${OK}
 			}
 			;;
@@ -247,7 +264,8 @@ WindowSetup() {
 						_log "window ${windowId}: Disabling below"
 					wmctrl -i -r ${windowId} -b remove,below || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -257,7 +275,8 @@ WindowSetup() {
 						_log "window ${windowId}: Setting above"
 					wmctrl -i -r ${windowId} -b add,above || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -268,7 +287,8 @@ WindowSetup() {
 						_log "window ${windowId}: Disabling above"
 					wmctrl -i -r ${windowId} -b remove,above || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -282,7 +302,8 @@ WindowSetup() {
 						_log "window ${windowId}: Disabling above"
 					wmctrl -i -r ${windowId} -b remove,above || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -292,7 +313,8 @@ WindowSetup() {
 						_log "window ${windowId}: Setting below"
 					wmctrl -i -r ${windowId} -b add,below || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -303,7 +325,8 @@ WindowSetup() {
 						_log "window ${windowId}: Disabling below"
 					wmctrl -i -r ${windowId} -b remove,below || {
 						! CheckWindowExists ${windowId} || \
-							_log "window ${windowId}: setup error"
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error setting up"
 						return ${OK}
 					}
 				}
@@ -317,7 +340,8 @@ WindowSetup() {
 					_log "window ${windowId}: Setting desktop to ${val}"
 				xdotool set_desktop_for_window ${windowId} ${val} || {
 					! CheckWindowExists ${windowId} || \
-						_log "window ${windowId}: setup error"
+						LogPrio="err" _log "window ${windowId}:" \
+						"Error setting up"
 					return ${OK}
 				}
 			fi
@@ -329,7 +353,8 @@ WindowSetup() {
 					_log "window ${windowId}: Setting active desktop to ${val}"
 				xdotool set_desktop ${val} || {
 					! CheckWindowExists ${windowId} || \
-						_log "window ${windowId}: setup error"
+						LogPrio="err" _log "window ${windowId}:" \
+						"Error setting up"
 					return ${OK}
 				}
 			fi
@@ -339,7 +364,8 @@ WindowSetup() {
 				_log "window ${windowId}: Closing window"
 			xdotool windowclose ${windowId} || {
 				! CheckWindowExists ${windowId} || \
-					_log "window ${windowId}: setup error"
+					LogPrio="err" _log "window ${windowId}:" \
+					"Error setting up"
 				return ${OK}
 			}
 			;;
@@ -348,7 +374,8 @@ WindowSetup() {
 				_log "window ${windowId}: Killing window"
 			xdotool windowkill ${windowId} || {
 				! CheckWindowExists ${windowId} || \
-					_log "window ${windowId}: setup error"
+					LogPrio="err" _log "window ${windowId}:" \
+					"Error setting up"
 				return ${OK}
 			}
 			;;
@@ -356,7 +383,8 @@ WindowSetup() {
 			:
 			;;
 		*)
-			LogPrio="err" _log "WindowSetup: Invalid property ${prop}='${val}'"
+			LogPrio="err" _log "window ${windowId}:" \
+				"WindowSetup: Invalid property ${prop}='${val}'"
 			;;
 		esac
 	done < <(sort \
