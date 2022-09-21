@@ -164,13 +164,13 @@ GetWindowProp() {
 GetWindowState() {
 	local windowId="${1}"
 	awk '$0 ~ "window state:" {print $NF}' \
-		< <(GetWindowProp "${windowId}" "WM_STATE")
+		< <(GetWindowProp ${windowId} "WM_STATE")
 }
 
 GetWindowWMState() {
 	local windowId="${1}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp "${windowId}" "_NET_WM_STATE")
+		< <(GetWindowProp ${windowId} "_NET_WM_STATE")
 }
 
 IsWindowWMStateActive() {
@@ -193,7 +193,7 @@ GetWindowTitle() {
 GetWindowType() {
 	local windowId="${1}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp "${windowId}" "_NET_WM_WINDOW_TYPE")
+		< <(GetWindowProp ${windowId} "_NET_WM_WINDOW_TYPE")
 }
 
 GetWindowApplication() {
@@ -205,18 +205,18 @@ GetWindowApplication() {
 GetWindowClass() {
 	local windowId="${1}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp "${windowId}" "WM_CLASS")
+		< <(GetWindowProp ${windowId} "WM_CLASS")
 }
 
 GetWindowRole() {
 	local windowId="${1}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp "${windowId}" "WM_WINDOW_ROLE")
+		< <(GetWindowProp ${windowId} "WM_WINDOW_ROLE")
 }
 
 GetWindowIsMaximized() {
 	local windowId="${1}"
-	IsWindowWMStateActive "${windowId}" \
+	IsWindowWMStateActive ${windowId} \
 	'_NET_WM_STATE_MAXIMIZED_HORZ' \
 	'_NET_WM_STATE_MAXIMIZED_VERT' && \
 		echo "${AFFIRMATIVE}" || \
@@ -225,7 +225,7 @@ GetWindowIsMaximized() {
 
 GetWindowIsMaximizedHorz() {
 	local windowId="${1}"
-	IsWindowWMStateActive "${windowId}" \
+	IsWindowWMStateActive ${windowId} \
 	'_NET_WM_STATE_MAXIMIZED_HORZ' && \
 		echo "${AFFIRMATIVE}" || \
 		echo "${NEGATIVE}"
@@ -233,7 +233,7 @@ GetWindowIsMaximizedHorz() {
 
 GetWindowIsMaximizedVert() {
 	local windowId="${1}"
-	IsWindowWMStateActive "${windowId}" \
+	IsWindowWMStateActive ${windowId} \
 	'_NET_WM_STATE_MAXIMIZED_VERT' && \
 		echo "${AFFIRMATIVE}" || \
 		echo "${NEGATIVE}"
@@ -241,7 +241,7 @@ GetWindowIsMaximizedVert() {
 
 GetWindowDesktop() {
 	local windowId="${1}"
-	xdotool get_desktop_for_window "${windowId}" 2> /dev/null || :
+	xdotool get_desktop_for_window ${windowId} 2> /dev/null || :
 }
 
 WindowExists() {

@@ -25,11 +25,16 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
 
-#exec > $(mktemp /tmp/SetNewWinprops-XXXXXXX.txt) 2>&1
-#set-x
-pids="$(ps -u ${USER} -o pid= -o cmd= | \
-	awk -v action="[[:digit:]]+ ${action}" \
-	'$0 ~ action {print $1}')"
-[ -z "${pids}" ] || \
-	kill ${pids} > /dev/null 2>&1
+[ "${Debug}" != "xtrace" ] || {
+	exec {BASH_XTRACEFD}>> "${LOGFILE}.xtrace"
+	set -o xtrace
+}
+pid="$(ps -u ${USER} -o pid= -o cmd= | \
+	awk -v cmd="[[:digit:]]+ ${cmd}" \
+	'$0 ~ cmd {print $1}')"
+[ -z "${pid}" ] || {
+	[ -z "${Debug}" ] || \
+		echo "killing process ${pid} of user ${USER} \"${cmd}\"" >> "${LOGFILE}"
+	kill ${pid} 2> /dev/null
+}
 :
