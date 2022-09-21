@@ -1,6 +1,13 @@
 setnewwinprops (0.5) unstable; urgency=low
 
-  * 
+  * config.txt:
+    Debug values may be:
+    - empty string (default)
+    - y|verbose
+    - xtrace
+  * bin/setnewwinprops-daemon.sh WindowSetup():
+    - wait until the window has focus
+    - much better error management
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 19 Sep 2022 14:37:40 +0200
 
