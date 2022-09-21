@@ -34,7 +34,8 @@ pid="$(ps -u ${USER} -o pid= -o cmd= | \
 	'$0 ~ cmd {print $1}')"
 [ -z "${pid}" ] || {
 	[ -z "${Debug}" ] || \
-		echo "killing process ${pid} of user ${USER} \"${cmd}\"" >> "${LOGFILE}"
+		echo "$(date +'%F %X') daemon.notice:" \
+			"killing process ${pid} of user ${USER} \"${cmd}\"" >> "${LOGFILE}"
 	kill ${pid} 2> /dev/null
 }
 :
