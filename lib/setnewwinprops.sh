@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.5 $
+#  $Revision: 0.6 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -147,6 +147,13 @@ GetWindowProp() {
 	xprop -len 256 -id "${@}"
 }
 
+GetWindowPropAtom() {
+	local windowId="${1}" \
+		atom="${2}"
+	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
+		< <(GetWindowProp ${windowId} "${atom}")
+}
+
 GetWindowState() {
 	local windowId="${1}"
 	awk '$0 ~ "window state:" {print $NF}' \
@@ -155,8 +162,7 @@ GetWindowState() {
 
 GetWindowWMState() {
 	local windowId="${1}"
-	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp ${windowId} "_NET_WM_STATE")
+	GetWindowPropAtom ${windowId} "_NET_WM_STATE"
 }
 
 IsWindowWMStateActive() {
@@ -178,26 +184,23 @@ GetWindowTitle() {
 
 GetWindowType() {
 	local windowId="${1}"
-	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp ${windowId} "_NET_WM_WINDOW_TYPE")
+	GetWindowPropAtom ${windowId} "_NET_WM_WINDOW_TYPE"
 }
 
 GetWindowApplication() {
 	local windowId="${1}"
-	2> /dev/null ps -ho cmd "$(xdotool getwindowpid "${windowId}")" || \
+	ps -ho cmd "$(xdotool getwindowpid "${windowId}")" || \
 		return ${ERR}
 }
 
 GetWindowClass() {
 	local windowId="${1}"
-	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp ${windowId} "WM_CLASS")
+	GetWindowPropAtom ${windowId} "WM_CLASS"
 }
 
 GetWindowRole() {
 	local windowId="${1}"
-	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp ${windowId} "WM_WINDOW_ROLE")
+	GetWindowPropAtom ${windowId} "WM_WINDOW_ROLE"
 }
 
 GetWindowIsMaximized() {

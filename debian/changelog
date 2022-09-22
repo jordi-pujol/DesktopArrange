@@ -1,3 +1,9 @@
+setnewwinprops (0.6) unstable; urgency=medium
+
+  * some code improvements
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 21 Sep 2022 14:02:20 +0200
+
 setnewwinprops (0.5) unstable; urgency=low
 
   * config.txt:

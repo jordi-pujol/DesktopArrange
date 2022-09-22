@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.5 $
+#  $Revision: 0.6 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -412,7 +412,7 @@ WindowNew() {
 		return ${OK}
 	window_type="$(GetWindowType "${windowId}")" || \
 		return ${OK}
-	window_application="$(GetWindowApplication "${windowId}")" || \
+	window_application="$(GetWindowApplication "${windowId}" 2> /dev/null)" || \
 		return ${OK}
 	window_class="$(GetWindowClass "${windowId}")" || \
 		return ${OK}
@@ -547,7 +547,7 @@ WindowNew() {
 		< <(set)))
 
 		if [ -n "${rc}" ]; then
-			(WindowSetup ${windowId} "${rule}") &
+			((WindowSetup ${windowId} "${rule}") &)
 			return ${OK}
 		fi
 	done
@@ -562,9 +562,8 @@ WindowsUpdate() {
 		_log "current window count ${#}"
 	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
 	< <(printf '%s\n' "${@}")); do
-		window_type="$(GetWindowProp ${windowId} "_NET_WM_WINDOW_TYPE")"
 		if grep -qswF "_NET_WM_WINDOW_TYPE_DESKTOP${LF}_NET_WM_WINDOW_TYPE_DOCK" \
-		<<< "${window_type}"; then
+		< <(GetWindowType ${windowId}); then
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: discarding win of type" \
 				"\"$(awk -F '_' '{print $NF}' <<< "${window_type}")\""
@@ -585,6 +584,8 @@ WindowsUpdate() {
 
 Main() {
 	# constants
+	readonly NAME="$(basename "${0}")" \
+		APPNAME="setnewwinprops"
 	local XROOT t=0
 	while ! XROOT="$(xprop -root _NET_SUPPORTING_WM_CHECK | \
 	awk '$NF ~ "^0x[0-9A-Fa-f]+$" {print $NF; rc=-1; exit}
@@ -594,16 +595,14 @@ Main() {
 	done 2> /dev/null
 	[ -n "${XROOT}" ] || \
 		exit ${ERR}
-	readonly NAME="$(basename "${0}")" \
-		APPNAME="setnewwinprops" \
-		XROOT
-	readonly LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
+	readonly XROOT \
+		LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
 		PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid" \
 		PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe" \
 		PID="${$}"
 	# internal variables, daemon scope
 	local Rules Debug LogPrio txt \
-		WindowIds="" pidsChildren
+		WindowIds=""
 
 	trap '_exit' EXIT
 	trap 'exit' INT
@@ -628,8 +627,10 @@ Main() {
 	_log "Start"
 	LoadConfig "${@}"
 
-	(xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}" || \
-	kill -INT ${PID})&
+	(while xprop -root "_NET_CLIENT_LIST"; do
+		xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}" || :
+	done
+	kill -INT ${PID}) &
 
 	while :; do
 		if read -r txt < "${PIPE}"; then
