@@ -562,13 +562,13 @@ WindowsUpdate() {
 		_log "current window count ${#}"
 	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
 	< <(printf '%s\n' "${@}")); do
-		window_type="$(GetWindowType ${windowId})" || \
-			continue
-		if grep -qswF "_NET_WM_WINDOW_TYPE_DESKTOP${LF}_NET_WM_WINDOW_TYPE_DOCK" \
+		if ! window_type="$(GetWindowType ${windowId})" || \
+		grep -qswF "_NET_WM_WINDOW_TYPE_DESKTOP${LF}_NET_WM_WINDOW_TYPE_DOCK" \
 		<<< "${window_type}"; then
 			[ -z "${Debug}" ] || \
-				_log "window ${windowId}: discarding win of type" \
-				"\"$(awk -F '_' '{print $NF}' <<< "${window_type}")\""
+				_log "window ${windowId}: discarding window" \
+				$([ -z "${window_type}" ] || \
+				echo "of type \"$(awk -F '_' '{print $NF}' <<< "${window_type}")\"")
 			continue
 		fi
 
