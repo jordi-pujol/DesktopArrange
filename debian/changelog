@@ -1,5 +1,10 @@
 setnewwinprops (0.6) unstable; urgency=medium
 
+  * bin/setnewwinprops-daemon.sh:
+    Has been renamed to bin/setnewwinprops.sh
+  * introduce new window properties to check:
+    - state
+    - app name
   * some code improvements
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 21 Sep 2022 14:02:20 +0200

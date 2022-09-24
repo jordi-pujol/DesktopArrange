@@ -77,7 +77,7 @@ WindowSetup() {
 		_log "window ${windowId}:" \
 		"Waiting to get focus"
 	(export windowId LOGFILE Debug cmd
-	cmd="xdotool behave ${windowId} focus exec /usr/bin/SetNewWinProps.sh"
+	cmd="xdotool behave ${windowId} focus exec /usr/bin/SetNewWinProps-waitfocus.sh"
 	${cmd}) &
 	wait ${!} || :
 
@@ -396,7 +396,9 @@ WindowSetup() {
 WindowNew() {
 	local windowId="${1}" \
 		window_title \
+		window_state \
 		window_type \
+		window_app_name \
 		window_application \
 		window_class \
 		window_role \
@@ -410,7 +412,11 @@ WindowNew() {
 
 	window_title="$(GetWindowTitle "${windowId}")" || \
 		return ${OK}
+	window_state="$(GetWindowState "${windowId}")" || \
+		return ${OK}
 	window_type="$(GetWindowType "${windowId}")" || \
+		return ${OK}
+	window_app_name="$(GetWindowAppName "${windowId}")" || \
 		return ${OK}
 	window_application="$(GetWindowApplication "${windowId}" 2> /dev/null)" || \
 		return ${OK}
@@ -434,7 +440,9 @@ WindowNew() {
 		printf "%s='%s'\n" \
 			"New window id" ${windowId} \
 			"window_title" "${window_title}" \
+			"window_state" "${window_state}" \
 			"window_type" "${window_type}" \
+			"window_app_name" "${window_app_name}" \
 			"window_application" "${window_application}" \
 			"window_class" "${window_class}" \
 			$(test -z "${window_role}" || \
@@ -468,6 +476,16 @@ WindowNew() {
 					rc=""
 				fi
 				;;
+			rule${rule}_check_state)
+				if [ "${val}" = "${window_state}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_state \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_state \"${val}\""
+					rc=""
+				fi
+				;;
 			rule${rule}_check_type)
 				if grep -qs -iwF "${window_type}" <<< "${val}" ; then
 					[ -z "${Debug}" ] || \
@@ -475,6 +493,16 @@ WindowNew() {
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: doesn't match window_type \"${val}\""
+					rc=""
+				fi
+				;;
+			rule${rule}_check_app_name)
+				if [ "${val}" = "${window_app_name}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_app_name \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_app_name \"${val}\""
 					rc=""
 				fi
 				;;
@@ -630,7 +658,7 @@ Main() {
 	_log "Start"
 	LoadConfig "${@}"
 
-	(while xprop -root "_NET_CLIENT_LIST"; do
+	(while xprop -root "_NET_CLIENT_LIST" > /dev/null 2>&1; do
 		xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}" || :
 	done
 	kill -INT ${PID}) &

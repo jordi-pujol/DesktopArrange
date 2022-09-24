@@ -2,9 +2,15 @@ Source: setnewwinprops
 Section: X11
 Priority: optional
 Maintainer: Jordi Pujol <jordi-pujol@telefonica.net>
-Build-Depends-Indep: debhelper (>= 9),
- devscripts,
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-exec,
  bash, dash,
+Build-Depends-Indep:
+ debhelper (>= 9),
+ devscripts,
+Rules-Requires-Root: no
+Standards-Version: 4.5.1
 
 Package: setnewwinprops
 Architecture: all

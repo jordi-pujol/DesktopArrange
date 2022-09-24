@@ -25,18 +25,25 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
 
-[ "${Debug}" != "xtrace" ] || {
+if [ "${Debug}" = "xtrace" ]; then
+	export PS4='+\t ${BASH_SOURCE}:${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
 	exec {BASH_XTRACEFD}>> "${LOGFILE}.xtrace"
+	exec >> "${LOGFILE}.xtrace" 2>&1
 	set -o xtrace
-}
-pid="$(ps -u ${USER} -o pid= -o cmd= | \
-	awk -v cmd="[[:digit:]]+ ${cmd}" \
-	'$0 ~ cmd {print $1}')"
-[ -z "${pid}" ] || {
-	[ -z "${Debug}" ] || \
-		echo "$(date +'%F %X') daemon.notice:" \
-			"window ${windowId}:" \
-			"killing process ${pid} of user ${USER} \"${cmd}\"" >> "${LOGFILE}"
-	kill ${pid} 2> /dev/null
-}
+else
+	exec >> "${LOGFILE}" 2>&1
+fi
+
+pids="$(ps -u ${USER} -o pid= -o cmd= | \
+	awk -v cmd="${cmd}" \
+	'$0 ~ cmd && $1 ~ "[[:digit:]]+" {printf $1 " "; rc=-1}
+	END{exit rc+1}')" || \
+		exit 1
+
+kill ${pids} 2> /dev/null
+
+[ "${Debug}" != "xtrace" ] || \
+	echo "$(date +'%F %X') daemon.notice:" \
+		"window ${windowId}:" \
+		"killing process ${pids} of user ${USER} \"${cmd}\"" >> "${LOGFILE}"
 :

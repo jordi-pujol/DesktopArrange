@@ -1,5 +1,5 @@
-bin/setnewwinprops-daemon.sh			usr/bin
-bin/SetNewWinProps.sh			usr/bin
+bin/setnewwinprops.sh			usr/bin
+bin/SetNewWinProps-waitfocus.sh			usr/bin
 lib/setnewwinprops.sh			usr/lib/setnewwinprops
 desktop/setnewwinprops.desktop				etc/xdg/autostart
 conf/*							usr/share/doc/setnewwinprops/conf

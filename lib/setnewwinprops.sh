@@ -182,6 +182,11 @@ GetWindowTitle() {
 		return ${ERR}
 }
 
+GetWindowAppName() {
+	local windowId="${1}"
+	_unquote "$(GetWindowPropAtom ${windowId} "_OB_APP_NAME")"
+}
+
 GetWindowType() {
 	local windowId="${1}"
 	GetWindowPropAtom ${windowId} "_NET_WM_WINDOW_TYPE"
@@ -234,15 +239,10 @@ GetWindowDesktop() {
 }
 
 WindowExists() {
-	local windowId="${1}" \
-		win
-	for win in $(tr -s ' ,' ' ' \
-	< <(cut -f 2- -s -d '#' \
-	< <(xprop -root "_NET_CLIENT_LIST"))); do
-		[[ ${windowId} -ne ${win} ]] || \
-			return ${OK}
-	done
-	return ${ERR}
+	local windowId="$(printf '0x%0x' "${1}")"
+	grep -qswF "${windowId}" < <(tr -s ' ,' ' ' \
+		< <(cut -f 2- -s -d '#' \
+		< <(xprop -root "_NET_CLIENT_LIST")))
 }
 
 GetDesktopSize() {
@@ -280,8 +280,14 @@ RuleAppend() {
 		rule_check_title)
 			eval rule${Rules}_check_title=\'${val}\'
 			;;
+		rule_check_state)
+			eval rule${Rules}_check_state=\'${val}\'
+			;;
 		rule_check_type)
 			eval rule${Rules}_check_type=\'${val}\'
+			;;
+		rule_check_app_name)
+			eval rule${Rules}_check_app_name=\'${val}\'
 			;;
 		rule_check_application)
 			eval rule${Rules}_check_application=\'${val}\'
@@ -400,7 +406,9 @@ AddRule() {
 			continue
 		case "${prop}" in
 			rule_check_title | \
+			rule_check_state | \
 			rule_check_type | \
+			rule_check_app_name | \
 			rule_check_application | \
 			rule_check_class | \
 			rule_check_role | \
@@ -435,7 +443,9 @@ AddRule() {
 
 LoadConfig() {
 	local rule_check_title \
+		rule_check_state \
 		rule_check_type \
+		rule_check_app_name \
 		rule_check_application \
 		rule_check_class \
 		rule_check_role \

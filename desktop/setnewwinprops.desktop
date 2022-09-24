@@ -1,6 +1,6 @@
 [Desktop Entry]
 Comment=Set New Window Properties
-Exec=/usr/bin/setnewwinprops-daemon.sh start
+Exec=/usr/bin/setnewwinprops.sh start
 GenericName=SetNewWinProps
 Name=SetNewWinProps
 StartupNotify=true
