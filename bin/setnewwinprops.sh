@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.6 $
+#  $Revision: 0.7 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -60,18 +60,15 @@ WindowSetup() {
 	[ -z "${Debug}" ] || \
 		_log "window ${windowId}:" \
 		"Setting up using rule num. ${rule}"
-	while IFS="=" read -r prop val; do
-		_check_natural val 0
-		[ ${val} -le 0 ] || {
-			[ -z "${Debug}" ] || \
-				_log "window ${windowId}:" \
-				"Waiting ${val} seconds to set up"
-			sleep ${val} &
-			wait ${!} || :
-		}
-		break
-	done < <(grep -se "^rule${rule}_set_delay=" \
-	< <(set))
+	eval val=\"\${rule${rule}_set_delay:-}\"
+	_check_natural val 0
+	if [ ${val} -gt 0 ]; then
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}:" \
+			"Waiting ${val} seconds to set up"
+		sleep ${val} &
+		wait ${!} || :
+	fi
 
 	[ -z "${Debug}" ] || \
 		_log "window ${windowId}:" \
@@ -436,7 +433,7 @@ WindowNew() {
 	window_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
 		return ${OK}
 
-	[ -z "${Debug}" ] || \
+	[ -z "${Debug}" ] || {
 		printf "%s='%s'\n" \
 			"New window id" ${windowId} \
 			"window_title" "${window_title}" \
@@ -445,15 +442,16 @@ WindowNew() {
 			"window_app_name" "${window_app_name}" \
 			"window_application" "${window_application}" \
 			"window_class" "${window_class}" \
-			$(test -z "${window_role}" || \
-				printf '%s\n' "window_role" "${window_role}") \
 			"window_desktop" "${window_desktop}" \
 			"window_desktop_size" "${window_desktop_size}" \
 			"window_desktop_workarea" "${window_desktop_workarea}" \
 			"window_is_maximized" "${window_is_maximized}" \
 			"window_is_maximized_horz" "${window_is_maximized_horz}" \
-			"window_is_maximized_vert" "${window_is_maximized_vert}" \
-			>> "${LOGFILE}"
+			"window_is_maximized_vert" "${window_is_maximized_vert}"
+		test -z "${window_role}" || \
+			printf "%s='%s'\n" "window_role" "${window_role}"
+				
+	} >> "${LOGFILE}"
 
 	# checking properties of this window
 	# we'll set up only the first rule that matches

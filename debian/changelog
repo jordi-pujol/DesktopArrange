@@ -1,3 +1,9 @@
+setnewwinprops (0.7) unstable; urgency=medium
+
+  * l
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 24 Sep 2022 11:56:56 +0200
+
 setnewwinprops (0.6) unstable; urgency=medium
 
   * bin/setnewwinprops-daemon.sh:
