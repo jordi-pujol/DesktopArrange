@@ -44,9 +44,15 @@ _exit() {
 CheckWindowExists() {
 	local windowId="${1}"
 	WindowExists ${windowId} || {
-		_log "window ${windowId}: error setting up this window, has been closed"
+		_log "window ${windowId}: can't set up this window, has been closed"
 		return ${ERR}
 	}
+}
+
+CmdWaitFocus() {
+	local windowId="${1}"
+	echo "xdotool behave ${windowId} focus" \
+		"exec /usr/bin/SetNewWinProps-waitfocus.sh"
 }
 
 WindowSetup() {
@@ -60,23 +66,30 @@ WindowSetup() {
 	[ -z "${Debug}" ] || \
 		_log "window ${windowId}:" \
 		"Setting up using rule num. ${rule}"
+
 	eval val=\"\${rule${rule}_set_delay:-}\"
-	_check_natural val 0
-	if [ ${val} -gt 0 ]; then
+	if [ ${val} -gt ${NONE} ]; then
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId}:" \
 			"Waiting ${val} seconds to set up"
-		sleep ${val} &
-		wait ${!} || :
+		while [ $((val--)) -ge ${NONE} ]; do
+			sleep 1
+			CheckWindowExists ${windowId} || \
+				return ${OK}
+		done
 	fi
 
-	[ -z "${Debug}" ] || \
-		_log "window ${windowId}:" \
-		"Waiting to get focus"
-	(export windowId LOGFILE Debug cmd
-	cmd="xdotool behave ${windowId} focus exec /usr/bin/SetNewWinProps-waitfocus.sh"
-	${cmd}) &
-	wait ${!} || :
+	if [[ $(xdotool getactivewindow) -ne ${windowId} ]]; then
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}:" \
+			"Waiting to get focus"
+		(export windowId LOGFILE Debug cmd
+		cmd="$(CmdWaitFocus ${windowId})"
+		${cmd}) &
+		wait ${!} || :
+		CheckWindowExists ${windowId} || \
+			return ${OK}
+	fi
 
 	GetDesktopStatus
 
@@ -573,7 +586,7 @@ WindowNew() {
 		< <(set)))
 
 		if [ -n "${rc}" ]; then
-			((WindowSetup ${windowId} "${rule}") &)
+			(WindowSetup ${windowId} "${rule}") &
 			return ${OK}
 		fi
 	done
@@ -583,7 +596,7 @@ WindowNew() {
 }
 
 WindowsUpdate() {
-	local windowId window_type
+	local windowId window_type pids
 	[ -z "${Debug}" ] || \
 		_log "current window count ${#}"
 	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
@@ -601,34 +614,23 @@ WindowsUpdate() {
 		WindowNew ${windowId} || :
 	done
 
-	[ -z "${Debug}" ] || \
-		for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
-		< <(printf '%s\n' ${WindowIds})); do
+	for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
+	< <(printf '%s\n' ${WindowIds})); do
+		[ -z "${Debug}" ] || \
 			_log "window ${windowId}: has been closed"
-		done
+		if pids="$(ps -u ${USER} -o pid= -o cmd= | \
+		awk -v cmd="$(CmdWaitFocus ${windowId})" \
+		'$0 ~ cmd && $1 ~ "[[:digit:]]+" {printf $1 " "; rc=-1}
+		END{exit rc+1}')"; then
+			kill ${pids} 2> /dev/null || :
+		fi
+	done
 
 	WindowIds="${@}"
 	return ${OK}
 }
 
 Main() {
-	# constants
-	readonly NAME="$(basename "${0}")" \
-		APPNAME="setnewwinprops"
-	local XROOT t=0
-	while ! XROOT="$(xprop -root _NET_SUPPORTING_WM_CHECK | \
-	awk '$NF ~ "^0x[0-9A-Fa-f]+$" {print $NF; rc=-1; exit}
-	END{exit rc+1}')" && \
-	[ $((t++)) -lt 5 ]; do
-		sleep 1
-	done 2> /dev/null
-	[ -n "${XROOT}" ] || \
-		exit ${ERR}
-	readonly XROOT \
-		LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
-		PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid" \
-		PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe" \
-		PID="${$}"
 	# internal variables, daemon scope
 	local Rules Debug LogPrio txt \
 		WindowIds=""
@@ -641,7 +643,7 @@ Main() {
 	mkdir -p "/tmp/${APPNAME}/${USER}"
 	rm -f "${LOGFILE}"*
 
-	echo "${PID}" > "${PIDFILE}"
+	echo "${$}" > "${PIDFILE}"
 
 	[ -e "${PIPE}" ] || \
 		mkfifo "${PIPE}"
@@ -659,7 +661,7 @@ Main() {
 	(while xprop -root "_NET_CLIENT_LIST" > /dev/null 2>&1; do
 		xprop -root -spy "_NET_CLIENT_LIST" >> "${PIPE}" || :
 	done
-	kill -INT ${PID}) &
+	kill -INT ${$}) &
 
 	while :; do
 		if read -r txt < "${PIPE}"; then
@@ -679,13 +681,50 @@ Main() {
 }
 
 set -o errexit -o nounset -o pipefail +o noglob +o noclobber
+
+# constants
+readonly NAME="$(basename "${0}")" \
+	APPNAME="setnewwinprops"
+XROOT="$(GetXroot)" || \
+	exit ${ERR}
+readonly XROOT \
+	LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
+	PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid" \
+	PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe"
+
 case "${1:-}" in
 start)
-	shift
-	Main "${@}"
+	if ! pid="$(AlreadyRunning)"; then
+		if [ $(ps -o ppid= ${$}) -eq 1 ]; then
+			shift
+			Main "${@}"
+			echo "${APPNAME} start" >&2
+		else
+			(("${0}" "${@}") &)
+			echo "${APPNAME} submit" >&2
+		fi
+	else
+		echo "Error: ${APPNAME} is already running for this session" >&2
+	fi
+	;;
+stop)
+	if pid="$(AlreadyRunning)"; then
+		kill -s INT ${pid} 2> /dev/null
+		echo "${APPNAME} stop" >&2
+	else
+		echo "Error: ${APPNAME} is not running for this session" >&2
+	fi
+	;;
+reload)
+	if pid="$(AlreadyRunning)"; then
+		kill -s HUP ${pid} 2> /dev/null
+		echo "${APPNAME} reload" >&2
+	else
+		echo "Error: ${APPNAME} is not running for this session" >&2
+	fi
 	;;
 *)
-	echo "Wrong arguments" >&2
+	echo "Wrong action. Valid actions are: start, stop or reload" >&2
 	exit 1
 	;;
 esac

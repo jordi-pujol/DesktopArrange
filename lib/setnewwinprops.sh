@@ -143,8 +143,28 @@ _check_fixedsize() {
 	fi
 }
 
+GetXroot() {
+	local XROOT t=0
+	while ! XROOT="$(xprop -root _NET_SUPPORTING_WM_CHECK | \
+	awk '$NF ~ "^0x[0-9A-Fa-f]+$" {print $NF; rc=-1; exit}
+	END{exit rc+1}')" && \
+	[ $((t++)) -lt 5 ]; do
+		sleep 1
+	done 2> /dev/null
+	[ -n "${XROOT}" ] && \
+		echo "${XROOT}" || \
+		return ${ERR}
+}
+
+AlreadyRunning() {
+	[ -e "${PIDFILE}" ] && \
+	kill -s 0 "$(cat "${PIDFILE}")" 2> /dev/null && \
+	cat "${PIDFILE}" || \
+		return ${ERR}
+}
+
 GetWindowProp() {
-	xprop -len 256 -id "${@}"
+	xprop -len 1024 -id "${@}"
 }
 
 GetWindowPropAtom() {
@@ -299,7 +319,7 @@ RuleAppend() {
 			eval rule${Rules}_check_role=\'${val}\'
 			;;
 		rule_check_desktop)
-			_check_natural val 0
+			_check_natural val ${NONE}
 			eval rule${Rules}_check_desktop=\'${val}\'
 			;;
 		rule_check_is_maximized)
@@ -318,8 +338,8 @@ RuleAppend() {
 			_check_fixedsize "rule${Rules}_check_desktop_workarea" "${val}"
 			;;
 		rule_set_delay)
-			_check_natural val 0
-			[ "${val}" -eq 0 ] || \
+			_check_natural val ${NONE}
+			[ "${val}" -eq ${NONE} ] || \
 				eval rule${Rules}_set_delay=\'${val}\'
 			;;
 		rule_set_position)
@@ -371,11 +391,11 @@ RuleAppend() {
 			_check_y "rule${Rules}_set_killed" "${val}"
 			;;
 		rule_set_desktop)
-			_check_natural val 0
+			_check_natural val ${NONE}
 			eval rule${Rules}_set_desktop=\'${val}\'
 			;;
 		rule_set_active_desktop)
-			_check_natural val 0
+			_check_natural val ${NONE}
 			eval rule${Rules}_set_active_desktop=\'${val}\'
 			;;
 		*)
@@ -399,7 +419,7 @@ RuleAppend() {
 }
 
 AddRule() {
-	local prop val rc=0
+	local prop val rc=${NONE}
 	while IFS="=" read -r prop val; do
 		val="$(_unquote "${val}")"
 		[ -n "${val}" ] || \
@@ -423,14 +443,14 @@ AddRule() {
 			*)
 				LogPrio="warn" _log "Error in config: Property \"${prop}\"" \
 					"has not been implemented yet"
-				rc=0
+				rc=${NONE}
 				break
 			;;
 		esac
 	done < <(sort \
 	< <(grep -se "^rule_check_" \
 	< <(set)))
-	if [ ${rc} -eq 0 ]; then
+	if [ ${rc} -eq ${NONE} ]; then
 		LogPrio="warn" _log "Error in config. Can't add a new rule"
 	else
 		RuleAppend
