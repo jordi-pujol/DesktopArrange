@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.7 $
+#  $Revision: 0.8 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -620,7 +620,7 @@ WindowsUpdate() {
 			_log "window ${windowId}: has been closed"
 		if pids="$(ps -u ${USER} -o pid= -o cmd= | \
 		awk -v cmd="$(CmdWaitFocus ${windowId})" \
-		'$0 ~ cmd && $1 ~ "[[:digit:]]+" {printf $1 " "; rc=-1}
+		'$0 ~ cmd && $1 ~ "^[[:digit:]]+$" {printf $1 " "; rc=-1}
 		END{exit rc+1}')"; then
 			kill ${pids} 2> /dev/null || :
 		fi
@@ -697,11 +697,11 @@ start)
 	if ! pid="$(AlreadyRunning)"; then
 		if [ $(ps -o ppid= ${$}) -eq 1 ]; then
 			shift
-			Main "${@}"
 			echo "${APPNAME} start" >&2
+			Main "${@}"
 		else
-			(("${0}" "${@}") &)
 			echo "${APPNAME} submit" >&2
+			(("${0}" "${@}") &)
 		fi
 	else
 		echo "Error: ${APPNAME} is already running for this session" >&2
@@ -709,16 +709,16 @@ start)
 	;;
 stop)
 	if pid="$(AlreadyRunning)"; then
-		kill -s INT ${pid} 2> /dev/null
 		echo "${APPNAME} stop" >&2
+		kill -s INT ${pid} 2> /dev/null
 	else
 		echo "Error: ${APPNAME} is not running for this session" >&2
 	fi
 	;;
 reload)
 	if pid="$(AlreadyRunning)"; then
-		kill -s HUP ${pid} 2> /dev/null
 		echo "${APPNAME} reload" >&2
+		kill -s HUP ${pid} 2> /dev/null
 	else
 		echo "Error: ${APPNAME} is not running for this session" >&2
 	fi

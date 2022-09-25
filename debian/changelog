@@ -1,3 +1,9 @@
+setnewwinprops (0.8) unstable; urgency=medium
+
+  * l
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sun, 25 Sep 2022 11:13:07 +0200
+
 setnewwinprops (0.7) unstable; urgency=medium
 
   * daemon actions:

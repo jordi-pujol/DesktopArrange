@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.7 $
+#  $Revision: 0.8 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -36,7 +36,7 @@ fi
 
 pids="$(ps -u ${USER} -o pid= -o cmd= | \
 	awk -v cmd="${cmd}" \
-	'$0 ~ cmd && $1 ~ "[[:digit:]]+" {printf $1 " "; rc=-1}
+	'$0 ~ cmd && $1 ~ "^[[:digit:]]+$" {printf $1 " "; rc=-1}
 	END{exit rc+1}')" || \
 		exit 1
 
