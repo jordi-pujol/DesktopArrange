@@ -158,9 +158,10 @@ GetXroot() {
 
 AlreadyRunning() {
 	[ -e "${PIDFILE}" ] && \
-	kill -s 0 "$(cat "${PIDFILE}")" 2> /dev/null && \
-	cat "${PIDFILE}" || \
+	kill -s 0 "$(cat "${PIDFILE}")" 2> /dev/null || \
 		return ${ERR}
+	echo "Info: ${APPNAME} is running in pid $(cat "${PIDFILE}")" >&2
+	cat "${PIDFILE}"
 }
 
 GetWindowProp() {
@@ -400,22 +401,11 @@ RuleAppend() {
 			;;
 		*)
 			_log "Property \"${prop}\" is not implemented yet"
-		# 	_check_yn_val "rule_set_pin" ""
-		# 	_check_ind_val "rule_set_decoration" ""
-		# 	_check_int_pair_val "rule_set_pointer" ""
 			;;
 		esac
 	done < <(sort \
 	< <(grep -sEe "^rule_(check|set)_" \
 	< <(set)))
-	# 
-	# 	if [ -n "${Debug}" ]; then
-	# 		local msg="Adding new rule $( \
-	# 			WindowName "${Rules}" \
-	# 			"${rule_bssid:-"${BEL}"}" \
-	# 			"${rule_ssid:-"${BEL}"}")"
-	# 		_log "${msg}"
-	# 	fi
 }
 
 AddRule() {
@@ -493,7 +483,6 @@ LoadConfig() {
 		rule_set_closed \
 		rule_set_killed \
 		rule_set_pointer \
-		bash_xtracefd \
 		rule msg="Loading configuration"
 
 	# config variables, default values
@@ -519,8 +508,7 @@ LoadConfig() {
 		Debug="xtrace"
 	if [ "${Debug}" = "xtrace" ]; then
 		export PS4='+\t ${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
-		exec {bash_xtracefd}>> "${LOGFILE}.xtrace"
-		BASH_XTRACEFD=${bash_xtracefd}
+		exec {BASH_XTRACEFD}>> "${LOGFILE}.xtrace"
 		set -o xtrace
 	else
 		set +o xtrace

@@ -83,7 +83,7 @@ WindowSetup() {
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId}:" \
 			"Waiting to get focus"
-		(export windowId LOGFILE Debug cmd
+		(export windowId LOGFILE Debug cmd BASH_XTRACEFD
 		cmd="$(CmdWaitFocus ${windowId})"
 		${cmd}) &
 		wait ${!} || :
@@ -618,9 +618,9 @@ WindowsUpdate() {
 	< <(printf '%s\n' ${WindowIds})); do
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId}: has been closed"
-		if pids="$(ps -u ${USER} -o pid= -o cmd= | \
-		awk -v cmd="$(CmdWaitFocus ${windowId})" \
-		'$0 ~ cmd && $1 ~ "^[[:digit:]]+$" {printf $1 " "; rc=-1}
+		if pids="$(ps -C "$(CmdWaitFocus ${windowId})" -o pid= -o user= | \
+		awk -v user="${USER}" \
+		'$2 == user && $1 ~ "^[[:digit:]]+$" {printf $1 " "; rc=-1}
 		END{exit rc+1}')"; then
 			kill ${pids} 2> /dev/null || :
 		fi
@@ -694,37 +694,51 @@ readonly XROOT \
 
 case "${1:-}" in
 start)
-	if ! pid="$(AlreadyRunning)"; then
-		if [ $(ps -o ppid= ${$}) -eq 1 ]; then
-			shift
-			echo "${APPNAME} start" >&2
-			Main "${@}"
-		else
-			echo "${APPNAME} submit" >&2
-			(("${0}" "${@}") &)
-		fi
-	else
+	if pid="$(AlreadyRunning)"; then
 		echo "Error: ${APPNAME} is already running for this session" >&2
+		exit ${ERR}
+	fi
+	if [ $(ps -o ppid= ${$}) -eq 1 ]; then
+		shift
+		echo "Info: ${APPNAME} start" >&2
+		Main "${@}"
+	else
+		echo "Info: ${APPNAME} submit" >&2
+		(("${0}" "${@}" > /dev/null 2>&1) &)
+	fi
+	;;
+status)
+	if ! pid="$(AlreadyRunning)"; then
+		echo "Info: ${APPNAME} is not running for this session" >&2
+		exit ${ERR}
 	fi
 	;;
 stop)
-	if pid="$(AlreadyRunning)"; then
-		echo "${APPNAME} stop" >&2
-		kill -s INT ${pid} 2> /dev/null
-	else
+	if ! pid="$(AlreadyRunning)"; then
 		echo "Error: ${APPNAME} is not running for this session" >&2
+		exit ${ERR}
 	fi
+	echo "Info: ${APPNAME} stop" >&2
+	kill -s INT ${pid} 2> /dev/null
+	;;
+restart)
+	exec "${0}" stop &
+	wait ${!} || :
+	exec "${0}" start &
+	wait ${!} || exit ${?}
 	;;
 reload)
-	if pid="$(AlreadyRunning)"; then
-		echo "${APPNAME} reload" >&2
-		kill -s HUP ${pid} 2> /dev/null
-	else
+	if ! pid="$(AlreadyRunning)"; then
 		echo "Error: ${APPNAME} is not running for this session" >&2
+		exit ${ERR}
 	fi
+	echo "Info: ${APPNAME} reload" >&2
+	kill -s HUP ${pid} 2> /dev/null
 	;;
 *)
-	echo "Wrong action. Valid actions are: start, stop or reload" >&2
-	exit 1
+	echo "Wrong action." >&2
+	echo "Valid actions are: start|stop|restart|status|reload" >&2
+	exit ${ERR}
 	;;
 esac
+:

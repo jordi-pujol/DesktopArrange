@@ -27,20 +27,24 @@
 
 if [ "${Debug}" = "xtrace" ]; then
 	export PS4='+\t ${BASH_SOURCE}:${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
-	exec {BASH_XTRACEFD}>> "${LOGFILE}.xtrace"
 	exec >> "${LOGFILE}.xtrace" 2>&1
 	set -o xtrace
 else
 	exec >> "${LOGFILE}" 2>&1
 fi
 
-pids="$(ps -u ${USER} -o pid= -o cmd= | \
-	awk -v cmd="${cmd}" \
-	'$0 ~ cmd && $1 ~ "^[[:digit:]]+$" {printf $1 " "; rc=-1}
+pids="$(ps -C "${cmd}" -o pid= -o user= | \
+	awk -v user="${USER}" \
+	'$2 == user && $1 ~ "^[[:digit:]]+$" {printf $1 " "; rc=-1}
 	END{exit rc+1}')" || \
 		exit 1
 
 kill ${pids} 2> /dev/null
+
+[ -z "${Debug}" ] || \
+	echo "$(date +'%F %X') daemon.notice:" \
+		"window ${windowId}:" \
+		"got focus" >> "${LOGFILE}"
 
 [ "${Debug}" != "xtrace" ] || \
 	echo "$(date +'%F %X') daemon.notice:" \
