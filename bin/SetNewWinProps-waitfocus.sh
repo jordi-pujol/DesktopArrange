@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.8 $
+#  $Revision: 0.9 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -33,21 +33,17 @@ else
 	exec >> "${LOGFILE}" 2>&1
 fi
 
-pids="$(ps -C "${cmd}" -o pid= -o user= | \
-	awk -v user="${USER}" \
-	'$2 == user && $1 ~ "^[[:digit:]]+$" {printf $1 " "; rc=-1}
-	END{exit rc+1}')" || \
-		exit 1
+pid="$(echo $(ps -o ppid= ${$}))"
 
-kill ${pids} 2> /dev/null
+kill ${pid} 2> /dev/null
 
 [ -z "${Debug}" ] || \
-	echo "$(date +'%F %X') daemon.notice:" \
+	echo "$(date +'%F %X') notice:" \
 		"window ${windowId}:" \
 		"got focus" >> "${LOGFILE}"
 
 [ "${Debug}" != "xtrace" ] || \
-	echo "$(date +'%F %X') daemon.notice:" \
+	echo "$(date +'%F %X') notice:" \
 		"window ${windowId}:" \
-		"killing process ${pids} of user ${USER} \"${cmd}\"" >> "${LOGFILE}"
+		"killing process ${pid} of user ${USER}" >> "${LOGFILE}"
 :

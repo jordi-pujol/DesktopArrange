@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.8 $
+#  $Revision: 0.9 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -60,12 +60,33 @@ WindowSetup() {
 		rule="${2}" \
 		desktopCurrent desktops \
 		desktopWidth desktopHeight \
-		windowDesktop windowWidth windowHeight windowX windowY windowScreen \
+		windowWidth windowHeight windowX windowY windowScreen \
 		prop val
 
 	[ -z "${Debug}" ] || \
 		_log "window ${windowId}:" \
 		"Setting up using rule num. ${rule}"
+
+	GetDesktopStatus
+
+	eval val=\"\${rule${rule}_set_desktop:-}\"
+	if [ -n "${val}" ]; then
+		if [ ${val} -lt ${desktops} ]; then
+			if [ ${val} -ne $(GetWindowDesktop "${windowId}") ]; then
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Moving window to desktop to ${val}"
+				xdotool set_desktop_for_window ${windowId} ${val} || {
+					! CheckWindowExists ${windowId} || \
+						LogPrio="err" _log "window ${windowId}:" \
+						"Error moving window to desktop to ${val}"
+					return ${OK}
+				}
+			fi
+		else
+			LogPrio="err" _log "window ${windowId}:" \
+				"Can't move window to invalid desktop ${val}"
+		fi
+	fi
 
 	eval val=\"\${rule${rule}_set_delay:-}\"
 	if [ ${val} -gt ${NONE} ]; then
@@ -79,16 +100,45 @@ WindowSetup() {
 		done
 	fi
 
+	GetDesktopStatus
+
+	eval val=\"\${rule${rule}_set_active_desktop:-}\"
+	if [ -n "${val}" ]; then
+		if [ ${val} -lt ${desktops} ]; then
+			if [ ${val} -ne ${desktopCurrent} ]; then
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Setting up active desktop ${val}"
+				xdotool set_desktop ${val} || {
+					LogPrio="err" _log "window ${windowId}:" \
+						"Error setting up active desktop ${val}"
+					return ${OK}
+				}
+			fi
+		else
+			LogPrio="err" _log "window ${windowId}:" \
+				"Can't set invalid active desktop ${val}"
+		fi
+	fi
+
 	if [[ $(xdotool getactivewindow) -ne ${windowId} ]]; then
-		[ -z "${Debug}" ] || \
-			_log "window ${windowId}:" \
-			"Waiting to get focus"
-		(export windowId LOGFILE Debug cmd BASH_XTRACEFD
-		cmd="$(CmdWaitFocus ${windowId})"
-		${cmd}) &
-		wait ${!} || :
-		CheckWindowExists ${windowId} || \
-			return ${OK}
+		eval val=\"\${rule${rule}_set_focus:-}\"
+		if [ -n "${val}" ]; then
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Setting up focus"
+			xdotool windowactivate --sync ${windowId} || {
+				CheckWindowExists ${windowId} || :
+				return ${OK}
+			}
+		else
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}:" \
+				"Waiting to get focus"
+			(export windowId LOGFILE Debug BASH_XTRACEFD
+			$(CmdWaitFocus ${windowId})) &
+			wait ${!} || :
+			CheckWindowExists ${windowId} || \
+				return ${OK}
+		fi
 	fi
 
 	GetDesktopStatus
@@ -104,17 +154,17 @@ WindowSetup() {
 			xdotool windowmove --sync ${windowId} ${val} || {
 				! CheckWindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
-					"Error setting up"
+					"Error moving to ${val}"
 				return ${OK}
 			}
 			;;
 		rule${rule}_set_size)
 			[ -z "${Debug}" ] || \
-				_log "window ${windowId}: Setting size to ${val}"
+				_log "window ${windowId}: Setting up size to ${val}"
 			xdotool windowsize --sync ${windowId} ${val} || {
 				! CheckWindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
-					"Error setting up"
+					"Error setting up size to ${val}"
 				return ${OK}
 			}
 			;;
@@ -125,7 +175,7 @@ WindowSetup() {
 				xdotool windowminimize --sync ${windowId} || {
 				! CheckWindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
-					"Error setting up"
+					"Error minimizing"
 				return ${OK}
 			}
 			else
@@ -134,14 +184,14 @@ WindowSetup() {
 				wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
 					! CheckWindowExists ${windowId} || \
 						LogPrio="err" _log "window ${windowId}:" \
-						"Error setting up"
+						"Error un-minimizing"
 					return ${OK}
 				}
 				sleep 0.1
 				wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
 					! CheckWindowExists ${windowId} || \
 						LogPrio="err" _log "window ${windowId}:" \
-						"Error setting up"
+						"Error un-minimizing"
 					return ${OK}
 				}
 			fi
@@ -156,7 +206,7 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error maximizing"
 						return ${OK}
 					}
 				}
@@ -169,7 +219,7 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error un-maximizing"
 						return ${OK}
 					}
 				}
@@ -184,7 +234,7 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b add,maximized_horz || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error maximizing horizontally"
 						return ${OK}
 					}
 				}
@@ -196,7 +246,7 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b remove,maximized_horz || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error un-maximizing horizontally"
 						return ${OK}
 					}
 				}
@@ -211,7 +261,7 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b add,maximized_vert || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error maximizing vertically"
 						return ${OK}
 					}
 				}
@@ -223,7 +273,61 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b remove,maximized_vert || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error un-maximizing vertically"
+						return ${OK}
+					}
+				}
+			fi
+			;;
+		rule${rule}_set_shaded)
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				IsWindowWMStateActive ${windowId} \
+				'_NET_WM_STATE_SHADED' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Shading"
+					wmctrl -i -r ${windowId} -b add,shade || {
+						! CheckWindowExists ${windowId} || \
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error shading"
+						return ${OK}
+					}
+				}
+			else
+				! IsWindowWMStateActive ${windowId} \
+				'_NET_WM_STATE_SHADED' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Un-shading"
+					wmctrl -i -r ${windowId} -b remove,shade || {
+						! CheckWindowExists ${windowId} || \
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error un-shading"
+						return ${OK}
+					}
+				}
+			fi
+			;;
+		rule${rule}_set_sticky)
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				IsWindowWMStateActive ${windowId} \
+				'_NET_WM_STATE_STICKY' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Sticking"
+					wmctrl -i -r ${windowId} -b add,sticky || {
+						! CheckWindowExists ${windowId} || \
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error sticking"
+						return ${OK}
+					}
+				}
+			else
+				! IsWindowWMStateActive ${windowId} \
+				'_NET_WM_STATE_STICKY' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Un-sticking"
+					wmctrl -i -r ${windowId} -b remove,sticky || {
+						! CheckWindowExists ${windowId} || \
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error un-sticking"
 						return ${OK}
 					}
 				}
@@ -234,11 +338,11 @@ WindowSetup() {
 				IsWindowWMStateActive ${windowId} \
 				'_NET_WM_STATE_FULLSCREEN' || {
 					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Setting fullscreen"
+						_log "window ${windowId}: Enabling fullscreen"
 					wmctrl -i -r ${windowId} -b add,fullscreen || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error enabling fullscreen"
 						return ${OK}
 					}
 				}
@@ -250,21 +354,11 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b remove,fullscreen || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error disabling fullscreen"
 						return ${OK}
 					}
 				}
 			fi
-			;;
-		rule${rule}_set_focus)
-			[ -z "${Debug}" ] || \
-				_log "window ${windowId}: Setting focus"
-			xdotool windowactivate --sync ${windowId} || {
-				! CheckWindowExists ${windowId} || \
-					LogPrio="err" _log "window ${windowId}:" \
-					"Error setting up"
-				return ${OK}
-			}
 			;;
 		rule${rule}_set_above)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
@@ -275,18 +369,18 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b remove,below || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error disabling below"
 						return ${OK}
 					}
 				}
 				IsWindowWMStateActive ${windowId} \
 				'_NET_WM_STATE_ABOVE' || {
 					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Setting above"
+						_log "window ${windowId}: Enabling above"
 					wmctrl -i -r ${windowId} -b add,above || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error enabling above"
 						return ${OK}
 					}
 				}
@@ -298,7 +392,7 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b remove,above || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error disabling above"
 						return ${OK}
 					}
 				}
@@ -313,18 +407,18 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b remove,above || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error disabling above"
 						return ${OK}
 					}
 				}
 				IsWindowWMStateActive ${windowId} \
 				'_NET_WM_STATE_BELOW' || {
 					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Setting below"
+						_log "window ${windowId}: Enabling below"
 					wmctrl -i -r ${windowId} -b add,below || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error enabling below"
 						return ${OK}
 					}
 				}
@@ -336,36 +430,9 @@ WindowSetup() {
 					wmctrl -i -r ${windowId} -b remove,below || {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
-							"Error setting up"
+							"Error disabling below"
 						return ${OK}
 					}
-				}
-			fi
-			;;
-		rule${rule}_set_desktop)
-			GetWindowDesktop
-			if [ ${val} -lt ${desktops} -a \
-			${val} -ne ${windowDesktop} ]; then
-				[ -z "${Debug}" ] || \
-					_log "window ${windowId}: Setting desktop to ${val}"
-				xdotool set_desktop_for_window ${windowId} ${val} || {
-					! CheckWindowExists ${windowId} || \
-						LogPrio="err" _log "window ${windowId}:" \
-						"Error setting up"
-					return ${OK}
-				}
-			fi
-			;;
-		rule${rule}_set_active_desktop)
-			if [ ${val} -lt ${desktops} -a \
-			{val} -ne ${desktopCurrent} ]; then
-				[ -z "${Debug}" ] || \
-					_log "window ${windowId}: Setting active desktop to ${val}"
-				xdotool set_desktop ${val} || {
-					! CheckWindowExists ${windowId} || \
-						LogPrio="err" _log "window ${windowId}:" \
-						"Error setting up"
-					return ${OK}
 				}
 			fi
 			;;
@@ -375,7 +442,7 @@ WindowSetup() {
 			xdotool windowclose ${windowId} || {
 				! CheckWindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
-					"Error setting up"
+					"Error closing window"
 				return ${OK}
 			}
 			;;
@@ -385,11 +452,14 @@ WindowSetup() {
 			xdotool windowkill ${windowId} || {
 				! CheckWindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
-					"Error setting up"
+					"Error killing window"
 				return ${OK}
 			}
 			;;
-		rule${rule}_set_delay)
+		rule${rule}_set_delay | \
+		rule${rule}_set_desktop | \
+		rule${rule}_set_focus | \
+		rule${rule}_set_active_desktop)
 			:
 			;;
 		*)
@@ -418,6 +488,8 @@ WindowNew() {
 		window_is_maximized \
 		window_is_maximized_horz \
 		window_is_maximized_vert \
+		window_is_shaded \
+		window_is_sticky \
 		rule
 
 	window_title="$(GetWindowTitle "${windowId}")" || \
@@ -445,6 +517,10 @@ WindowNew() {
 		return ${OK}
 	window_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
 		return ${OK}
+	window_is_shaded="$(GetWindowIsShaded "${windowId}")" || \
+		return ${OK}
+	window_is_sticky="$(GetWindowIsSticky "${windowId}")" || \
+		return ${OK}
 
 	[ -z "${Debug}" ] || {
 		printf "%s='%s'\n" \
@@ -460,7 +536,9 @@ WindowNew() {
 			"window_desktop_workarea" "${window_desktop_workarea}" \
 			"window_is_maximized" "${window_is_maximized}" \
 			"window_is_maximized_horz" "${window_is_maximized_horz}" \
-			"window_is_maximized_vert" "${window_is_maximized_vert}"
+			"window_is_maximized_vert" "${window_is_maximized_vert}" \
+			"window_is_shaded" "${window_is_shaded}" \
+			"window_is_sticky" "${window_is_sticky}"
 		test -z "${window_role}" || \
 			printf "%s='%s'\n" "window_role" "${window_role}"
 				

@@ -1,3 +1,18 @@
+setnewwinprops (0.9) unstable; urgency=medium
+
+  * Window setup sequence:
+    - move to desktop
+    - wait delay
+    - change active desktop
+    - wait for focus
+    - set up remaining properties
+  * add code to manage more properties:
+    - shaded
+    - sticky
+  * more explanative messages
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 26 Sep 2022 09:49:13 +0200
+
 setnewwinprops (0.8) unstable; urgency=medium
 
   * daemon actions:

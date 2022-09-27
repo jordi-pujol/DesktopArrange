@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.8 $
+#  $Revision: 0.9 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -48,7 +48,7 @@ _ps_children() {
 # priority: info notice warn err debug
 _log() {
 	local msg \
-		p="daemon.${LogPrio:-"notice"}"
+		p="${LogPrio:-"notice"}"
 	LogPrio=""
 	msg="$(_datetime) ${p}: ${@}"
 	printf '%s\n' "${msg}" >> "${LOGFILE}"
@@ -254,6 +254,22 @@ GetWindowIsMaximizedVert() {
 		echo "${NEGATIVE}"
 }
 
+GetWindowIsShaded() {
+	local windowId="${1}"
+	IsWindowWMStateActive ${windowId} \
+	'_NET_WM_STATE_SHADED' && \
+		echo "${AFFIRMATIVE}" || \
+		echo "${NEGATIVE}"
+}
+
+GetWindowIsSticky() {
+	local windowId="${1}"
+	IsWindowWMStateActive ${windowId} \
+	'_NET_WM_STATE_STICKY' && \
+		echo "${AFFIRMATIVE}" || \
+		echo "${NEGATIVE}"
+}
+
 GetWindowDesktop() {
 	local windowId="${1}"
 	xdotool get_desktop_for_window ${windowId} 2> /dev/null || :
@@ -332,6 +348,12 @@ RuleAppend() {
 		rule_check_is_maximized_vert)
 			_check_yn "rule${Rules}_check_is_maximized_vert" "${val}"
 			;;
+		rule_check_is_shaded)
+			_check_yn "rule${Rules}_check_is_shaded" "${val}"
+			;;
+		rule_check_is_sticky)
+			_check_yn "rule${Rules}_check_is_sticky" "${val}"
+			;;
 		rule_check_desktop_size)
 			_check_fixedsize "rule${Rules}_check_desktop_size" "${val}"
 			;;
@@ -372,6 +394,12 @@ RuleAppend() {
 			;;
 		rule_set_maximized_vertically)
 			_check_yn "rule${Rules}_set_maximized_vertically" "${val}"
+			;;
+		rule_set_shaded)
+			_check_yn "rule${Rules}_set_shaded" "${val}"
+			;;
+		rule_set_sticky)
+			_check_yn "rule${Rules}_set_sticky" "${val}"
 			;;
 		rule_set_fullscreen)
 			_check_yn "rule${Rules}_set_fullscreen" "${val}"
@@ -427,7 +455,9 @@ AddRule() {
 			rule_check_desktop_workarea | \
 			rule_check_is_maximized | \
 			rule_check_is_maximized_horz | \
-			rule_check_is_maximized_vert)
+			rule_check_is_maximized_vert | \
+			rule_check_is_shaded | \
+			rule_check_is_sticky)
 				let rc++,1
 			;;
 			*)
@@ -463,6 +493,8 @@ LoadConfig() {
 		rule_check_is_maximized \
 		rule_check_is_maximized_horz \
 		rule_check_is_maximized_vert \
+		rule_check_is_shaded \
+		rule_check_is_sticky \
 		rule_check_desktop_size \
 		rule_check_desktop_workarea \
 		rule_set_delay \
@@ -471,6 +503,8 @@ LoadConfig() {
 		rule_set_maximized \
 		rule_set_maximized_horizontally \
 		rule_set_maximized_vertically \
+		rule_set_shaded \
+		rule_set_sticky \
 		rule_set_fullscreen \
 		rule_set_focus \
 		rule_set_minimized \

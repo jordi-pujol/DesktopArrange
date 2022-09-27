@@ -5,7 +5,9 @@ cd "$(dirname $0)"
 [ -e build-stamp ] || \
 	touch -d '@0' build-stamp
 
-if [ -n "$(find . -type f -anewer build-stamp)" ]; then
+changed=
+if [ -n "${changed:="$(find . -type f -anewer build-stamp)"}" ]; then
+	printf '%s\n' "Changed files:" ${changed} ""
 	debuild -tc
 	: > build-stamp
 else
