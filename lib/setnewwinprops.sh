@@ -144,15 +144,15 @@ _check_fixedsize() {
 }
 
 GetXroot() {
-	local XROOT t=0
-	while ! XROOT="$(xprop -root _NET_SUPPORTING_WM_CHECK | \
+	local xroot t=0
+	while ! xroot="$(xprop -root _NET_SUPPORTING_WM_CHECK | \
 	awk '$NF ~ "^0x[0-9A-Fa-f]+$" {print $NF; rc=-1; exit}
 	END{exit rc+1}')" && \
 	[ $((t++)) -lt 5 ]; do
 		sleep 1
 	done 2> /dev/null
-	[ -n "${XROOT}" ] && \
-		echo "${XROOT}" || \
+	[ -n "${xroot}" ] && \
+		echo "${xroot}" || \
 		return ${ERR}
 }
 
@@ -254,6 +254,22 @@ GetWindowIsMaximizedVert() {
 		echo "${NEGATIVE}"
 }
 
+GetWindowIsFullscreen() {
+	local windowId="${1}"
+	IsWindowWMStateActive ${windowId} \
+	'_NET_WM_STATE_FULLSCREEN' && \
+		echo "${AFFIRMATIVE}" || \
+		echo "${NEGATIVE}"
+}
+
+GetWindowIsMinimized() {
+	local windowId="${1}"
+	IsWindowWMStateActive ${windowId} \
+	'_NET_WM_STATE_MINIMIZED' && \
+		echo "${AFFIRMATIVE}" || \
+		echo "${NEGATIVE}"
+}
+
 GetWindowIsShaded() {
 	local windowId="${1}"
 	IsWindowWMStateActive ${windowId} \
@@ -275,11 +291,23 @@ GetWindowDesktop() {
 	xdotool get_desktop_for_window ${windowId} 2> /dev/null || :
 }
 
-WindowExists() {
+GetWindowGeometry() {
+	eval $(sed -e '/^WIDTH=/s//windowWidth=/' \
+			-e '/^HEIGHT=/s//windowHeight=/' \
+			-e '/^X=/s//windowX=/' \
+			-e '/^Y=/s//windowY=/' \
+			-e '/^SCREEN=/s//windowScreen=/' \
+			< <(xdotool getwindowgeometry --shell "${windowId}"))
+}
+
+CheckWindowExists() {
 	local windowId="$(printf '0x%0x' "${1}")"
 	grep -qswF "${windowId}" < <(tr -s ' ,' ' ' \
-		< <(cut -f 2- -s -d '#' \
-		< <(xprop -root "_NET_CLIENT_LIST")))
+	< <(cut -f 2- -s -d '#' \
+	< <(xprop -root "_NET_CLIENT_LIST"))) || {
+		_log "window ${windowId}: can't set up this window, has been closed"
+		return ${ERR}
+	}
 }
 
 GetDesktopSize() {
@@ -298,21 +326,14 @@ GetDesktopStatus() {
 	desktops="$(xdotool get_num_desktops)"
 }
 
-GetWindowGeometry() {
-	eval $(sed -e '/^WIDTH=/s//windowWidth=/' \
-			-e '/^HEIGHT=/s//windowHeight=/' \
-			-e '/^X=/s//windowX=/' \
-			-e '/^Y=/s//windowY=/' \
-			-e '/^SCREEN=/s//windowScreen=/' \
-			< <(xdotool getwindowgeometry --shell "${windowId}"))
-}
-
 RuleAppend() {
 	let Rules++,1
 	while IFS="=" read -r prop val; do
 		val="$(_unquote "${val}")"
-		[ -n "${val}" ] || \
+		[ -n "${val}" ] || {
+			LogPrio="err" _log "Rule ${Rules}: Property \"${prop}\" has not a value"
 			continue
+		}
 		case "${prop}" in
 		rule_check_title)
 			eval rule${Rules}_check_title=\'${val}\'
@@ -348,6 +369,12 @@ RuleAppend() {
 		rule_check_is_maximized_vert)
 			_check_yn "rule${Rules}_check_is_maximized_vert" "${val}"
 			;;
+		rule_check_is_fullscreen)
+			_check_yn "rule${Rules}_check_is_fullscreen" "${val}"
+			;;
+		rule_check_is_minimized)
+			_check_yn "rule${Rules}_check_is_minimized" "${val}"
+			;;
 		rule_check_is_shaded)
 			_check_yn "rule${Rules}_check_is_shaded" "${val}"
 			;;
@@ -359,6 +386,12 @@ RuleAppend() {
 			;;
 		rule_check_desktop_workarea)
 			_check_fixedsize "rule${Rules}_check_desktop_workarea" "${val}"
+			;;
+		rule_check_desktops)
+			_check_natural "rule${Rules}_check_desktops" "${val}"
+			;;
+		rule_set_ignore)
+			eval rule${Rules}_set_ignore=\'y\'
 			;;
 		rule_set_delay)
 			_check_natural val ${NONE}
@@ -383,9 +416,6 @@ RuleAppend() {
 				eval rule${Rules}_set_size=\'${val}\'
 			fi
 			;;
-		rule_set_minimized)
-			_check_yn "rule${Rules}_set_minimized" "${val}"
-			;;
 		rule_set_maximized)
 			_check_yn "rule${Rules}_set_maximized" "${val}"
 			;;
@@ -395,14 +425,17 @@ RuleAppend() {
 		rule_set_maximized_vertically)
 			_check_yn "rule${Rules}_set_maximized_vertically" "${val}"
 			;;
-		rule_set_shaded)
-			_check_yn "rule${Rules}_set_shaded" "${val}"
+		rule_set_minimized)
+			_check_yn "rule${Rules}_set_minimized" "${val}"
+			;;
+		rule_set_fullscreen)
+			_check_yn "rule${Rules}_set_fullscreen" "${val}"
 			;;
 		rule_set_sticky)
 			_check_yn "rule${Rules}_set_sticky" "${val}"
 			;;
-		rule_set_fullscreen)
-			_check_yn "rule${Rules}_set_fullscreen" "${val}"
+		rule_set_shaded)
+			_check_yn "rule${Rules}_set_shaded" "${val}"
 			;;
 		rule_set_focus)
 			_check_y "rule${Rules}_set_focus" "${val}"
@@ -413,19 +446,19 @@ RuleAppend() {
 		rule_set_below)
 			_check_yn "rule${Rules}_set_below" "${val}"
 			;;
-		rule_set_closed)
-			_check_y "rule${Rules}_set_closed" "${val}"
-			;;
-		rule_set_killed)
-			_check_y "rule${Rules}_set_killed" "${val}"
+		rule_set_active_desktop)
+			_check_natural val ${NONE}
+			eval rule${Rules}_set_active_desktop=\'${val}\'
 			;;
 		rule_set_desktop)
 			_check_natural val ${NONE}
 			eval rule${Rules}_set_desktop=\'${val}\'
 			;;
-		rule_set_active_desktop)
-			_check_natural val ${NONE}
-			eval rule${Rules}_set_active_desktop=\'${val}\'
+		rule_set_closed)
+			_check_y "rule${Rules}_set_closed" "${val}"
+			;;
+		rule_set_killed)
+			_check_y "rule${Rules}_set_killed" "${val}"
 			;;
 		*)
 			_log "Property \"${prop}\" is not implemented yet"
@@ -451,13 +484,16 @@ AddRule() {
 			rule_check_class | \
 			rule_check_role | \
 			rule_check_desktop | \
-			rule_check_desktop_size | \
-			rule_check_desktop_workarea | \
 			rule_check_is_maximized | \
 			rule_check_is_maximized_horz | \
 			rule_check_is_maximized_vert | \
+			rule_check_is_fullscreen | \
+			rule_check_is_minimized | \
 			rule_check_is_shaded | \
-			rule_check_is_sticky)
+			rule_check_is_sticky | \
+			rule_check_desktop_size | \
+			rule_check_desktop_workarea | \
+			rule_check_desktops)
 				let rc++,1
 			;;
 			*)
@@ -493,31 +529,33 @@ LoadConfig() {
 		rule_check_is_maximized \
 		rule_check_is_maximized_horz \
 		rule_check_is_maximized_vert \
+		rule_check_is_fullscreen \
+		rule_check_is_minimized \
 		rule_check_is_shaded \
 		rule_check_is_sticky \
 		rule_check_desktop_size \
 		rule_check_desktop_workarea \
+		rule_check_desktops \
+		rule_set_ignore \
 		rule_set_delay \
-		rule_set_above \
-		rule_set_below \
+		rule_set_position \
+		rule_set_size \
 		rule_set_maximized \
 		rule_set_maximized_horizontally \
 		rule_set_maximized_vertically \
+		rule_set_fullscreen \
+		rule_set_minimized \
 		rule_set_shaded \
 		rule_set_sticky \
-		rule_set_fullscreen \
 		rule_set_focus \
-		rule_set_minimized \
-		rule_set_pin \
-		rule_set_position \
-		rule_set_size \
+		rule_set_above \
+		rule_set_below \
 		rule_set_active_desktop \
 		rule_set_desktop \
-		rule_set_decoration \
 		rule_set_closed \
 		rule_set_killed \
-		rule_set_pointer \
-		rule msg="Loading configuration"
+		rule dbg config emptylist \
+		msg="Loading configuration"
 
 	# config variables, default values
 	Debug=""
@@ -527,19 +565,47 @@ LoadConfig() {
 
 	_log "${msg}"
 
+	dbg=""
+	emptylist=""
+	config="${HOME}/.config/${APPNAME}/config.txt"
+	for option in "${@}"; do
+		[ -z "${option,,}" ] || \
+			case "${option,,}" in
+			xtrace)
+				dbg="xtrace"
+				;;
+			config=*)
+				eval config=\'$(cut -f 2- -s -d '=' <<< "${option}")\'
+				;;
+			debug|verbose)
+				dbg="verbose"
+				;;
+			emptylist)
+				emptylist="y"
+				;;
+			*)
+				LogPrio="warn" _log "Invalid command line option:" \
+					"\"${option}\""
+				;;
+			esac
+	done
+
+	[ -n "${emptylist}" ] && \
+		WindowIds="" || \
+		WindowIds="$(tr -s ' ,' ' ' \
+			< <(cut -f 2- -s -d '#' \
+			< <(xprop -root "_NET_CLIENT_LIST")))"
+
 	Rules=${NONE}
-	[ -s "${HOME}/.config/${APPNAME}/config.txt" ] && \
-		. "${HOME}/.config/${APPNAME}/config.txt" || {
+	[ -s "${config}" ] && \
+		. "${config}" || {
 			LogPrio="err" _log "Invalid config file:" \
-				"\"${HOME}/.config/${APPNAME}/config.txt\""
+				"\"${config}\""
 			exit ${ERR}
 		}
 
-	Debug="${Debug:-}"
-	! printf '%s\n' "${@}" | grep -qsxiF 'debug' || \
-		Debug="verbose"
-	! printf '%s\n' "${@}" | grep -qsxiF 'xtrace' || \
-		Debug="xtrace"
+	Debug="${dbg:-${Debug:-}}"
+
 	if [ "${Debug}" = "xtrace" ]; then
 		export PS4='+\t ${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
 		exec {BASH_XTRACEFD}>> "${LOGFILE}.xtrace"
@@ -547,6 +613,7 @@ LoadConfig() {
 	else
 		set +o xtrace
 	fi
+
 	[ -z "${Debug}" ] || {
 		[ "${Debug}" = "xtrace" ] || \
 			Debug="verbose"

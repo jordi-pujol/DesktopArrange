@@ -25,6 +25,9 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
 
+[ -n "${LOGFILE}" -a -f "${LOGFILE}" ] || \
+	exit 1
+
 if [ "${Debug}" = "xtrace" ]; then
 	export PS4='+\t ${BASH_SOURCE}:${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
 	exec >> "${LOGFILE}.xtrace" 2>&1
@@ -33,9 +36,7 @@ else
 	exec >> "${LOGFILE}" 2>&1
 fi
 
-pid="$(echo $(ps -o ppid= ${$}))"
-
-kill ${pid} 2> /dev/null
+ppid="$(echo $(ps -o ppid= ${$}))"
 
 [ -z "${Debug}" ] || \
 	echo "$(date +'%F %X') notice:" \
@@ -45,5 +46,7 @@ kill ${pid} 2> /dev/null
 [ "${Debug}" != "xtrace" ] || \
 	echo "$(date +'%F %X') notice:" \
 		"window ${windowId}:" \
-		"killing process ${pid} of user ${USER}" >> "${LOGFILE}"
+		"killing process ${ppid} of user ${USER}" >> "${LOGFILE}"
+
+kill ${ppid} 2> /dev/null
 :

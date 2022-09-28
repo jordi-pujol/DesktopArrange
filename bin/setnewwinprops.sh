@@ -41,14 +41,6 @@ _exit() {
 	wait || :
 }
 
-CheckWindowExists() {
-	local windowId="${1}"
-	WindowExists ${windowId} || {
-		_log "window ${windowId}: can't set up this window, has been closed"
-		return ${ERR}
-	}
-}
-
 CmdWaitFocus() {
 	local windowId="${1}"
 	echo "xdotool behave ${windowId} focus" \
@@ -66,6 +58,14 @@ WindowSetup() {
 	[ -z "${Debug}" ] || \
 		_log "window ${windowId}:" \
 		"Setting up using rule num. ${rule}"
+
+	eval val=\"\${rule${rule}_set_ignore:-}\"
+	if [ -n "${val}" ]; then
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}:" \
+			"Ignored"
+		return ${OK}
+	fi
 
 	GetDesktopStatus
 
@@ -168,34 +168,6 @@ WindowSetup() {
 				return ${OK}
 			}
 			;;
-		rule${rule}_set_minimized)
-			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				[ -z "${Debug}" ] || \
-					_log "window ${windowId}: Minimizing"
-				xdotool windowminimize --sync ${windowId} || {
-				! CheckWindowExists ${windowId} || \
-					LogPrio="err" _log "window ${windowId}:" \
-					"Error minimizing"
-				return ${OK}
-			}
-			else
-				[ -z "${Debug}" ] || \
-					_log "window ${windowId}: Un-minimizing"
-				wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
-					! CheckWindowExists ${windowId} || \
-						LogPrio="err" _log "window ${windowId}:" \
-						"Error un-minimizing"
-					return ${OK}
-				}
-				sleep 0.1
-				wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
-					! CheckWindowExists ${windowId} || \
-						LogPrio="err" _log "window ${windowId}:" \
-						"Error un-minimizing"
-					return ${OK}
-				}
-			fi
-			;;
 		rule${rule}_set_maximized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowWMStateActive ${windowId} \
@@ -279,6 +251,61 @@ WindowSetup() {
 				}
 			fi
 			;;
+		rule${rule}_set_fullscreen)
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				IsWindowWMStateActive ${windowId} \
+				'_NET_WM_STATE_FULLSCREEN' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Enabling fullscreen"
+					wmctrl -i -r ${windowId} -b add,fullscreen || {
+						! CheckWindowExists ${windowId} || \
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error enabling fullscreen"
+						return ${OK}
+					}
+				}
+			else
+				! IsWindowWMStateActive ${windowId} \
+				'_NET_WM_STATE_FULLSCREEN' || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Disabling fullscreen"
+					wmctrl -i -r ${windowId} -b remove,fullscreen || {
+						! CheckWindowExists ${windowId} || \
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error disabling fullscreen"
+						return ${OK}
+					}
+				}
+			fi
+			;;
+		rule${rule}_set_minimized)
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Minimizing"
+				xdotool windowminimize --sync ${windowId} || {
+				! CheckWindowExists ${windowId} || \
+					LogPrio="err" _log "window ${windowId}:" \
+					"Error minimizing"
+				return ${OK}
+			}
+			else
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Un-minimizing"
+				wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
+					! CheckWindowExists ${windowId} || \
+						LogPrio="err" _log "window ${windowId}:" \
+						"Error un-minimizing"
+					return ${OK}
+				}
+				sleep 0.1
+				wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
+					! CheckWindowExists ${windowId} || \
+						LogPrio="err" _log "window ${windowId}:" \
+						"Error un-minimizing"
+					return ${OK}
+				}
+			fi
+			;;
 		rule${rule}_set_shaded)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowWMStateActive ${windowId} \
@@ -328,33 +355,6 @@ WindowSetup() {
 						! CheckWindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error un-sticking"
-						return ${OK}
-					}
-				}
-			fi
-			;;
-		rule${rule}_set_fullscreen)
-			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_FULLSCREEN' || {
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Enabling fullscreen"
-					wmctrl -i -r ${windowId} -b add,fullscreen || {
-						! CheckWindowExists ${windowId} || \
-							LogPrio="err" _log "window ${windowId}:" \
-							"Error enabling fullscreen"
-						return ${OK}
-					}
-				}
-			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_FULLSCREEN' || {
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Disabling fullscreen"
-					wmctrl -i -r ${windowId} -b remove,fullscreen || {
-						! CheckWindowExists ${windowId} || \
-							LogPrio="err" _log "window ${windowId}:" \
-							"Error disabling fullscreen"
 						return ${OK}
 					}
 				}
@@ -483,13 +483,16 @@ WindowNew() {
 		window_class \
 		window_role \
 		window_desktop \
-		window_desktop_size \
-		window_desktop_workarea \
 		window_is_maximized \
 		window_is_maximized_horz \
 		window_is_maximized_vert \
+		window_is_fullscreen \
+		window_is_minimized \
 		window_is_shaded \
 		window_is_sticky \
+		window_desktop_size \
+		window_desktop_workarea \
+		window_desktops \
 		rule
 
 	window_title="$(GetWindowTitle "${windowId}")" || \
@@ -507,20 +510,27 @@ WindowNew() {
 	window_role="$(GetWindowRole "${windowId}")" || :
 	window_desktop="$(GetWindowDesktop "${windowId}")" || \
 		return ${OK}
-	window_desktop_size="$(GetDesktopSize)" || \
-		return ${OK}
-	window_desktop_workarea="$(GetDesktopWorkarea)" || \
-		return ${OK}
 	window_is_maximized="$(GetWindowIsMaximized "${windowId}")" || \
 		return ${OK}
 	window_is_maximized_horz="$(GetWindowIsMaximizedHorz "${windowId}")" || \
 		return ${OK}
 	window_is_maximized_vert="$(GetWindowIsMaximizedVert "${windowId}")" || \
 		return ${OK}
+	window_is_fullscreen="$(GetWindowIsFullscreen "${windowId}")" || \
+		return ${OK}
+	window_is_minimized="$(GetWindowIsMinimized "${windowId}")" || \
+		return ${OK}
 	window_is_shaded="$(GetWindowIsShaded "${windowId}")" || \
 		return ${OK}
 	window_is_sticky="$(GetWindowIsSticky "${windowId}")" || \
 		return ${OK}
+	window_desktop_size="$(GetDesktopSize)" || \
+		return ${OK}
+	window_desktop_workarea="$(GetDesktopWorkarea)" || \
+		return ${OK}
+
+	GetDesktopStatus
+	window_desktops="${desktops}"
 
 	[ -z "${Debug}" ] || {
 		printf "%s='%s'\n" \
@@ -532,13 +542,16 @@ WindowNew() {
 			"window_application" "${window_application}" \
 			"window_class" "${window_class}" \
 			"window_desktop" "${window_desktop}" \
-			"window_desktop_size" "${window_desktop_size}" \
-			"window_desktop_workarea" "${window_desktop_workarea}" \
 			"window_is_maximized" "${window_is_maximized}" \
 			"window_is_maximized_horz" "${window_is_maximized_horz}" \
 			"window_is_maximized_vert" "${window_is_maximized_vert}" \
+			"window_is_fullscreen" "${window_is_fullscreen}" \
+			"window_is_minimized" "${window_is_minimized}" \
 			"window_is_shaded" "${window_is_shaded}" \
-			"window_is_sticky" "${window_is_sticky}"
+			"window_is_sticky" "${window_is_sticky}" \
+			"window_desktop_size" "${window_desktop_size}" \
+			"window_desktop_workarea" "${window_desktop_workarea}" \
+			"window_desktops" "${desktops}"
 		test -z "${window_role}" || \
 			printf "%s='%s'\n" "window_role" "${window_role}"
 				
@@ -635,6 +648,76 @@ WindowNew() {
 					rc=""
 				fi
 				;;
+			rule${rule}_check_is_maximized)
+				if [ "${val}" = "${window_is_maximized}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: is \"${val}\" maximized"
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_is_maximized \"${val}\""
+					rc=""
+				fi
+				;;
+			rule${rule}_check_is_maximized_horz)
+				if [ "${val}" = "${window_is_maximized_horz}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: is \"${val}\" maximized horizontally"
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_is_maximized_horz \"${val}\""
+					rc=""
+				fi
+				;;
+			rule${rule}_check_is_maximized_vert)
+				if [ "${val}" = "${window_is_maximized_vert}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: is \"${val}\" maximized vertically"
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_is_maximized_vert \"${val}\""
+					rc=""
+				fi
+				;;
+			rule${rule}_check_is_fullscreen)
+				if [ "${val}" = "${window_is_fullscreen}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: is \"${val}\" fullscreen"
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_is_fullscreen \"${val}\""
+					rc=""
+				fi
+				;;
+			rule${rule}_check_is_minimized)
+				if [ "${val}" = "${window_is_minimized}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: is \"${val}\" minimized"
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_is_minimized \"${val}\""
+					rc=""
+				fi
+				;;
+			rule${rule}_check_is_sticky)
+				if [ "${val}" = "${window_is_sticky}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: is \"${val}\" sticky"
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_is_sticky \"${val}\""
+					rc=""
+				fi
+				;;
+			rule${rule}_check_is_shaded)
+				if [ "${val}" = "${window_is_shaded}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: is \"${val}\" shaded"
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_is_shaded \"${val}\""
+					rc=""
+				fi
+				;;
 			rule${rule}_check_desktop_size)
 				if [ "${val}" = "${window_desktop_size}" ]; then
 					[ -z "${Debug}" ] || \
@@ -652,6 +735,16 @@ WindowNew() {
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: doesn't match window_desktop_workarea \"${val}\""
+					rc=""
+				fi
+				;;
+			rule${rule}_check_desktops)
+				if [ "${val}" = "${window_desktops}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: matches window_desktops \"${val}\""
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_desktops \"${val}\""
 					rc=""
 				fi
 				;;
@@ -731,7 +824,7 @@ Main() {
 		exec {BASH_XTRACEFD}> "${LOGFILE}.xtrace"
 		set -o xtrace
 	}
-	exec > "${LOGFILE}" 2>&1
+	exec >> "${LOGFILE}" 2>&1
 
 	_log "Start"
 	LoadConfig "${@}"
@@ -778,15 +871,18 @@ start)
 	fi
 	if [ $(ps -o ppid= ${$}) -eq 1 ]; then
 		shift
-		echo "Info: ${APPNAME} start" >&2
+		echo "Info: ${APPNAME} start ${@}" >&2
 		Main "${@}"
 	else
-		echo "Info: ${APPNAME} submit" >&2
-		(("${0}" "${@}" > /dev/null 2>&1) &)
+		echo "Info: submit ${APPNAME} ${@}" >&2
+		((exec "${0}" "${@}" > /dev/null 2>&1) &)
 	fi
 	;;
 status)
-	if ! pid="$(AlreadyRunning)"; then
+	if pid="$(AlreadyRunning)"; then
+		echo "Info: log files" \
+			$(ls "${LOGFILE}"{,.xtrace} 2> /dev/null) >&2
+	else
 		echo "Info: ${APPNAME} is not running for this session" >&2
 		exit ${ERR}
 	fi
@@ -802,7 +898,8 @@ stop)
 restart)
 	exec "${0}" stop &
 	wait ${!} || :
-	exec "${0}" start &
+	shift
+	exec "${0}" start "${@}" &
 	wait ${!} || exit ${?}
 	;;
 reload)
