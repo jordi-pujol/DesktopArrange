@@ -38,6 +38,9 @@ fi
 
 ppid="$(echo $(ps -o ppid= ${$}))"
 
+kill -0 ${ppid} 2> /dev/null || \
+	exit 0
+
 [ -z "${Debug}" ] || \
 	echo "$(date +'%F %X') notice:" \
 		"window ${windowId}:" \
@@ -49,4 +52,6 @@ ppid="$(echo $(ps -o ppid= ${$}))"
 		"killing process ${ppid} of user ${USER}" >> "${LOGFILE}"
 
 kill ${ppid} 2> /dev/null
+
+sleep 1
 :

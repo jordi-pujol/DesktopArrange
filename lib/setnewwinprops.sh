@@ -323,7 +323,7 @@ GetDesktopStatus() {
 			-e '/^HEIGHT=/s//desktopHeight=/' \
 			< <(xdotool getdisplaygeometry --shell))
 	desktopCurrent="$(xdotool get_desktop)"
-	desktops="$(xdotool get_num_desktops)"
+	desktopsCount="$(xdotool get_num_desktops)"
 }
 
 RuleAppend() {
@@ -558,16 +558,17 @@ LoadConfig() {
 		msg="Loading configuration"
 
 	# config variables, default values
-	Debug=""
+	Debug="verbose"
+	dbg=""
 	unset $(awk -F '=' \
 		'$1 ~ "^rule[[:digit:]]*_" {print $1}' \
 		< <(set)) 2> /dev/null || :
+	IgnoreWindowTypes="DESKTOP,DOCK"
+	emptylist=""
+	config="${HOME}/.config/${APPNAME}/config.txt"
 
 	_log "${msg}"
 
-	dbg=""
-	emptylist=""
-	config="${HOME}/.config/${APPNAME}/config.txt"
 	for option in "${@}"; do
 		[ -z "${option,,}" ] || \
 			case "${option,,}" in
@@ -579,6 +580,9 @@ LoadConfig() {
 				;;
 			debug|verbose)
 				dbg="verbose"
+				;;
+			silent)
+				dbg=""
 				;;
 			emptylist)
 				emptylist="y"
@@ -614,12 +618,6 @@ LoadConfig() {
 		set +o xtrace
 	fi
 
-	[ -z "${Debug}" ] || {
-		[ "${Debug}" = "xtrace" ] || \
-			Debug="verbose"
-		_log "debug level is \"${Debug}\""
-	}
-
 	if [ -n "${Debug}" -o ${#} -gt ${NONE} ]; then
 		msg="daemon's command line"
 		[ ${#} -gt ${NONE} ] && \
@@ -627,6 +625,12 @@ LoadConfig() {
 			msg="${msg} is empty"
 		_log "${msg}"
 	fi
+
+	[ -z "${Debug}" ] || {
+		[ "${Debug}" = "xtrace" ] || \
+			Debug="verbose"
+		_log "debug level is \"${Debug}\""
+	}
 
 	if [ ${Rules} -eq ${NONE} ]; then
 		LogPrio="warn" _log "Have not configured any rule"
@@ -642,7 +646,7 @@ LoadConfig() {
 				grep -qsve "^rule${rule}_set_delay=" \
 				< <(grep -se "^rule${rule}_set_.*=" \
 				< <(set)) || \
-					LogPrio="err" _log "hasn't defined any set property for rule ${rule}"
+					LogPrio="err" _log "hasn't defined any property to set for rule ${rule}"
 			else
 				LogPrio="err" _log "can't find any property for rule ${rule}"
 			fi
