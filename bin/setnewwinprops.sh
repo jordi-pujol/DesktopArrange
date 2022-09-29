@@ -66,16 +66,16 @@ WindowSetup() {
 		return ${OK}
 	fi
 
-	GetDesktopStatus
+	DesktopStatus
 
 	eval val=\"\${rule${rule}_set_desktop:-}\"
 	if [ -n "${val}" ]; then
 		if [ ${val} -lt ${desktopsCount} ]; then
-			if [ ${val} -ne $(GetWindowDesktop "${windowId}") ]; then
+			if [ ${val} -ne $(WindowDesktop "${windowId}") ]; then
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Moving window to desktop ${val}"
 				xdotool set_desktop_for_window ${windowId} ${val} || {
-					! CheckWindowExists ${windowId} || \
+					! WindowExists ${windowId} || \
 						LogPrio="err" _log "window ${windowId}:" \
 						"Error moving window to desktop ${val}"
 					return ${OK}
@@ -95,12 +95,12 @@ WindowSetup() {
 			"Waiting ${val} seconds to set up"
 		while [ $((val--)) -ge ${NONE} ]; do
 			sleep 1
-			CheckWindowExists ${windowId} || \
+			WindowExists ${windowId} || \
 				return ${OK}
 		done
 	fi
 
-	GetDesktopStatus
+	DesktopStatus
 
 	eval val=\"\${rule${rule}_set_active_desktop:-}\"
 	if [ -n "${val}" ]; then
@@ -127,7 +127,7 @@ WindowSetup() {
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting up focus"
 			xdotool windowactivate --sync ${windowId} || {
-				CheckWindowExists ${windowId} || :
+				WindowExists ${windowId} || :
 				return ${OK}
 			}
 		else
@@ -137,23 +137,23 @@ WindowSetup() {
 			(export windowId LOGFILE Debug BASH_XTRACEFD
 			$(CmdWaitFocus ${windowId})) &
 			wait ${!} || :
-			CheckWindowExists ${windowId} || \
+			WindowExists ${windowId} || \
 				return ${OK}
 		fi
 	fi
 
-	GetDesktopStatus
+	DesktopStatus
 
 	while IFS="=" read -r prop val; do
 		val="$(_unquote "${val}")"
-		CheckWindowExists ${windowId} || \
+		WindowExists ${windowId} || \
 			return ${OK}
 		case "${prop}" in
 		rule${rule}_set_position)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Moving to ${val}"
 			xdotool windowmove --sync ${windowId} ${val} || {
-				! CheckWindowExists ${windowId} || \
+				! WindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
 					"Error moving to ${val}"
 				return ${OK}
@@ -163,7 +163,7 @@ WindowSetup() {
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting up size to ${val}"
 			xdotool windowsize --sync ${windowId} ${val} || {
-				! CheckWindowExists ${windowId} || \
+				! WindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
 					"Error setting up size to ${val}"
 				return ${OK}
@@ -171,26 +171,22 @@ WindowSetup() {
 			;;
 		rule${rule}_set_maximized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_MAXIMIZED_HORZ' \
-				'_NET_WM_STATE_MAXIMIZED_VERT' || {
+				IsWindowMaximized ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing"
 					wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error maximizing"
 						return ${OK}
 					}
 				}
 			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_MAXIMIZED_HORZ' \
-				'_NET_WM_STATE_MAXIMIZED_VERT' || {
+				! IsWindowMaximized ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing"
 					wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error un-maximizing"
 						return ${OK}
@@ -200,24 +196,22 @@ WindowSetup() {
 			;;
 		rule${rule}_set_maximized_horizontally)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_MAXIMIZED_HORZ' || {
+				IsWindowMaximizedHorz ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing horizontally"
 					wmctrl -i -r ${windowId} -b add,maximized_horz || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error maximizing horizontally"
 						return ${OK}
 					}
 				}
 			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_MAXIMIZED_HORZ' || {
+				! IsWindowMaximizedHorz ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing horizontally"
 					wmctrl -i -r ${windowId} -b remove,maximized_horz || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error un-maximizing horizontally"
 						return ${OK}
@@ -227,24 +221,22 @@ WindowSetup() {
 			;;
 		rule${rule}_set_maximized_vertically)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_MAXIMIZED_VERT' || {
+				IsWindowMaximizedVert ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing vertically"
 					wmctrl -i -r ${windowId} -b add,maximized_vert || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error maximizing vertically"
 						return ${OK}
 					}
 				}
 			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_MAXIMIZED_VERT' || {
+				! IsWindowMaximizedVert ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing vertically "
 					wmctrl -i -r ${windowId} -b remove,maximized_vert || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error un-maximizing vertically"
 						return ${OK}
@@ -254,24 +246,22 @@ WindowSetup() {
 			;;
 		rule${rule}_set_fullscreen)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_FULLSCREEN' || {
+				IsWindowFullscreen ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Enabling fullscreen"
 					wmctrl -i -r ${windowId} -b add,fullscreen || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error enabling fullscreen"
 						return ${OK}
 					}
 				}
 			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_FULLSCREEN' || {
+				! IsWindowFullscreen ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling fullscreen"
 					wmctrl -i -r ${windowId} -b remove,fullscreen || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error disabling fullscreen"
 						return ${OK}
@@ -281,52 +271,54 @@ WindowSetup() {
 			;;
 		rule${rule}_set_minimized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				[ -z "${Debug}" ] || \
-					_log "window ${windowId}: Minimizing"
-				xdotool windowminimize --sync ${windowId} || {
-				! CheckWindowExists ${windowId} || \
-					LogPrio="err" _log "window ${windowId}:" \
-					"Error minimizing"
-				return ${OK}
-			}
-			else
-				[ -z "${Debug}" ] || \
-					_log "window ${windowId}: Un-minimizing"
-				wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
-					! CheckWindowExists ${windowId} || \
+				IsWindowMinimized ${windowId} || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Minimizing"
+					xdotool windowminimize --sync ${windowId} || {
+					! WindowExists ${windowId} || \
 						LogPrio="err" _log "window ${windowId}:" \
-						"Error un-minimizing"
+						"Error minimizing"
 					return ${OK}
+					}
 				}
-				sleep 0.1
-				wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
-					! CheckWindowExists ${windowId} || \
-						LogPrio="err" _log "window ${windowId}:" \
-						"Error un-minimizing"
-					return ${OK}
+			else
+				! IsWindowMinimized ${windowId} || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Un-minimizing"
+					wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || {
+						! WindowExists ${windowId} || \
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error un-minimizing"
+						return ${OK}
+					}
+					sleep 0.1
+					wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || {
+						! WindowExists ${windowId} || \
+							LogPrio="err" _log "window ${windowId}:" \
+							"Error un-minimizing"
+						return ${OK}
+					}
 				}
 			fi
 			;;
 		rule${rule}_set_shaded)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_SHADED' || {
+				IsWindowShaded ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Shading"
 					wmctrl -i -r ${windowId} -b add,shade || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error shading"
 						return ${OK}
 					}
 				}
 			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_SHADED' || {
+				! IsWindowShaded ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-shading"
 					wmctrl -i -r ${windowId} -b remove,shade || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error un-shading"
 						return ${OK}
@@ -334,26 +326,39 @@ WindowSetup() {
 				}
 			fi
 			;;
+		rule${rule}_set_decorated)
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				IsWindowDecorated ${windowId} || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Decorating"
+					TapKeys ${windowId} "alt+space" "d"
+				}
+			else
+				! IsWindowDecorated ${windowId} || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Un-decorating"
+					TapKeys ${windowId} "alt+space" "d"
+				}
+			fi
+			;;
 		rule${rule}_set_sticky)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_STICKY' || {
+				IsWindowSticky ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Sticking"
 					wmctrl -i -r ${windowId} -b add,sticky || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error sticking"
 						return ${OK}
 					}
 				}
 			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_STICKY' || {
+				! IsWindowSticky ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-sticking"
 					wmctrl -i -r ${windowId} -b remove,sticky || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error un-sticking"
 						return ${OK}
@@ -363,35 +368,32 @@ WindowSetup() {
 			;;
 		rule${rule}_set_above)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_BELOW' || {
+				! IsWindowBelow ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling below"
 					wmctrl -i -r ${windowId} -b remove,below || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error disabling below"
 						return ${OK}
 					}
 				}
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_ABOVE' || {
+				IsWindowAbove ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Enabling above"
 					wmctrl -i -r ${windowId} -b add,above || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error enabling above"
 						return ${OK}
 					}
 				}
 			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_ABOVE' || {
+				! IsWindowAbove ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling above"
 					wmctrl -i -r ${windowId} -b remove,above || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error disabling above"
 						return ${OK}
@@ -401,35 +403,32 @@ WindowSetup() {
 			;;
 		rule${rule}_set_below)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_ABOVE' || {
+				! IsWindowAbove ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling above"
 					wmctrl -i -r ${windowId} -b remove,above || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error disabling above"
 						return ${OK}
 					}
 				}
-				IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_BELOW' || {
+				IsWindowBelow ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Enabling below"
 					wmctrl -i -r ${windowId} -b add,below || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error enabling below"
 						return ${OK}
 					}
 				}
 			else
-				! IsWindowWMStateActive ${windowId} \
-				'_NET_WM_STATE_BELOW' || {
+				! IsWindowBelow ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Disabling below"
 					wmctrl -i -r ${windowId} -b remove,below || {
-						! CheckWindowExists ${windowId} || \
+						! WindowExists ${windowId} || \
 							LogPrio="err" _log "window ${windowId}:" \
 							"Error disabling below"
 						return ${OK}
@@ -441,7 +440,7 @@ WindowSetup() {
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Closing window"
 			xdotool windowclose ${windowId} || {
-				! CheckWindowExists ${windowId} || \
+				! WindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
 					"Error closing window"
 				return ${OK}
@@ -451,7 +450,7 @@ WindowSetup() {
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Killing window"
 			xdotool windowkill ${windowId} || {
-				! CheckWindowExists ${windowId} || \
+				! WindowExists ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
 					"Error killing window"
 				return ${OK}
@@ -490,43 +489,46 @@ WindowNew() {
 		window_is_fullscreen="" \
 		window_is_minimized="" \
 		window_is_shaded="" \
+		window_is_decorated="" \
 		window_is_sticky="" \
 		window_desktop_size="" \
 		window_desktop_workarea="" \
 		desktopWidth desktopHeight desktopCurrent desktopsCount \
 		rule
 
-	GetDesktopStatus
+	DesktopStatus
 
 	[ -z "${Debug}" ] || {
 		printf "%s='%s'\n" \
 			"New window id" ${windowId} \
-			"window_title" "${window_title:="$(GetWindowTitle "${windowId}")"}" \
-			"window_state" "${window_state:="$(GetWindowState "${windowId}")"}" \
-			"window_type" "${window_type:="$(GetWindowType "${windowId}")"}" \
-			"window_app_name" "${window_app_name:="$(GetWindowAppName "${windowId}")"}" \
+			"window_title" "${window_title:="$(WindowTitle "${windowId}")"}" \
+			"window_state" "${window_state:="$(WindowState "${windowId}")"}" \
+			"window_type" "${window_type:="$(WindowType "${windowId}")"}" \
+			"window_app_name" "${window_app_name:="$(WindowAppName "${windowId}")"}" \
 			"window_application" \
-				"${window_application:="$(GetWindowApplication "${windowId}" 2> /dev/null)"}" \
-			"window_class" "${window_class:="$(GetWindowClass "${windowId}")"}" \
-			"window_role" "${window_role:="$(GetWindowRole "${windowId}" || :)"}" \
-			"window_desktop" "${window_desktop:="$(GetWindowDesktop "${windowId}")"}" \
+				"${window_application:="$(WindowApplication "${windowId}" 2> /dev/null)"}" \
+			"window_class" "${window_class:="$(WindowClass "${windowId}")"}" \
+			"window_role" "${window_role:="$(WindowRole "${windowId}" || :)"}" \
+			"window_desktop" "${window_desktop:="$(WindowDesktop "${windowId}")"}" \
 			"window_is_maximized" \
-				"${window_is_maximized:="$(GetWindowIsMaximized "${windowId}")"}" \
+				"${window_is_maximized:="$(IsWindowMaximized "${windowId}" ".")"}" \
 			"window_is_maximized_horz" \
-				"${window_is_maximized_horz:="$(GetWindowIsMaximizedHorz "${windowId}")"}" \
+				"${window_is_maximized_horz:="$(IsWindowMaximizedHorz "${windowId}" ".")"}" \
 			"window_is_maximized_vert" \
-				"${window_is_maximized_vert:="$(GetWindowIsMaximizedVert "${windowId}")"}" \
+				"${window_is_maximized_vert:="$(IsWindowMaximizedVert "${windowId}" ".")"}" \
 			"window_is_fullscreen" \
-				"${window_is_fullscreen:="$(GetWindowIsFullscreen "${windowId}")"}" \
+				"${window_is_fullscreen:="$(IsWindowFullscreen "${windowId}" ".")"}" \
 			"window_is_minimized" \
-				"${window_is_minimized:="$(GetWindowIsMinimized "${windowId}")"}" \
+				"${window_is_minimized:="$(IsWindowMinimized "${windowId}" ".")"}" \
 			"window_is_shaded" \
-				"${window_is_shaded:="$(GetWindowIsShaded "${windowId}")"}" \
+				"${window_is_shaded:="$(IsWindowShaded "${windowId}" ".")"}" \
+			"window_is_decorated" \
+				"${window_is_decorated:="$(IsWindowDecorated "${windowId}" ".")"}" \
 			"window_is_sticky" \
-				"${window_is_sticky:="$(GetWindowIsSticky "${windowId}")"}" \
-			"window_desktop_size" "${window_desktop_size:="$(GetDesktopSize)"}" \
+				"${window_is_sticky:="$(IsWindowSticky "${windowId}" ".")"}" \
+			"window_desktop_size" "${window_desktop_size:="$(DesktopSize)"}" \
 			"window_desktop_workarea" \
-				"${window_desktop_workarea:="$(GetDesktopWorkarea)"}" \
+				"${window_desktop_workarea:="$(DesktopWorkarea)"}" \
 			"desktopsCount" "${desktopsCount}"
 	} >> "${LOGFILE}"
 
@@ -542,7 +544,7 @@ WindowNew() {
 			val="$(_unquote "${val}")"
 			case "${prop}" in
 			rule${rule}_check_title)
-				if [ "${val}" = "${window_title:="$(GetWindowTitle "${windowId}")"}" ]; then
+				if [ "${val}" = "${window_title:="$(WindowTitle "${windowId}")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_title \"${val}\""
 				else
@@ -552,7 +554,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_state)
-				if [ "${val}" = "${window_state:="$(GetWindowState "${windowId}")"}" ]; then
+				if [ "${val}" = "${window_state:="$(WindowState "${windowId}")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_state \"${val}\""
 				else
@@ -562,7 +564,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_type)
-				if grep -qs -iwF "${window_type:="$(GetWindowType "${windowId}")"}" \
+				if grep -qs -iwF "${window_type:="$(WindowType "${windowId}")"}" \
 				<<< "${val}" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_type \"${val}\""
@@ -573,7 +575,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_app_name)
-				if [ "${val}" = "${window_app_name:="$(GetWindowAppName "${windowId}")"}" ]; then
+				if [ "${val}" = "${window_app_name:="$(WindowAppName "${windowId}")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_app_name \"${val}\""
 				else
@@ -584,7 +586,7 @@ WindowNew() {
 				;;
 			rule${rule}_check_application)
 				if grep -qs -iwF \
-				"${window_application:="$(GetWindowApplication "${windowId}" 2> /dev/null)"}" \
+				"${window_application:="$(WindowApplication "${windowId}" 2> /dev/null)"}" \
 				<<< "${val}" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_application \"${val}\""
@@ -595,7 +597,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_class)
-				if grep -qs -iwF "${window_class:="$(GetWindowClass "${windowId}")"}" \
+				if grep -qs -iwF "${window_class:="$(WindowClass "${windowId}")"}" \
 				<<< "${val}" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_class \"${val}\""
@@ -606,7 +608,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_role)
-				if grep -qs -iwF "${window_role:="$(GetWindowRole "${windowId}")"}" \
+				if grep -qs -iwF "${window_role:="$(WindowRole "${windowId}")"}" \
 				<<< "${val}"; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_role \"${val}\""
@@ -617,7 +619,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_desktop)
-				if [ "${val}" = "${window_desktop:="$(GetWindowDesktop "${windowId}")"}" ]; then
+				if [ "${val}" = "${window_desktop:="$(WindowDesktop "${windowId}")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_desktop \"${val}\""
 				else
@@ -628,7 +630,7 @@ WindowNew() {
 				;;
 			rule${rule}_check_is_maximized)
 				if [ "${val}" = \
-				"${window_is_maximized:="$(GetWindowIsMaximized "${windowId}")"}" ]; then
+				"${window_is_maximized:="$(IsWindowMaximized "${windowId}" ".")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: is \"${val}\" maximized"
 				else
@@ -639,7 +641,7 @@ WindowNew() {
 				;;
 			rule${rule}_check_is_maximized_horz)
 				if [ "${val}" = \
-				"${window_is_maximized_horz:="$(GetWindowIsMaximizedHorz "${windowId}")"}" ]; then
+				"${window_is_maximized_horz:="$(IsWindowMaximizedHorz "${windowId}" ".")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: is \"${val}\" maximized horizontally"
 				else
@@ -650,7 +652,7 @@ WindowNew() {
 				;;
 			rule${rule}_check_is_maximized_vert)
 				if [ "${val}" = \
-				"${window_is_maximized_vert:="$(GetWindowIsMaximizedVert "${windowId}")"}" ]; then
+				"${window_is_maximized_vert:="$(IsWindowMaximizedVert "${windowId}" ".")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: is \"${val}\" maximized vertically"
 				else
@@ -661,7 +663,7 @@ WindowNew() {
 				;;
 			rule${rule}_check_is_fullscreen)
 				if [ "${val}" = \
-				"${window_is_fullscreen:="$(GetWindowIsFullscreen "${windowId}")"}" ]; then
+				"${window_is_fullscreen:="$(IsWindowFullscreen "${windowId}" ".")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: is \"${val}\" fullscreen"
 				else
@@ -672,7 +674,7 @@ WindowNew() {
 				;;
 			rule${rule}_check_is_minimized)
 				if [ "${val}" = \
-				"${window_is_minimized:="$(GetWindowIsMinimized "${windowId}")"}" ]; then
+				"${window_is_minimized:="$(IsWindowMinimized "${windowId}" ".")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: is \"${val}\" minimized"
 				else
@@ -683,7 +685,7 @@ WindowNew() {
 				;;
 			rule${rule}_check_is_shaded)
 				if [ "${val}" = \
-				"${window_is_shaded:="$(GetWindowIsShaded "${windowId}")"}" ]; then
+				"${window_is_shaded:="$(IsWindowShaded "${windowId}" ".")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: is \"${val}\" shaded"
 				else
@@ -692,9 +694,20 @@ WindowNew() {
 					rc=""
 				fi
 				;;
+			rule${rule}_check_is_decorated)
+				if [ "${val}" = \
+				"${window_is_decorated:="$(IsWindowDecorated "${windowId}" ".")"}" ]; then
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: is \"${val}\" decorated"
+				else
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: doesn't match window_is_decorated \"${val}\""
+					rc=""
+				fi
+				;;
 			rule${rule}_check_is_sticky)
 				if [ "${val}" = \
-				"${window_is_sticky:="$(GetWindowIsSticky "${windowId}")"}" ]; then
+				"${window_is_sticky:="$(IsWindowSticky "${windowId}" ".")"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: is \"${val}\" sticky"
 				else
@@ -704,7 +717,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_desktop_size)
-				if [ "${val}" = "${window_desktop_size:="$(GetDesktopSize)"}" ]; then
+				if [ "${val}" = "${window_desktop_size:="$(DesktopSize)"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_desktop_size \"${val}\""
 				else
@@ -715,7 +728,7 @@ WindowNew() {
 				;;
 			rule${rule}_check_desktop_workarea)
 				if [ "${val}" = \
-				"${window_desktop_workarea:="$(GetDesktopWorkarea)"}" ]; then
+				"${window_desktop_workarea:="$(DesktopWorkarea)"}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window_desktop_workarea \"${val}\""
 				else
@@ -759,7 +772,7 @@ WindowsUpdate() {
 	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
 	< <(printf '%s\n' "${@}")); do
 		[ -z "${IgnoreWindowTypes}" ] || \
-			if ! window_type="$(GetWindowType ${windowId})" || \
+			if ! window_type="$(WindowType ${windowId})" || \
 			grep -qswEe "_NET_WM_WINDOW_TYPE_($(
 			tr -s ' ,|' '|' <<< "${IgnoreWindowTypes}" ))" \
 			<<< "${window_type}"; then

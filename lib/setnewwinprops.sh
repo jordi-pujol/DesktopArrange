@@ -164,38 +164,38 @@ AlreadyRunning() {
 	cat "${PIDFILE}"
 }
 
-GetWindowProp() {
+WindowProp() {
 	xprop -len 1024 -id "${@}"
 }
 
-GetWindowPropAtom() {
+WindowPropAtom() {
 	local windowId="${1}" \
 		atom="${2}"
 	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(GetWindowProp ${windowId} "${atom}")
+		< <(WindowProp ${windowId} "${atom}")
 }
 
-GetWindowState() {
+WindowState() {
 	local windowId="${1}"
 	awk '$0 ~ "window state:" {print $NF}' \
-		< <(GetWindowProp ${windowId} "WM_STATE")
+		< <(WindowProp ${windowId} "WM_STATE")
 }
 
-GetWindowWMState() {
+WindowWMState() {
 	local windowId="${1}"
-	GetWindowPropAtom ${windowId} "_NET_WM_STATE"
+	WindowPropAtom ${windowId} "_NET_WM_STATE"
 }
 
 IsWindowWMStateActive() {
 	local windowId="${1}" wmstate
-	wmstate="$(GetWindowWMState "${windowId}")" || \
+	wmstate="$(WindowWMState "${windowId}")" || \
 		return ${ERR}
 	shift
 	[ $(grep -s --count -wF "$(printf '%s\n' "${@}")" \
 	< <(printf '%s\n' ${wmstate})) -eq ${#} ]
 }
 
-GetWindowTitle() {
+WindowTitle() {
 	local windowId="${1}" name
 	name="$(xdotool getwindowname "${windowId}")"
 	[ -n "${name}" ] && \
@@ -203,95 +203,163 @@ GetWindowTitle() {
 		return ${ERR}
 }
 
-GetWindowAppName() {
+WindowAppName() {
 	local windowId="${1}"
-	_unquote "$(GetWindowPropAtom ${windowId} "_OB_APP_NAME")"
+	_unquote "$(WindowPropAtom ${windowId} "_OB_APP_NAME")"
 }
 
-GetWindowType() {
+WindowType() {
 	local windowId="${1}"
-	GetWindowPropAtom ${windowId} "_NET_WM_WINDOW_TYPE"
+	WindowPropAtom ${windowId} "_NET_WM_WINDOW_TYPE"
 }
 
-GetWindowApplication() {
+WindowApplication() {
 	local windowId="${1}"
 	ps -ho cmd "$(xdotool getwindowpid "${windowId}")" || \
 		return ${ERR}
 }
 
-GetWindowClass() {
+WindowClass() {
 	local windowId="${1}"
-	GetWindowPropAtom ${windowId} "WM_CLASS"
+	WindowPropAtom ${windowId} "WM_CLASS"
 }
 
-GetWindowRole() {
+WindowRole() {
 	local windowId="${1}"
-	GetWindowPropAtom ${windowId} "WM_WINDOW_ROLE"
+	WindowPropAtom ${windowId} "WM_WINDOW_ROLE"
 }
 
-GetWindowIsMaximized() {
-	local windowId="${1}"
+IsWindowMaximized() {
+	local windowId="${1}" \
+		answer="${2:-}"
 	IsWindowWMStateActive ${windowId} \
 	'_NET_WM_STATE_MAXIMIZED_HORZ' \
-	'_NET_WM_STATE_MAXIMIZED_VERT' && \
-		echo "${AFFIRMATIVE}" || \
-		echo "${NEGATIVE}"
+	'_NET_WM_STATE_MAXIMIZED_VERT' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-GetWindowIsMaximizedHorz() {
-	local windowId="${1}"
-	IsWindowWMStateActive ${windowId} \
-	'_NET_WM_STATE_MAXIMIZED_HORZ' && \
-		echo "${AFFIRMATIVE}" || \
-		echo "${NEGATIVE}"
+IsWindowMaximizedHorz() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_MAXIMIZED_HORZ' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-GetWindowIsMaximizedVert() {
-	local windowId="${1}"
-	IsWindowWMStateActive ${windowId} \
-	'_NET_WM_STATE_MAXIMIZED_VERT' && \
-		echo "${AFFIRMATIVE}" || \
-		echo "${NEGATIVE}"
+IsWindowMaximizedVert() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_MAXIMIZED_VERT' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-GetWindowIsFullscreen() {
-	local windowId="${1}"
-	IsWindowWMStateActive ${windowId} \
-	'_NET_WM_STATE_FULLSCREEN' && \
-		echo "${AFFIRMATIVE}" || \
-		echo "${NEGATIVE}"
+IsWindowFullscreen() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_FULLSCREEN' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-GetWindowIsMinimized() {
-	local windowId="${1}"
-	IsWindowWMStateActive ${windowId} \
-	'_NET_WM_STATE_MINIMIZED' && \
-		echo "${AFFIRMATIVE}" || \
-		echo "${NEGATIVE}"
+IsWindowMinimized() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_MINIMIZED' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-GetWindowIsShaded() {
-	local windowId="${1}"
-	IsWindowWMStateActive ${windowId} \
-	'_NET_WM_STATE_SHADED' && \
-		echo "${AFFIRMATIVE}" || \
-		echo "${NEGATIVE}"
+IsWindowShaded() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_SHADED' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-GetWindowIsSticky() {
-	local windowId="${1}"
-	IsWindowWMStateActive ${windowId} \
-	'_NET_WM_STATE_STICKY' && \
-		echo "${AFFIRMATIVE}" || \
-		echo "${NEGATIVE}"
+IsWindowDecorated() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	! IsWindowWMStateActive ${windowId} '_OB_WM_STATE_UNDECORATED' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-GetWindowDesktop() {
+IsWindowSticky() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_STICKY' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
+}
+
+IsWindowAbove() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_ABOVE' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
+}
+
+IsWindowBelow() {
+	local windowId="${1}" \
+		answer="${2:-}"
+	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_BELOW' || {
+		echo "${answer:+${NEGATIVE}}"
+		return ${ERR}
+	}
+	echo "${answer:+${AFFIRMATIVE}}"
+}
+
+TapKeys() {
+	local windowId="${1}" \
+		xkbmap key rc
+	shift
+	xkbmap="$(setxkbmap -query | \
+		sed -nre '\|^options| s||option|' \
+		-e '\|([^:[:blank:]]+)[:[:blank:]]+(.*)| s||-\1 \2|p')"
+	setxkbmap us dvorak -rules xorg -model pc105 -option
+	rc="."
+	for key in "${@}"; do
+		[ -n "${rc}" ] && \
+			rc="" || \
+			sleep 1
+		[[ $(xdotool getactivewindow) -eq ${windowId} ]] || \
+			xdotool windowactivate --sync ${windowId} || {
+				WindowExists ${windowId} || :
+				return ${OK}
+			}
+		xdotool key --clearmodifiers "${key}"
+	done
+	setxkbmap ${xkbmap}
+}
+
+WindowDesktop() {
 	local windowId="${1}"
 	xdotool get_desktop_for_window ${windowId} 2> /dev/null || :
 }
 
-GetWindowGeometry() {
+WindowGeometry() {
 	eval $(sed -e '/^WIDTH=/s//windowWidth=/' \
 			-e '/^HEIGHT=/s//windowHeight=/' \
 			-e '/^X=/s//windowX=/' \
@@ -300,7 +368,7 @@ GetWindowGeometry() {
 			< <(xdotool getwindowgeometry --shell "${windowId}"))
 }
 
-CheckWindowExists() {
+WindowExists() {
 	local windowId="$(printf '0x%0x' "${1}")"
 	grep -qswF "${windowId}" < <(tr -s ' ,' ' ' \
 	< <(cut -f 2- -s -d '#' \
@@ -310,15 +378,15 @@ CheckWindowExists() {
 	}
 }
 
-GetDesktopSize() {
+DesktopSize() {
 	awk '$2 == "*" {print $4; exit}' < <(wmctrl -d)
 }
 
-GetDesktopWorkarea() {
+DesktopWorkarea() {
 	awk '$2 == "*" {print $9; exit}' < <(wmctrl -d)
 }
 
-GetDesktopStatus() {
+DesktopStatus() {
 	eval $(sed -e '/^WIDTH=/s//desktopWidth=/' \
 			-e '/^HEIGHT=/s//desktopHeight=/' \
 			< <(xdotool getdisplaygeometry --shell))
@@ -377,6 +445,9 @@ RuleAppend() {
 			;;
 		rule_check_is_shaded)
 			_check_yn "rule${Rules}_check_is_shaded" "${val}"
+			;;
+		rule_check_is_decorated)
+			_check_yn "rule${Rules}_check_is_decorated" "${val}"
 			;;
 		rule_check_is_sticky)
 			_check_yn "rule${Rules}_check_is_sticky" "${val}"
@@ -437,6 +508,9 @@ RuleAppend() {
 		rule_set_shaded)
 			_check_yn "rule${Rules}_set_shaded" "${val}"
 			;;
+		rule_set_decorated)
+			_check_yn "rule${Rules}_set_decorated" "${val}"
+			;;
 		rule_set_focus)
 			_check_y "rule${Rules}_set_focus" "${val}"
 			;;
@@ -490,6 +564,7 @@ AddRule() {
 			rule_check_is_fullscreen | \
 			rule_check_is_minimized | \
 			rule_check_is_shaded | \
+			rule_check_is_decorated | \
 			rule_check_is_sticky | \
 			rule_check_desktop_size | \
 			rule_check_desktop_workarea | \
@@ -532,6 +607,7 @@ LoadConfig() {
 		rule_check_is_fullscreen \
 		rule_check_is_minimized \
 		rule_check_is_shaded \
+		rule_check_is_decorated \
 		rule_check_is_sticky \
 		rule_check_desktop_size \
 		rule_check_desktop_workarea \
@@ -546,6 +622,7 @@ LoadConfig() {
 		rule_set_fullscreen \
 		rule_set_minimized \
 		rule_set_shaded \
+		rule_set_decorated \
 		rule_set_sticky \
 		rule_set_focus \
 		rule_set_above \

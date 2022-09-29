@@ -17,5 +17,9 @@ Architecture: all
 Description: Change window properties for opening windows
  according to a set of configurable rules.
 Depends: ${misc:Depends},
- gawk, x11-utils, wmctrl, xdotool,
+ gawk,
+ x11-utils,
+ x11-xkb-utils,
+ wmctrl,
+ xdotool,
  bash,
