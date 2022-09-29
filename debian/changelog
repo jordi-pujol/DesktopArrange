@@ -1,3 +1,12 @@
+setnewwinprops (0.11) unstable; urgency=medium
+
+  * new rule option: rule_set_continue
+    allows to set sequentially multiple rules for every window.
+  * code improvement:
+    - make better logic
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Thu, 29 Sep 2022 13:17:34 +0200
+
 setnewwinprops (0.10) unstable; urgency=medium
 
   * new properties to check and set up.

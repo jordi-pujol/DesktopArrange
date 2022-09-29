@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.10 $
+#  $Revision: 0.11 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -113,24 +113,27 @@ _check_natural() {
 
 _check_yn() {
 	local var="${1}" \
-		val="${2}"
+		val="${2}" \
+		dft="${3:-${AFFIRMATIVE}}"
 	if [[ "${val,,}" =~ ${PATTERN_YES} ]]; then
 		eval ${var}=\'${AFFIRMATIVE}\'
 	elif [[ "${val,,}" =~ ${PATTERN_NO} ]]; then
 		eval ${var}=\'${NEGATIVE}\'
 	else
-		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\""
+		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\"," \
+			"assuming default \"${dft}\""
+		eval ${var}=\'${dft}\'
 	fi
 }
 
 _check_y() {
 	local var="${1}" \
-		val="${2}"
-	if [[ "${val,,}" =~ ${PATTERN_YES} ]]; then
-		eval ${var}=\'${AFFIRMATIVE}\'
-	else
-		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\""
-	fi
+		val="${2}" \
+		dft="${3:-${AFFIRMATIVE}}"
+	[[ "${val,,}" =~ ${PATTERN_YES} ]] || \
+		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\"," \
+			"assuming default \"${dft}\""
+	eval ${var}=\'${dft}\'
 }
 
 _check_fixedsize() {
@@ -164,6 +167,53 @@ AlreadyRunning() {
 	cat "${PIDFILE}"
 }
 
+DesktopSize() {
+	awk '$2 == "*" {print $4; exit}' < <(wmctrl -d)
+}
+
+DesktopWorkarea() {
+	awk '$2 == "*" {print $9; exit}' < <(wmctrl -d)
+}
+
+DesktopStatus() {
+	eval $(sed -e '/^WIDTH=/s//desktopWidth=/' \
+			-e '/^HEIGHT=/s//desktopHeight=/' \
+			< <(xdotool getdisplaygeometry --shell))
+	desktopCurrent="$(xdotool get_desktop)"
+	desktopsCount="$(xdotool get_num_desktops)"
+}
+
+WindowDesktop() {
+	local windowId="${1}"
+	xdotool get_desktop_for_window ${windowId} 2> /dev/null || \
+		printf '%s\n' "-2"
+}
+
+WindowGeometry() {
+	eval $(sed -e '/^WIDTH=/s//windowWidth=/' \
+			-e '/^HEIGHT=/s//windowHeight=/' \
+			-e '/^X=/s//windowX=/' \
+			-e '/^Y=/s//windowY=/' \
+			-e '/^SCREEN=/s//windowScreen=/' \
+			< <(xdotool getwindowgeometry --shell ${windowId}))
+}
+
+WindowExists() {
+	local windowId="$(printf '0x%0x' "${1}")"
+	grep -qswF "${windowId}" < <(tr -s ' ,' ' ' \
+	< <(cut -f 2- -s -d '#' \
+	< <(xprop -root "_NET_CLIENT_LIST"))) || {
+		_log "window ${windowId}: can't set up this window, has been closed"
+		return ${ERR}
+	}
+}
+
+WindowActive() {
+	printf '0x%0x\n' \
+		$(xdotool getactivewindow 2>/dev/null || \
+		echo 0)
+}
+
 WindowProp() {
 	xprop -len 1024 -id "${@}"
 }
@@ -181,14 +231,14 @@ WindowState() {
 		< <(WindowProp ${windowId} "WM_STATE")
 }
 
-WindowWMState() {
+WindowNetstate() {
 	local windowId="${1}"
 	WindowPropAtom ${windowId} "_NET_WM_STATE"
 }
 
-IsWindowWMStateActive() {
+IsWindowNetstateActive() {
 	local windowId="${1}" wmstate
-	wmstate="$(WindowWMState "${windowId}")" || \
+	wmstate="$(WindowNetstate ${windowId})" || \
 		return ${ERR}
 	shift
 	[ $(grep -s --count -wF "$(printf '%s\n' "${@}")" \
@@ -197,7 +247,7 @@ IsWindowWMStateActive() {
 
 WindowTitle() {
 	local windowId="${1}" name
-	name="$(xdotool getwindowname "${windowId}")"
+	name="$(xdotool getwindowname ${windowId})"
 	[ -n "${name}" ] && \
 		printf '%s\n' "${name}" || \
 		return ${ERR}
@@ -215,7 +265,7 @@ WindowType() {
 
 WindowApplication() {
 	local windowId="${1}"
-	ps -ho cmd "$(xdotool getwindowpid "${windowId}")" || \
+	ps -ho cmd "$(xdotool getwindowpid ${windowId})" || \
 		return ${ERR}
 }
 
@@ -232,7 +282,7 @@ WindowRole() {
 IsWindowMaximized() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} \
+	IsWindowNetstateActive ${windowId} \
 	'_NET_WM_STATE_MAXIMIZED_HORZ' \
 	'_NET_WM_STATE_MAXIMIZED_VERT' || {
 		echo "${answer:+${NEGATIVE}}"
@@ -244,7 +294,7 @@ IsWindowMaximized() {
 IsWindowMaximizedHorz() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_MAXIMIZED_HORZ' || {
+	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_MAXIMIZED_HORZ' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
@@ -254,7 +304,7 @@ IsWindowMaximizedHorz() {
 IsWindowMaximizedVert() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_MAXIMIZED_VERT' || {
+	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_MAXIMIZED_VERT' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
@@ -264,7 +314,7 @@ IsWindowMaximizedVert() {
 IsWindowFullscreen() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_FULLSCREEN' || {
+	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_FULLSCREEN' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
@@ -274,7 +324,7 @@ IsWindowFullscreen() {
 IsWindowMinimized() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_MINIMIZED' || {
+	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_MINIMIZED' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
@@ -284,7 +334,7 @@ IsWindowMinimized() {
 IsWindowShaded() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_SHADED' || {
+	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_SHADED' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
@@ -294,7 +344,7 @@ IsWindowShaded() {
 IsWindowDecorated() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	! IsWindowWMStateActive ${windowId} '_OB_WM_STATE_UNDECORATED' || {
+	! IsWindowNetstateActive ${windowId} '_OB_WM_STATE_UNDECORATED' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
@@ -304,7 +354,7 @@ IsWindowDecorated() {
 IsWindowSticky() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_STICKY' || {
+	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_STICKY' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
@@ -314,7 +364,7 @@ IsWindowSticky() {
 IsWindowAbove() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_ABOVE' || {
+	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_ABOVE' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
@@ -324,14 +374,14 @@ IsWindowAbove() {
 IsWindowBelow() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowWMStateActive ${windowId} '_NET_WM_STATE_BELOW' || {
+	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_BELOW' || {
 		echo "${answer:+${NEGATIVE}}"
 		return ${ERR}
 	}
 	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-TapKeys() {
+WindowTapKeys() {
 	local windowId="${1}" \
 		xkbmap key rc
 	shift
@@ -344,7 +394,7 @@ TapKeys() {
 		[ -n "${rc}" ] && \
 			rc="" || \
 			sleep 1
-		[[ $(xdotool getactivewindow) -eq ${windowId} ]] || \
+		[[ $(WindowActive) -eq ${windowId} ]] || \
 			xdotool windowactivate --sync ${windowId} || {
 				WindowExists ${windowId} || :
 				return ${OK}
@@ -352,46 +402,6 @@ TapKeys() {
 		xdotool key --clearmodifiers "${key}"
 	done
 	setxkbmap ${xkbmap}
-}
-
-WindowDesktop() {
-	local windowId="${1}"
-	xdotool get_desktop_for_window ${windowId} 2> /dev/null || :
-}
-
-WindowGeometry() {
-	eval $(sed -e '/^WIDTH=/s//windowWidth=/' \
-			-e '/^HEIGHT=/s//windowHeight=/' \
-			-e '/^X=/s//windowX=/' \
-			-e '/^Y=/s//windowY=/' \
-			-e '/^SCREEN=/s//windowScreen=/' \
-			< <(xdotool getwindowgeometry --shell "${windowId}"))
-}
-
-WindowExists() {
-	local windowId="$(printf '0x%0x' "${1}")"
-	grep -qswF "${windowId}" < <(tr -s ' ,' ' ' \
-	< <(cut -f 2- -s -d '#' \
-	< <(xprop -root "_NET_CLIENT_LIST"))) || {
-		_log "window ${windowId}: can't set up this window, has been closed"
-		return ${ERR}
-	}
-}
-
-DesktopSize() {
-	awk '$2 == "*" {print $4; exit}' < <(wmctrl -d)
-}
-
-DesktopWorkarea() {
-	awk '$2 == "*" {print $9; exit}' < <(wmctrl -d)
-}
-
-DesktopStatus() {
-	eval $(sed -e '/^WIDTH=/s//desktopWidth=/' \
-			-e '/^HEIGHT=/s//desktopHeight=/' \
-			< <(xdotool getdisplaygeometry --shell))
-	desktopCurrent="$(xdotool get_desktop)"
-	desktopsCount="$(xdotool get_num_desktops)"
 }
 
 RuleAppend() {
@@ -462,7 +472,10 @@ RuleAppend() {
 			_check_natural "rule${Rules}_check_desktops" "${val}"
 			;;
 		rule_set_ignore)
-			eval rule${Rules}_set_ignore=\'y\'
+			_check_y "rule${Rules}_set_ignore" "${val}"
+			;;
+		rule_set_continue)
+			_check_y "rule${Rules}_set_continue" "${val}"
 			;;
 		rule_set_delay)
 			_check_natural val ${NONE}
@@ -613,6 +626,7 @@ LoadConfig() {
 		rule_check_desktop_workarea \
 		rule_check_desktops \
 		rule_set_ignore \
+		rule_set_continue \
 		rule_set_delay \
 		rule_set_position \
 		rule_set_size \
@@ -720,7 +734,7 @@ LoadConfig() {
 				grep -qse "^rule${rule}_check_.*=" \
 				< <(set) || \
 					LogPrio="err" _log "hasn't defined any check property for rule ${rule}"
-				grep -qsve "^rule${rule}_set_delay=" \
+				grep -qsvEe "^rule${rule}_set_(delay|continue)=" \
 				< <(grep -se "^rule${rule}_set_.*=" \
 				< <(set)) || \
 					LogPrio="err" _log "hasn't defined any property to set for rule ${rule}"
