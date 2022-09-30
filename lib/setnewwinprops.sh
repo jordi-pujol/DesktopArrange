@@ -160,33 +160,54 @@ GetXroot() {
 }
 
 AlreadyRunning() {
-	[ -e "${PIDFILE}" ] && \
-	kill -s 0 "$(cat "${PIDFILE}")" 2> /dev/null || \
+	local pid
+	[ -e "${PIDFILE}" -a -f "${PIDFILE}" -a -s "${PIDFILE}" ] && \
+	pid="$(cat "${PIDFILE}")" 2> /dev/null && \
+	kill -s 0 "${pid}" 2> /dev/null || \
 		return ${ERR}
-	echo "Info: ${APPNAME} is running in pid $(cat "${PIDFILE}")" >&2
-	cat "${PIDFILE}"
+	echo "Info: ${APPNAME} is running in pid ${pid}" >&2
+	echo ${pid}
 }
 
 DesktopSize() {
 	awk '$2 == "*" {print $4; exit}' < <(wmctrl -d)
+#	awk -F '=' \
+#	'$1 == "WIDTH" {width=$2}
+#	$1 == "HEIGHT" {height=$2}
+#	END{if (width) print width "x" height
+#		else exit 1}' \
+#		< <(xdotool getdisplaygeometry --shell)
 }
 
 DesktopWorkarea() {
 	awk '$2 == "*" {print $9; exit}' < <(wmctrl -d)
 }
 
-DesktopStatus() {
-	eval $(sed -e '/^WIDTH=/s//desktopWidth=/' \
-			-e '/^HEIGHT=/s//desktopHeight=/' \
-			< <(xdotool getdisplaygeometry --shell))
-	desktopCurrent="$(xdotool get_desktop)"
-	desktopsCount="$(xdotool get_num_desktops)"
+DesktopCurrent() {
+	xdotool get_desktop
+}
+
+DesktopsCount() {
+	xdotool get_num_desktops
+}
+
+DesktopSetCurrent() {
+	local windowId="${1}" \
+		desktop="${2}"
+	xdotool set_desktop ${desktop} 2> /dev/null || {
+		LogPrio="err" \
+			_log "window ${windowId}: can't set current desktop to ${desktop}"
+		return ${ERR}
+	}
 }
 
 WindowDesktop() {
 	local windowId="${1}"
-	xdotool get_desktop_for_window ${windowId} 2> /dev/null || \
+	xdotool get_desktop_for_window ${windowId} 2> /dev/null || {
+		LogPrio="err" \
+			_log "window ${windowId}: can't get desktop for this window"
 		printf '%s\n' "-2"
+	}
 }
 
 WindowGeometry() {
@@ -212,6 +233,39 @@ WindowActive() {
 	printf '0x%0x\n' \
 		$(xdotool getactivewindow 2>/dev/null || \
 		echo 0)
+}
+
+WindowSetActive() {
+	local windowId="${1}" \
+		desktop
+	desktop="$(WindowDesktop ${windowId})"
+	[ ${desktop} -ge 0 ] && \
+	[ ${desktop} -eq $(DesktopCurrent) ] || \
+		DesktopSetCurrent ${windowId} ${desktop} || :
+	[[ $(WindowActive) -eq ${windowId} ]] || \
+		xdotool windowactivate --sync ${windowId} || 
+			WindowExists ${windowId} || \
+				return ${ERR}
+}
+
+WindowTapKeys() {
+	local windowId="${1}" \
+		xkbmap key first
+	shift
+	xkbmap="$(setxkbmap -query | \
+		sed -nre '\|^options| s||option|' \
+		-e '\|([^:[:blank:]]+)[:[:blank:]]+(.*)| s||-\1 \2|p')"
+	setxkbmap us dvorak -rules xorg -model pc105 -option
+	first="y"
+	for key in "${@}"; do
+		[ -n "${first}" ] || \
+			sleep 1
+		first=""
+		WindowSetActive ${windowId} || \
+			break
+		xdotool key --clearmodifiers "${key}"
+	done
+	setxkbmap ${xkbmap}
 }
 
 WindowProp() {
@@ -379,29 +433,6 @@ IsWindowBelow() {
 		return ${ERR}
 	}
 	echo "${answer:+${AFFIRMATIVE}}"
-}
-
-WindowTapKeys() {
-	local windowId="${1}" \
-		xkbmap key rc
-	shift
-	xkbmap="$(setxkbmap -query | \
-		sed -nre '\|^options| s||option|' \
-		-e '\|([^:[:blank:]]+)[:[:blank:]]+(.*)| s||-\1 \2|p')"
-	setxkbmap us dvorak -rules xorg -model pc105 -option
-	rc="."
-	for key in "${@}"; do
-		[ -n "${rc}" ] && \
-			rc="" || \
-			sleep 1
-		[[ $(WindowActive) -eq ${windowId} ]] || \
-			xdotool windowactivate --sync ${windowId} || {
-				WindowExists ${windowId} || :
-				return ${OK}
-			}
-		xdotool key --clearmodifiers "${key}"
-	done
-	setxkbmap ${xkbmap}
 }
 
 RuleAppend() {

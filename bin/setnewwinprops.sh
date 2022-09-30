@@ -50,13 +50,20 @@ CmdWaitFocus() {
 WindowSetDesktop() {
 	local windowId="${1}" \
 		rule="${2}" \
-		val
+		val first c
 	eval val=\"\${rule${rule}_set_desktop:-}\"
 	[ -n "${val}" ] || \
 		return ${OK}
-	if [ ${val} -lt ${desktopsCount} ]; then
-		local c=0
-		if [ ${val} -ne $(WindowDesktop ${windowId}) ]; then
+	if [ $(WindowDesktop ${windowId}) -ge 0 ] && \
+	[ ${val} -lt $(DesktopsCount) ]; then
+		c=0
+		first="y"
+		while [ $((c++)) -lt 5 ]; do
+			[ -n "${first}" ] || \
+				sleep 1
+			first=""
+			[ ${val} -ne $(WindowDesktop ${windowId}) ] || \
+				return ${OK}
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Moving window to desktop ${val}"
 			xdotool set_desktop_for_window ${windowId} ${val} || {
@@ -65,17 +72,11 @@ WindowSetDesktop() {
 					"Error moving window to desktop ${val}"
 				return ${OK}
 			}
-			[ ${val} -eq $(WindowDesktop ${windowId}) ] || {
-				[ $((c++)) -lt 5 ] && \
-					sleep 1 || \
-					break
-			}
-		fi
-	else
-		LogPrio="err" _log "window ${windowId}:" \
-			"Can't move window to invalid desktop ${val}"
-		return ${OK}
+		done
 	fi
+	[ ${val} -eq $(WindowDesktop ${windowId}) ] || \
+		LogPrio="err" _log "window ${windowId}:" \
+			"Can't move window to desktop ${val}"
 }
 
 WindowWaitFocus() {
@@ -89,10 +90,8 @@ WindowWaitFocus() {
 		if [ -n "${val}" -o -n "${mustGetFocus}" ]; then
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting up focus"
-			xdotool windowactivate --sync ${windowId} || {
-				WindowExists ${windowId} || :
+			WindowSetActive ${windowId} || \
 				return ${OK}
-			}
 		else
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}:" \
@@ -109,7 +108,6 @@ WindowWaitFocus() {
 WindowSetupRule() {
 	local windowId="${1}" \
 		rule="${2}" \
-		desktopWidth desktopHeight desktopCurrent desktopsCount \
 		windowWidth windowHeight windowX windowY windowScreen \
 		prop val mustGetFocus
 	[ -z "${Debug}" ] || \
@@ -123,8 +121,6 @@ WindowSetupRule() {
 			"Ignored"
 		return ${OK}
 	fi
-
-	DesktopStatus
 
 	WindowSetDesktop ${windowId} ${rule}
 
@@ -141,12 +137,10 @@ WindowSetupRule() {
 			done
 		fi
 
-	DesktopStatus
-
 	eval val=\"\${rule${rule}_set_active_desktop:-}\"
 	if [ -n "${val}" ]; then
-		if [ ${val} -lt ${desktopsCount} ]; then
-			if [ ${val} -ne ${desktopCurrent} ]; then
+		if [ ${val} -lt $(DesktopsCount) ]; then
+			if [ ${val} -ne $(DesktopCurrent) ]; then
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: Setting up active desktop ${val}"
 				xdotool set_desktop ${val} || {
@@ -154,7 +148,6 @@ WindowSetupRule() {
 						"Error setting up active desktop ${val}"
 					return ${OK}
 				}
-				DesktopStatus
 			fi
 		else
 			LogPrio="err" _log "window ${windowId}:" \
@@ -168,8 +161,7 @@ WindowSetupRule() {
 		val="$(_unquote "${val}")"
 		WindowExists ${windowId} || \
 			return ${OK}
-		WindowWaitFocus ${windowId} ${rule} ${mustGetFocus}
-		DesktopStatus
+		WindowWaitFocus ${windowId} ${rule} "${mustGetFocus}"
 		mustGetFocus="y"
 		case "${prop}" in
 		rule${rule}_set_position)
@@ -494,17 +486,15 @@ WindowSetupRule() {
 	done < <(sort \
 	< <(grep -se "^rule${rule}_set_" \
 	< <(set)))
-	return ${OK}
 }
 
 WindowSetup() {
 	local windowId="${1}" \
-		setuprules="${2}"
+		setupRules="${2}"
 
-	for rule in ${setuprules}; do
+	for rule in ${setupRules}; do
 		WindowSetupRule ${windowId} ${rule}
 	done
-	return ${OK}
 }
 
 WindowNew() {
@@ -527,10 +517,7 @@ WindowNew() {
 		window_is_sticky="" \
 		window_desktop_size="" \
 		window_desktop_workarea="" \
-		desktopWidth desktopHeight desktopCurrent desktopsCount \
-		rule setuprules
-
-	DesktopStatus
+		rule setupRules
 
 	[ -z "${Debug}" ] || {
 		printf "%s='%s'\n" \
@@ -563,12 +550,12 @@ WindowNew() {
 			"window_desktop_size" "${window_desktop_size:="$(DesktopSize)"}" \
 			"window_desktop_workarea" \
 				"${window_desktop_workarea:="$(DesktopWorkarea)"}" \
-			"desktopsCount" "${desktopsCount}"
+			"desktopsCount" "$(DesktopsCount)"
 	} >> "${LOGFILE}"
 
 	# checking properties of this window
 	# we'll set up only the first rule that matches
-	setuprules=""
+	setupRules=""
 	rule=${NONE}
 	while [ $((rule++)) -lt ${Rules} ]; do
 		local rc="${AFFIRMATIVE}" prop val
@@ -772,7 +759,7 @@ WindowNew() {
 				fi
 				;;
 			rule${rule}_check_desktops)
-				if [ "${val}" = "${desktopsCount}" ]; then
+				if [ "${val}" = "$(DesktopsCount)" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches desktopsCount \"${val}\""
 				else
@@ -791,14 +778,14 @@ WindowNew() {
 		< <(set)))
 
 		if [ -n "${rc}" ]; then
-			setuprules="${setuprules}${rule}${TAB}"
+			setupRules="${setupRules}${rule}${TAB}"
 			eval val=\"\${rule${rule}_set_continue:-}\"
 			[ -n "${val}" ] || \
 				break
 		fi
 	done
-	if [ -n "${setuprules}" ]; then
-		(WindowSetup ${windowId} "${setuprules}") &
+	if [ -n "${setupRules}" ]; then
+		(WindowSetup ${windowId} "${setupRules}") &
 	else
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId}: Doesn't match any rule"
