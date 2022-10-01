@@ -4,22 +4,16 @@
 
 BIN := $(notdir $(wildcard bin/*))
 LIB := $(notdir $(wildcard lib/*))
-CONF := $(notdir $(wildcard conf/*))
 DEBIAN := $(notdir $(wildcard debian/*init) $(wildcard debian/*default) $(wildcard debian/*post*) $(wildcard debian/*pre*))
 
 export VERSION=$(shell dpkg-parsechangelog | sed -ne 's/^Version: \(.*\)/\1/p')
 
-override_dh_auto_test: $(BIN:%=bin-%) $(CONF:%=conf-%) $(LIB:%=lib-%) $(DEBIAN:%=debian-%)
+override_dh_auto_test: $(BIN:%=bin-%) $(LIB:%=lib-%) $(DEBIAN:%=debian-%)
 
 bin-%:
 	$(info checking $* ...)
 	@bash -n bin/$*
 	-@checkbashisms -f bin/$*
-
-conf-%:
-	$(info checking $* ...)
-	@bash -n conf/$*
-	-@checkbashisms -f conf/$*
 
 lib-%:
 	$(info checking $* ...)

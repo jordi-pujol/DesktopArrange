@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.11 $
+#  $Revision: 0.20 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -24,6 +24,11 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
+
+_trim() {
+	printf '%s\n' "${@}" | \
+		sed -re "s/^[[:blank:]]*(.*)[[:blank:]]*$/\1/"
+}
 
 _unquote() {
 	printf '%s\n' "${@}" | \
@@ -188,20 +193,22 @@ DesktopsCount() {
 DesktopSetCurrent() {
 	local windowId="${1}" \
 		desktop="${2}"
-	xdotool set_desktop ${desktop} 2> /dev/null || {
-		LogPrio="err" \
-			_log "window ${windowId}: can't set current desktop to ${desktop}"
-		return ${ERR}
-	}
+	[ ${desktop} -eq $(DesktopCurrent) ] || \
+		xdotool set_desktop ${desktop} 2> /dev/null || {
+			LogPrio="err" \
+				_log "window ${windowId}: can't set current desktop to ${desktop}"
+			return ${ERR}
+		}
 }
 
 WindowDesktop() {
-	local windowId="${1}"
-	xdotool get_desktop_for_window ${windowId} 2> /dev/null || {
+	local windowId="${1}" \
+		desktop
+	desktop="$(xdotool get_desktop_for_window ${windowId} 2> /dev/null)" || :
+	[ -n "${desktop}" ] || \
 		LogPrio="err" \
 			_log "window ${windowId}: can't get desktop for this window"
-		printf '%s\n' "-2"
-	}
+	printf '%d\n' ${desktop:-"-1"}
 }
 
 WindowGeometry() {
@@ -231,20 +238,13 @@ WindowActive() {
 
 WindowSetActive() {
 	local windowId="${1}" \
-		desktop \
 		windowWidth windowHeight windowX windowY windowScreen
-	desktop="$(WindowDesktop ${windowId})"
-	[ ${desktop} -ge 0 ] && \
-	[ ${desktop} -eq $(DesktopCurrent) ] || \
-		DesktopSetCurrent ${windowId} ${desktop} || :
+	DesktopSetCurrent ${windowId} $(WindowDesktop ${windowId}) || :
 	[[ $(WindowActive) -eq ${windowId} ]] || \
 		xdotool windowactivate --sync ${windowId} || \
 			WindowExists ${windowId} || \
 				return ${ERR}
-	WindowGeometry ${windowId} || \
-		WindowExists ${windowId} || \
-			return ${ERR}
-	xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
+	xdotool mousemove --window ${windowId} 0 0 || \
 		WindowExists ${windowId} || \
 			return ${ERR}
 }
@@ -437,248 +437,145 @@ IsWindowBelow() {
 	echo "${answer:+${AFFIRMATIVE}}"
 }
 
-RuleAppend() {
-	let Rules++,1
-	while IFS="=" read -r prop val; do
-		val="$(_unquote "${val}")"
-		[ -n "${val}" ] || {
-			LogPrio="err" _log "Rule ${Rules}: Property \"${prop}\" has not a value"
-			continue
-		}
-		case "${prop}" in
-		rule_check_title)
-			eval rule${Rules}_check_title=\'${val}\'
-			;;
-		rule_check_state)
-			eval rule${Rules}_check_state=\'${val}\'
-			;;
-		rule_check_type)
-			eval rule${Rules}_check_type=\'${val}\'
-			;;
-		rule_check_app_name)
-			eval rule${Rules}_check_app_name=\'${val}\'
-			;;
-		rule_check_application)
-			eval rule${Rules}_check_application=\'${val}\'
-			;;
-		rule_check_class)
-			eval rule${Rules}_check_class=\'${val}\'
-			;;
-		rule_check_role)
-			eval rule${Rules}_check_role=\'${val}\'
-			;;
-		rule_check_desktop)
-			_check_natural val ${NONE}
-			eval rule${Rules}_check_desktop=\'${val}\'
-			;;
-		rule_check_is_maximized)
-			_check_yn "rule${Rules}_check_is_maximized" "${val}"
-			;;
-		rule_check_is_maximized_horz)
-			_check_yn "rule${Rules}_check_is_maximized_horz" "${val}"
-			;;
-		rule_check_is_maximized_vert)
-			_check_yn "rule${Rules}_check_is_maximized_vert" "${val}"
-			;;
-		rule_check_is_fullscreen)
-			_check_yn "rule${Rules}_check_is_fullscreen" "${val}"
-			;;
-		rule_check_is_minimized)
-			_check_yn "rule${Rules}_check_is_minimized" "${val}"
-			;;
-		rule_check_is_shaded)
-			_check_yn "rule${Rules}_check_is_shaded" "${val}"
-			;;
-		rule_check_is_decorated)
-			_check_yn "rule${Rules}_check_is_decorated" "${val}"
-			;;
-		rule_check_is_sticky)
-			_check_yn "rule${Rules}_check_is_sticky" "${val}"
-			;;
-		rule_check_desktop_size)
-			_check_fixedsize "rule${Rules}_check_desktop_size" "${val}"
-			;;
-		rule_check_desktop_workarea)
-			_check_fixedsize "rule${Rules}_check_desktop_workarea" "${val}"
-			;;
-		rule_check_desktops)
-			_check_natural "rule${Rules}_check_desktops" "${val}"
-			;;
-		rule_set_ignore)
-			_check_y "rule${Rules}_set_ignore" "${val}"
-			;;
-		rule_set_continue)
-			_check_y "rule${Rules}_set_continue" "${val}"
-			;;
-		rule_set_delay)
-			_check_natural val ${NONE}
-			[ "${val}" -eq ${NONE} ] || \
-				eval rule${Rules}_set_delay=\'${val}\'
-			;;
-		rule_set_position)
-			val="$(tr -s ' ,' ' ' <<< "${val,,}")"
-			if [ "$(wc -w <<< "${val}")" != 2 ]; then
-				_log "Property \"${prop}\" invalid value \"${val}\""
-			else
-				_check_integer_pair val "x" "y"
-				eval rule${Rules}_set_position=\'${val}\'
-			fi
-			;;
-		rule_set_size)
-			val="$(tr -s ' ,' ' ' <<< "${val,,}")"
-			if [ "$(wc -w <<< "${val}")" != 2 ]; then
-				_log "Property \"${prop}\" invalid value \"${val}\""
-			else
-				_check_integer_pair val "x" "y"
-				eval rule${Rules}_set_size=\'${val}\'
-			fi
-			;;
-		rule_set_maximized)
-			_check_yn "rule${Rules}_set_maximized" "${val}"
-			;;
-		rule_set_maximized_horizontally)
-			_check_yn "rule${Rules}_set_maximized_horizontally" "${val}"
-			;;
-		rule_set_maximized_vertically)
-			_check_yn "rule${Rules}_set_maximized_vertically" "${val}"
-			;;
-		rule_set_minimized)
-			_check_yn "rule${Rules}_set_minimized" "${val}"
-			;;
-		rule_set_fullscreen)
-			_check_yn "rule${Rules}_set_fullscreen" "${val}"
-			;;
-		rule_set_sticky)
-			_check_yn "rule${Rules}_set_sticky" "${val}"
-			;;
-		rule_set_shaded)
-			_check_yn "rule${Rules}_set_shaded" "${val}"
-			;;
-		rule_set_decorated)
-			_check_yn "rule${Rules}_set_decorated" "${val}"
-			;;
-		rule_set_focus)
-			_check_y "rule${Rules}_set_focus" "${val}"
-			;;
-		rule_set_above)
-			_check_yn "rule${Rules}_set_above" "${val}"
-			;;
-		rule_set_below)
-			_check_yn "rule${Rules}_set_below" "${val}"
-			;;
-		rule_set_active_desktop)
-			_check_natural val ${NONE}
-			eval rule${Rules}_set_active_desktop=\'${val}\'
-			;;
-		rule_set_desktop)
-			_check_natural val ${NONE}
-			eval rule${Rules}_set_desktop=\'${val}\'
-			;;
-		rule_set_closed)
-			_check_y "rule${Rules}_set_closed" "${val}"
-			;;
-		rule_set_killed)
-			_check_y "rule${Rules}_set_killed" "${val}"
-			;;
-		*)
-			_log "Property \"${prop}\" is not implemented yet"
-			;;
-		esac
-	done < <(sort \
-	< <(grep -sEe "^rule_(check|set)_" \
-	< <(set)))
+RuleProp() {
+	local prop="${1}" \
+		val="${2}"
+	[ -n "${val}" ] || {
+		LogPrio="err" _log "Rule ${Rules}: Property \"${prop}\" has not a value"
+		continue
+	}
+	case "${prop}" in
+	check_title | \
+	check_state | \
+	check_type | \
+	check_app_name | \
+	check_application | \
+	check_class | \
+	check_role)
+		eval rule${Rules}_${prop}=\'${val}\'
+		;;
+	check_desktop | \
+	check_desktops)
+		_check_natural "rule${Rules}_${prop}" "${val}"
+		;;
+	check_is_maximized | \
+	check_is_maximized_horz | \
+	check_is_maximized_vert | \
+	check_is_fullscreen | \
+	check_is_minimized | \
+	check_is_shaded | \
+	check_is_decorated | \
+	check_is_sticky)
+		_check_yn "rule${Rules}_${prop}" "${val}"
+		;;
+	check_desktop_size | \
+	check_desktop_workarea)
+		_check_fixedsize "rule${Rules}_${prop}" "${val}"
+		;;
+	check_continue)
+		_check_y "rule${Rules}_${prop}" "${val}"
+		;;
+	set_ignore | \
+	set_focus | \
+	set_closed | \
+	set_killed)
+		_check_y "rule${Rules}_$((++ruleLine))_${prop}" "${val}"
+		;;
+	set_delay)
+		_check_natural val ${NONE}
+		[ "${val}" -eq ${NONE} ] || \
+			eval rule${Rules}_$((++ruleLine))_${prop}=\'${val}\'
+		;;
+	set_active_desktop | \
+	set_desktop)
+		_check_natural val ${NONE}
+		eval rule${Rules}_$((++ruleLine))_${prop}=\'${val}\'
+		;;
+	set_position)
+		val="$(tr -s ' ,' ' ' <<< "${val,,}")"
+		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+			_log "Property \"${prop}\" invalid value \"${val}\""
+		else
+			_check_integer_pair val "x" "y"
+			eval rule${Rules}_$((++ruleLine))_${prop}=\'${val}\'
+		fi
+		;;
+	set_size)
+		val="$(tr -s ' ,' ' ' <<< "${val,,}")"
+		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+			_log "Property \"${prop}\" invalid value \"${val}\""
+		else
+			_check_integer_pair val "x" "y"
+			eval rule${Rules}_$((++ruleLine))_${prop}=\'${val}\'
+		fi
+		;;
+	set_maximized | \
+	set_maximized_horizontally | \
+	set_maximized_vertically | \
+	set_minimized | \
+	set_fullscreen | \
+	set_sticky | \
+	set_shaded | \
+	set_decorated | \
+	set_pinned | \
+	set_above | \
+	set_below)
+		_check_yn "rule${Rules}_$((++ruleLine))_${prop}" "${val}"
+		;;
+	*)
+		_log "Property \"${prop}\" is not implemented yet"
+		;;
+	esac
 }
 
-AddRule() {
-	local prop val rc=${NONE}
-	while IFS="=" read -r prop val; do
-		val="$(_unquote "${val}")"
-		[ -n "${val}" ] || \
+ReadConfig() {
+	local foundParm="" foundRule="" ruleLine
+	Rules=${NONE}
+	while read -r line; do
+		[ -n "${line}" ] && \
+		! grep -qsEe '^#' <<< "${line}" || \
 			continue
-		case "${prop}" in
-			rule_check_title | \
-			rule_check_state | \
-			rule_check_type | \
-			rule_check_app_name | \
-			rule_check_application | \
-			rule_check_class | \
-			rule_check_role | \
-			rule_check_desktop | \
-			rule_check_is_maximized | \
-			rule_check_is_maximized_horz | \
-			rule_check_is_maximized_vert | \
-			rule_check_is_fullscreen | \
-			rule_check_is_minimized | \
-			rule_check_is_shaded | \
-			rule_check_is_decorated | \
-			rule_check_is_sticky | \
-			rule_check_desktop_size | \
-			rule_check_desktop_workarea | \
-			rule_check_desktops)
-				let rc++,1
-			;;
-			*)
-				LogPrio="warn" _log "Error in config: Property \"${prop}\"" \
-					"has not been implemented yet"
-				rc=${NONE}
-				break
-			;;
-		esac
-	done < <(sort \
-	< <(grep -se "^rule_check_" \
-	< <(set)))
-	if [ ${rc} -eq ${NONE} ]; then
-		LogPrio="warn" _log "Error in config. Can't add a new rule"
-	else
-		RuleAppend
-	fi
-	unset $(awk -F '=' \
-		'$1 ~ "^rule_" {print $1}' \
-		< <(set)) 2> /dev/null || :
-	return ${OK}
+		if grep -qsxiEe 'parameters[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
+			printf '%s\n' "Parameters {"
+			[ -z "${foundRule}" ] || \
+				return ${ERR}
+			foundParm="y"
+		elif grep -qsxiEe 'rule[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
+			printf '%s\n' "Rule {"
+			[ -z "${foundParm}" ] || \
+				return ${ERR}
+			foundRule="y"
+			let Rules++,1
+			ruleLine=0
+		elif grep -qsxiEe '\}[[:blank:]]*' <<< "${line,,}"; then
+			printf '%s\n' "}" ""
+			foundParm=""
+			foundRule=""
+		else
+			printf '\t%s\n' "${line}"
+			if [ -n "${foundParm}" ]; then
+				case "${line,,}" in
+				debug=*)
+					Debug="$(_unquote "$(_trim "$(cut -f 2- -s -d '=' <<< "${line}")")")"
+					;;
+				*)
+					return ${ERR}
+					;;
+				esac
+			elif [ -n "${foundRule}" ]; then
+				RuleProp \
+				"$(cut -f 1 -s -d '=' <<< "${line,,}")" \
+				"$(_unquote "$(_trim "$(cut -f 2- -s -d '=' <<< "${line}")")")" || \
+					return ${ERR}
+			else
+				return ${ERR}
+			fi
+		fi
+	done < "${config}" >> "${LOGFILE}"
 }
 
 LoadConfig() {
-	local rule_check_title \
-		rule_check_state \
-		rule_check_type \
-		rule_check_app_name \
-		rule_check_application \
-		rule_check_class \
-		rule_check_role \
-		rule_check_desktop \
-		rule_check_is_maximized \
-		rule_check_is_maximized_horz \
-		rule_check_is_maximized_vert \
-		rule_check_is_fullscreen \
-		rule_check_is_minimized \
-		rule_check_is_shaded \
-		rule_check_is_decorated \
-		rule_check_is_sticky \
-		rule_check_desktop_size \
-		rule_check_desktop_workarea \
-		rule_check_desktops \
-		rule_set_ignore \
-		rule_set_continue \
-		rule_set_delay \
-		rule_set_position \
-		rule_set_size \
-		rule_set_maximized \
-		rule_set_maximized_horizontally \
-		rule_set_maximized_vertically \
-		rule_set_fullscreen \
-		rule_set_minimized \
-		rule_set_shaded \
-		rule_set_decorated \
-		rule_set_sticky \
-		rule_set_focus \
-		rule_set_above \
-		rule_set_below \
-		rule_set_active_desktop \
-		rule_set_desktop \
-		rule_set_closed \
-		rule_set_killed \
-		rule dbg config emptylist \
+	local rule dbg config emptylist \
 		msg="Loading configuration"
 
 	# config variables, default values
@@ -724,13 +621,17 @@ LoadConfig() {
 			< <(cut -f 2- -s -d '#' \
 			< <(xprop -root "_NET_CLIENT_LIST")))"
 
-	Rules=${NONE}
-	[ -s "${config}" ] && \
-		. "${config}" || {
-			LogPrio="err" _log "Invalid config file:" \
-				"\"${config}\""
-			exit ${ERR}
-		}
+	[ -f "${config}" -a -s "${config}" ] || {
+		LogPrio="err" _log "Invalid config file:" \
+			"\"${config}\""
+		exit ${ERR}
+	}
+
+	ReadConfig || {
+		LogPrio="err" _log "Syntax error in config file:" \
+			"\"${config}\""
+		exit ${ERR}
+	}
 
 	Debug="${dbg:-${Debug:-}}"
 
@@ -762,19 +663,13 @@ LoadConfig() {
 		rule=${NONE}
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
-			if sort < <(grep -se "^rule${rule}_.*=" \
-			< <(set)); then
-				grep -qse "^rule${rule}_check_.*=" \
-				< <(set) || \
-					LogPrio="err" _log "hasn't defined any check property for rule ${rule}"
-				grep -qsvEe "^rule${rule}_set_(delay|continue)=" \
-				< <(grep -se "^rule${rule}_set_.*=" \
-				< <(set)) || \
-					LogPrio="warn" _log "hasn't defined any property to set for rule ${rule}" \
-						"This rule will exclude check of following rules."
-			else
-				LogPrio="err" _log "can't find any property for rule ${rule}"
-			fi
+			grep -se "^rule${rule}_check_.*=" \
+			< <(set) || \
+				LogPrio="err" _log "hasn't defined any check property for rule ${rule}"
+			sort --numeric --field-separator="_" --key 2,2 \
+			< <(grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" \
+			< <(set)) || \
+				LogPrio="err" _log "hasn't defined any property to set for rule ${rule}"
 		done
 		echo
 	fi

@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.11 $
+#  $Revision: 0.20 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #

@@ -1,3 +1,14 @@
+setnewwinprops (0.20) unstable; urgency=medium
+
+  * config file is parsed instead of included in the bash program,
+  * For every rule the actions are numbered in order of appearance and therefore,
+    when a new window complies the checks
+    the actions will be applied in sequential order.
+  * new rule set action: rule_set_pinned, move to all desktops
+    rule_set_pinned = affirmative or negative
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 01 Oct 2022 06:43:15 +0200
+
 setnewwinprops (0.11) unstable; urgency=medium
 
   * new rule option: rule_set_continue
