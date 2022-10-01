@@ -171,12 +171,6 @@ AlreadyRunning() {
 
 DesktopSize() {
 	awk '$2 == "*" {print $4; exit}' < <(wmctrl -d)
-#	awk -F '=' \
-#	'$1 == "WIDTH" {width=$2}
-#	$1 == "HEIGHT" {height=$2}
-#	END{if (width) print width "x" height
-#		else exit 1}' \
-#		< <(xdotool getdisplaygeometry --shell)
 }
 
 DesktopWorkarea() {
@@ -237,21 +231,29 @@ WindowActive() {
 
 WindowSetActive() {
 	local windowId="${1}" \
-		desktop
+		desktop \
+		windowWidth windowHeight windowX windowY windowScreen
 	desktop="$(WindowDesktop ${windowId})"
 	[ ${desktop} -ge 0 ] && \
 	[ ${desktop} -eq $(DesktopCurrent) ] || \
 		DesktopSetCurrent ${windowId} ${desktop} || :
 	[[ $(WindowActive) -eq ${windowId} ]] || \
-		xdotool windowactivate --sync ${windowId} || 
+		xdotool windowactivate --sync ${windowId} || \
 			WindowExists ${windowId} || \
 				return ${ERR}
+	WindowGeometry ${windowId} || \
+		WindowExists ${windowId} || \
+			return ${ERR}
+	xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
+		WindowExists ${windowId} || \
+			return ${ERR}
 }
 
 WindowTapKeys() {
 	local windowId="${1}" \
 		xkbmap key first
 	shift
+	pid=${!}
 	xkbmap="$(setxkbmap -query | \
 		sed -nre '\|^options| s||option|' \
 		-e '\|([^:[:blank:]]+)[:[:blank:]]+(.*)| s||-\1 \2|p')"
@@ -768,7 +770,8 @@ LoadConfig() {
 				grep -qsvEe "^rule${rule}_set_(delay|continue)=" \
 				< <(grep -se "^rule${rule}_set_.*=" \
 				< <(set)) || \
-					LogPrio="err" _log "hasn't defined any property to set for rule ${rule}"
+					LogPrio="warn" _log "hasn't defined any property to set for rule ${rule}" \
+						"This rule will exclude check of following rules."
 			else
 				LogPrio="err" _log "can't find any property for rule ${rule}"
 			fi

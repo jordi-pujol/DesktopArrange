@@ -28,6 +28,8 @@
 [ -n "${LOGFILE}" -a -f "${LOGFILE}" ] || \
 	exit 1
 
+set -o errexit -o nounset -o pipefail +o noglob +o noclobber
+
 if [ "${Debug}" = "xtrace" ]; then
 	export PS4='+\t ${BASH_SOURCE}:${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
 	exec >> "${LOGFILE}.xtrace" 2>&1
