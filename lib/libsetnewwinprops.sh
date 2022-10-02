@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.21 $
+#  $Revision: 0.22 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -47,6 +47,27 @@ _ps_children() {
 	grep -svwEe "${excl}"); do
 		_ps_children ${pid} "${excl}"
 		pidsChildren="${pidsChildren}${pid}${TAB}"
+	done
+}
+
+_lock_release() {
+	local lockfile="${1}.lock"
+	rm -f "${lockfile}"
+}
+
+_lock_acquire() {
+	local lockfile="${1}.lock" \
+		pid="${2}" \
+		pidw
+	while (set -o noclobber;
+	! echo "${pid}" > "${lockfile}" 2> /dev/null); do
+		sleep 1 &
+		pidw="${!}"
+		kill -s 0 "$(cat "${lockfile}")" 2> /dev/null || {
+			rm -f "${lockfile}"
+			kill "${pidw}" 2> /dev/null || :
+		}
+		wait "${pidw}" || :
 	done
 }
 
@@ -175,16 +196,20 @@ AlreadyRunning() {
 	echo ${pid}
 }
 
+DesktopCurrent() {
+	xdotool get_desktop
+}
+
 DesktopSize() {
-	awk '$2 == "*" {print $4; exit}' < <(wmctrl -d)
+	local desktop="${1:-"-1"}"
+	[ ${desktop} -ge 0 ] || \
+		desktop=$(DesktopCurrent)
+	awk -v desktop="${desktop}" \
+	'$1 == desktop {print $4; exit}' < <(wmctrl -d)
 }
 
 DesktopWorkarea() {
 	awk '$2 == "*" {print $9; exit}' < <(wmctrl -d)
-}
-
-DesktopCurrent() {
-	xdotool get_desktop
 }
 
 DesktopsCount() {
@@ -480,6 +505,7 @@ RuleLine() {
 		;;
 	set_position | \
 	set_size | \
+	set_tile | \
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
@@ -512,6 +538,8 @@ RuleLine() {
 ReadConfig() {
 	local foundParm="" foundRule="" ruleIndex
 	Rules=${NONE}
+	rm -f "${TILESFILE}"*
+	: > "${TILESFILE}"
 	while read -r line; do
 		[ -n "${line}" ] && \
 		[ "${line:0:1}" != "#" ] || \
@@ -570,7 +598,7 @@ LoadConfig() {
 	EmptyList=""
 	emptylist=""
 	config="${HOME}/.config/${APPNAME}/config.txt"
-	IgnoreWindowTypes="DESKTOP,DOCK"
+	IgnoreWindowTypes="desktop|dock"
 	unset $(awk -F '=' \
 		'$1 ~ "^rule[[:digit:]]*_" {print $1}' \
 		< <(set)) 2> /dev/null || :

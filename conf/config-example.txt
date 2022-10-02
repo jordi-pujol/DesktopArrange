@@ -73,3 +73,8 @@ rule {
 	set_decorated='y'
 }
 
+Rule {
+	check_app_name='galculator'
+	set_position='5%,10%'
+	set_tile='3%,2%'
+}

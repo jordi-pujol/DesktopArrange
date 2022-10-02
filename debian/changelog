@@ -1,3 +1,12 @@
+setnewwinprops (0.22) unstable; urgency=medium
+
+  * new action: set_tile
+    setnewwinprops will store the window IDs when a rule sets a tile.
+    setnewwinprops will move next windows set by the same rule
+    adding the tile to the coordinates of the previously tiled window.
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sun, 02 Oct 2022 10:48:26 +0200
+
 setnewwinprops (0.21) unstable; urgency=medium
 
   * code improvement:

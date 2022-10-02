@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.21 $
+#  $Revision: 0.22 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -57,6 +57,7 @@ ActionNeedsFocus() {
 		;;
 	set_position | \
 	set_size | \
+	set_tile | \
 	set_maximized | \
 	set_maximized_horizontally | \
 	set_maximized_vertically | \
@@ -86,15 +87,15 @@ PointerMove() {
 	WindowGeometry ${windowId}
 	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
 	[ "${x//%}" != "${x}" ] && \
-		let "x=windowWidth*(${x//%/\/100}),1" || \
-		let "x=${x},1"
+		let "x=windowWidth*${x//%/\/100},1" || \
+		let "x=x,1"
 	[ -n "${x}" ] && \
 	[ ${x} -ge 0 -a ${x} -lt "${windowWidth}" ] || \
 		let "x=windowWidth/2,1"
 	y="$(cut -f 2 -s -d ' ' <<< "${val}")"
 	[ "${y//%}" != "${y}" ] && \
-		let "y=windowHeight*(${y//%/\/100}),1" || \
-		let "y=${y},1"
+		let "y=windowHeight*${y//%/\/100},1" || \
+		let "y=y,1"
 	[ -n "${y}" ] && \
 	[ ${y} -ge 0 -a ${y} -lt "${windowHeight}" ] || \
 		let "y=windowHeight/2,1"
@@ -157,6 +158,109 @@ WindowTapKeys() {
 		xdotool key --clearmodifiers "${key}"
 	done
 	setxkbmap ${xkbmap}
+}
+
+WindowTile() {
+	local windowId="${1}" \
+		rule="${2}" \
+		val="${3}" \
+		windowWidth windowHeight windowX windowY windowScreen \
+		w x y tile desktop desktopSize desktopW desktopH
+
+	if tile="$(awk -v rule="${rule}" \
+	'$1 == rule {print $0; rc=-1; exit}
+	END{exit rc+1}' < "${TILESFILE}")"; then
+		w="$(awk 'NF > 1 {print $NF; rc=-1}
+		END{exit rc+1}' <<< "${tile}")" || {
+			LogPrio="err" _log "window ${w}:" \
+				"Error tiling, can't get ID of previous tiled window"
+			return ${OK}
+		}
+		WindowGeometry ${w} || {
+			LogPrio="err" _log "window ${w}:" \
+				"Error tiling, can't get geometry of previous tiled window"
+			return ${OK}
+		}
+		desktop="$(WindowDesktop ${w})"
+		desktopSize="$(DesktopSize ${desktop})"
+		desktopW="$(cut -f 1 -s -d 'x' <<< "${desktopSize}")"
+		desktopH="$(cut -f 2 -s -d 'x' <<< "${desktopSize}")"
+		x="$(cut -f 1 -s -d ' ' <<< "${val}")"
+		if [ "${x}" = "x" ]; then
+			let "x=windowX,1"
+		else
+			if [ "${x//%}" != "${x}" ]; then
+				let "x=windowX+desktopW*${x//%/\/100},1"
+			else
+				let "x=windowX+x,1"
+			fi
+			if [ -n "${x}" ]; then
+				if [ ${x} -lt 0 ]; then
+					x=0
+				elif [ ${x} -ge $((desktopW-windowWidth)) ]; then
+					let "x=desktopW-windowWidth-1,1"
+				fi
+			else
+				let "x=windowX,1"
+			fi
+		fi
+		y="$(cut -f 2 -s -d ' ' <<< "${val}")"
+		if [ "${y}" = "y" ]; then
+			let "y=windowY,1"
+		else
+			if [ "${y//%}" != "${y}" ]; then
+				let "y=windowY+desktopH*${y//%/\/100},1"
+			else
+				let "y=windowY+y,1"
+			fi
+			if [ -n "${y}" ]; then
+				if [ ${y} -lt 0 ]; then
+					y=0
+				elif [ ${y} -ge $((desktopH-windowHeight)) ]; then
+					let "y=desktopH-windowHeight-1,1"
+				fi
+			else
+				let "y=windowY,1"
+			fi
+		fi
+		WindowActivate ${windowId} || :
+		[ ${desktop} -eq $(WindowDesktop ${windowId}) ] || {
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Setting up tile, moving to desktop ${desktop}"
+			xdotool set_desktop_for_window ${windowId} ${desktop} || \
+				LogPrio="err" _log "window ${windowId}:" \
+				"Error tiling, can't set desktop to ${desktop}"
+			sleep 1
+			WindowActivate ${windowId} || :
+		}
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}: Setting up tile, moving to (${val})=(${x} ${y})"
+		xdotool windowmove --sync ${windowId} ${x} ${y} || \
+			LogPrio="err" _log "window ${windowId}:" \
+				"Error tiling, can't move to (${val})=(${x} ${y})"
+	fi
+	{ awk -v rule="${rule}" \
+		'$1 != rule {print $0}' < "${TILESFILE}"
+	printf '%s\n' "${tile:-${rule}} ${windowId}"
+	} > "${TILESFILE}.part"
+	mv -f "${TILESFILE}.part" "${TILESFILE}"
+	[ "${Debug}" != "xtrace" ] || \
+		LogPrio="debug" _log "window ${windowId}: Tiling:" \
+		"${tile:-${rule}} ${windowId}"
+}
+
+WindowTiling() {
+	local windowId="${1}" \
+		rule="${2}" \
+		val="${3}" \
+		mypid
+	mypid=$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")
+	[ "${Debug}" != "xtrace" ] || \
+		LogPrio="debug" _log "Current process id ${mypid}:" \
+		"$(ps -h -l ${mypid})"
+	_lock_acquire "${TILESFILE}" "${mypid}"
+	WindowTile ${windowId} ${rule} "${val}"
+	_lock_release "${TILESFILE}"
 }
 
 WindowWaitFocus() {
@@ -262,6 +366,9 @@ WindowSetupRule() {
 			xdotool windowsize --sync ${windowId} ${val} || \
 				LogPrio="err" _log "window ${windowId}:" \
 					"Error setting up size to ${val}"
+			;;
+		set_tile)
+			WindowTiling ${windowId} ${rule} "${val}"
 			;;
 		set_maximized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
@@ -780,8 +887,7 @@ WindowsUpdate() {
 	< <(printf '%s\n' "${@}")); do
 		[ -z "${IgnoreWindowTypes}" ] || \
 			if ! window_type="$(WindowType ${windowId})" || \
-			grep -qswEe "_NET_WM_WINDOW_TYPE_($(
-			tr -s '[:blank:],|' '|' <<< "${IgnoreWindowTypes}" ))" \
+			grep -qswEe "_NET_WM_WINDOW_TYPE_(${IgnoreWindowTypes^^})" \
 			<<< "${window_type}"; then
 				[ -z "${Debug}" ] || \
 					_log "window ${windowId}: discarding window" \
@@ -803,6 +909,23 @@ WindowsUpdate() {
 		END{exit rc+1}')"; then
 			kill ${pids} 2> /dev/null || :
 		fi
+		_lock_acquire "${TILESFILE}" "${$}"
+		if grep -qswF "${windowId}" < "${TILESFILE}"; then
+			[ "${Debug}" != "xtrace" ] || \
+				LogPrio="debug" _log "window ${windowId}: Tile info:" \
+				"$(grep -swF "${windowId}" < "${TILESFILE}")"
+			awk -v windowId="${windowId}" \
+			'{for (i=2; i <= NF; i++)
+				if ($i == windowId) {
+					for (j=i; j < NF; j++)
+						$j=$(j+1)
+					NF--
+					break
+				}
+			if (NF > 1) print $0}' < "${TILESFILE}" > "${TILESFILE}.part"
+			mv -f "${TILESFILE}.part" "${TILESFILE}"
+		fi
+		_lock_release "${TILESFILE}"
 	done
 
 	WindowIds="${@}"
@@ -862,7 +985,7 @@ Main() {
 	done
 }
 
-set -o errexit -o nounset -o pipefail +o noglob +o noclobber
+set -o errexit -o nounset -o pipefail +o noglob -o noclobber
 
 # constants
 readonly NAME="$(basename "${0}")" \
@@ -872,7 +995,8 @@ XROOT="$(GetXroot)" || \
 readonly XROOT \
 	LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
 	PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid" \
-	PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe"
+	PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe" \
+	TILESFILE="/tmp/${APPNAME}/${USER}/${XROOT}.tiles"
 
 case "${1:-}" in
 start)

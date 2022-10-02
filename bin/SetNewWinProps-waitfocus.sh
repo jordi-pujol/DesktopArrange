@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.21 $
+#  $Revision: 0.22 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -28,8 +28,9 @@
 [ -n "${LOGFILE}" -a -f "${LOGFILE}" ] || \
 	exit 1
 
-set -o errexit -o nounset -o pipefail +o noglob +o noclobber
+set -o errexit -o nounset -o pipefail +o noglob -o noclobber
 
+set +o xtrace
 if [ "${Debug}" = "xtrace" ]; then
 	export PS4='+\t ${BASH_SOURCE}:${LINENO}:${FUNCNAME:+"${FUNCNAME}:"} '
 	exec >> "${LOGFILE}.xtrace" 2>&1
