@@ -1,6 +1,11 @@
 setnewwinprops (0.21) unstable; urgency=medium
 
-  * l
+  * code improvement:
+    - make better logic and check behaviour
+  * new action: set_pointer
+    the pointer is moved to coordinates relative to the window geometry
+  * bin/setnewwinprops.sh, WindowSetupRule():
+    all the actions are done according to the same logic
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 01 Oct 2022 18:50:30 +0200
 
