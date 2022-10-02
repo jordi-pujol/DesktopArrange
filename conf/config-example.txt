@@ -6,7 +6,7 @@ Parameters {
 Rule {
 	check_class="qemu"
 	# Continue checking and apply other rules also
-	check_continue='y'
+	check_others='y'
 	# Move immediately this window to the desktop num 3
 	set_desktop=3
 	# Change to desktop num 3
