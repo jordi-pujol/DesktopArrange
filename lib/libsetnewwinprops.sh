@@ -223,10 +223,6 @@ DesktopSize() {
 	desktopWorkareaH="$(cut -f 2 -s -d 'x' <<< "${desktopWorkareaWxH}")"
 }
 
-DesktopWorkarea() {
-	awk '$2 == "*" {print $9; exit}' < <(wmctrl -d)
-}
-
 DesktopsCount() {
 	xdotool get_num_desktops
 }
@@ -264,9 +260,10 @@ WindowGeometry() {
 
 WindowExists() {
 	local windowId="$(printf '0x%0x' "${1}")"
-	grep -qswF "${windowId}" < <(tr -s '[:blank:],' ' ' \
-	< <(cut -f 2- -s -d '#' \
-	< <(xprop -root "_NET_CLIENT_LIST"))) || {
+	xprop -root "_NET_CLIENT_LIST" | \
+	cut -f 2- -s -d '#' | \
+	tr -s '[:blank:],' ' ' | \
+	grep -qswF "${windowId}" || {
 		_log "window ${windowId}: can't set up this window, has been closed"
 		return ${ERR}
 	}
@@ -285,14 +282,14 @@ WindowProp() {
 WindowPropAtom() {
 	local windowId="${1}" \
 		atom="${2}"
-	sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p' \
-		< <(WindowProp ${windowId} "${atom}")
+	WindowProp ${windowId} "${atom}" | \
+		sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p'
 }
 
 WindowState() {
 	local windowId="${1}"
-	awk '$0 ~ "window state:" {print $NF}' \
-		< <(WindowProp ${windowId} "WM_STATE")
+	WindowProp ${windowId} "WM_STATE" | \
+		awk '$0 ~ "window state:" {print $NF}'
 }
 
 WindowNetstate() {
@@ -305,8 +302,8 @@ IsWindowNetstateActive() {
 	wmstate="$(WindowNetstate ${windowId})" || \
 		return ${ERR}
 	shift
-	[ $(grep -s --count -wF "$(printf '%s\n' "${@}")" \
-	< <(printf '%s\n' ${wmstate})) -eq ${#} ]
+	[ $(printf '%s\n' ${wmstate} | \
+	grep -s --count -wF "$(printf '%s\n' "${@}")") -eq ${#} ]
 }
 
 WindowTitle() {
@@ -696,13 +693,13 @@ LoadConfig() {
 		rule=${NONE}
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
-			grep -se "^rule${rule}_check_.*=" \
-			< <(set) || \
+			set | \
+			grep -se "^rule${rule}_check_.*=" || \
 				LogPrio="err" \
 				_log "hasn't defined any property to check for rule ${rule}"
-			sort --numeric --field-separator="_" --key 2,2 \
-			< <(grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" \
-			< <(set)) || \
+			set | \
+			grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" | \
+			sort --numeric --field-separator="_" --key 2,2 || \
 				LogPrio="warn" \
 				_log "hasn't defined any property to set for rule ${rule}"
 		done

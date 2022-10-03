@@ -639,6 +639,7 @@ WindowNew() {
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
 	[ -z "${Debug}" ] || {
+		DesktopSize $(WindowDesktop ${windowId})
 		printf "%s='%s'\n" \
 			"New window id" ${windowId} \
 			"window_title" "$(WindowTitle ${windowId})" \
@@ -657,10 +658,9 @@ WindowNew() {
 			"window_is_shaded" "$(IsWindowShaded ${windowId} ".")" \
 			"window_is_decorated" "$(IsWindowDecorated ${windowId} ".")" \
 			"window_is_sticky" "$(IsWindowSticky ${windowId} ".")" \
-			"window_desktop_size" \
-				"$(DesktopSize $(WindowDesktop ${windowId}) && \
-				echo "${desktopWidth}x${desktopHeight}")" \
-			"window_desktop_workarea" "$(DesktopWorkarea)" \
+			"window_desktop_size" "${desktopWidth}x${desktopHeight}" \
+			"window_desktop_workarea" \
+			"${desktopWorkareaX},${desktopWorkareaY} ${desktopWorkareaW}x${desktopWorkareaH}" \
 			"desktopsCount" "$(DesktopsCount)"
 	} >> "${LOGFILE}"
 
@@ -699,7 +699,7 @@ WindowNew() {
 				fi
 				;;
 			check_type)
-				if grep -qs -iwF "${val}" <<< "$(WindowType ${windowId})" ; then
+				if grep -qs -iF "${val}" <<< "$(WindowType ${windowId})" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window type \"${val}\""
 				else
@@ -851,7 +851,9 @@ WindowNew() {
 				fi
 				;;
 			check_desktop_workarea)
-				if [ "${val}" = "$(DesktopWorkarea)" ]; then
+				if [ "${val}" = \
+				"${desktopWorkareaX},${desktopWorkareaY} ${desktopWorkareaW}x${desktopWorkareaH}" \
+				]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window desktop workarea \"${val}\""
 				else
