@@ -23,3 +23,5 @@ Depends: ${misc:Depends},
  wmctrl,
  xdotool,
  bash,
+Recommends:
+ toggle-decorations

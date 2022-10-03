@@ -1,48 +1,47 @@
 Parameters {
-	#Debug=""
-	debug="verbose"
+	Debug=""
 }
 
+# ignore all libreoffice windows, when applied don't continue checking other rules
+Rule {
+	check_app_name='libreoffice'
+}
+
+# all qemu windows must be undecorated and moved to desktop 3
 Rule {
 	check_class="qemu"
-	# Continue checking and apply other rules also
-	check_others='y'
-	# Move immediately this window to the desktop num 3
-	set_desktop=3
-	# Change to desktop num 3
-	set_active_desktop=3
-	# Force to focus
-	set_focus='y'   
 	# Undecorate.
 	set_decorated='n'
+	# Minimize
+	set_minimized='y'
+	# Move immediately this window to the desktop num 3
+	set_desktop=3
+	# Continue checking other rules also
+	check_others='y'
 }
 
 Rule {
 	# Compare the title of the new window with this string.
 	check_title="QEMU (BlissOS9-overlay)"
 
-	# Move immediately this window to the desktop num 3
-	#set_desktop=3
 	# Wait 30 seconds to apply the following properties
 	set_delay=30
-	# After waiting (delay) seconds Change to desktop num 3
-	#set_active_desktop=3
+	# set_focus value is allways affirmative
+	set_focus=y
 	# Next, when the window is focused, set up the following properties:
 	# Set the X Y coordinates
 	set_position='25%,0'
 	# Set the width/height
 	set_size='73%,96%'
-	# Undecorate.
-	#set_decorated='n'
 }
 
 rule {
-	set_delay=30
 	# Get the title of the new window.
 	check_title="QEMU (BlissOS9-persistent)"
 	# Check size for current desktop
 	check_desktop_size="1920x1080"
 
+	set_delay=30
 	# Set the X/Y coordinates of a window.
 	set_position='50,0'
 	# Set the width/height of a window.

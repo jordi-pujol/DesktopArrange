@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.22 $
+#  $Revision: 0.23 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -60,14 +60,14 @@ _lock_acquire() {
 		pid="${2}" \
 		pidw
 	while (set -o noclobber;
-	! echo "${pid}" > "${lockfile}" 2> /dev/null); do
+	! echo ${pid} > "${lockfile}" 2> /dev/null); do
 		sleep 1 &
-		pidw="${!}"
-		kill -s 0 "$(cat "${lockfile}")" 2> /dev/null || {
+		pidw=${!}
+		kill -s 0 $(cat "${lockfile}") 2> /dev/null || {
 			rm -f "${lockfile}"
-			kill "${pidw}" 2> /dev/null || :
+			kill ${pidw} 2> /dev/null || :
 		}
-		wait "${pidw}" || :
+		wait ${pidw} || :
 	done
 }
 
@@ -201,11 +201,26 @@ DesktopCurrent() {
 }
 
 DesktopSize() {
-	local desktop="${1:-"-1"}"
+	local desktop="${1:-"-1"}" \
+		desktopGeometry desktopViewPos desktopWorkareaX_Y desktopWorkareaWxH dummy
 	[ ${desktop} -ge 0 ] || \
 		desktop=$(DesktopCurrent)
-	awk -v desktop="${desktop}" \
-	'$1 == desktop {print $4; exit}' < <(wmctrl -d)
+	read -r desktopNum dummy \
+	dummy desktopGeometry \
+	dummy desktopViewPos \
+	dummy desktopWorkareaX_Y desktopWorkareaWxH \
+	desktopName \
+		< <(awk -v desktop="${desktop}" \
+		'$1 == desktop {print $0; exit}' < <(wmctrl -d)) || \
+			return ${ERR}
+	desktopWidth="$(cut -f 1 -s -d 'x' <<< "${desktopGeometry}")"
+	desktopHeight="$(cut -f 2 -s -d 'x' <<< "${desktopGeometry}")"
+	desktopViewPosX="$(cut -f 1 -s -d ',' <<< "${desktopViewPos}")"
+	desktopViewPosY="$(cut -f 2 -s -d ',' <<< "${desktopViewPos}")"
+	desktopWorkareaX="$(cut -f 1 -s -d ',' <<< "${desktopWorkareaX_Y}")"
+	desktopWorkareaY="$(cut -f 2 -s -d ',' <<< "${desktopWorkareaX_Y}")"
+	desktopWorkareaW="$(cut -f 1 -s -d 'x' <<< "${desktopWorkareaWxH}")"
+	desktopWorkareaH="$(cut -f 2 -s -d 'x' <<< "${desktopWorkareaWxH}")"
 }
 
 DesktopWorkarea() {
@@ -576,7 +591,7 @@ ReadConfig() {
 				esac
 			elif [ -n "${foundRule}" ]; then
 				RuleLine \
-				"$(cut -f 1 -s -d '=' <<< "${line,,}")" \
+				"$(cut -f 1 -d '=' <<< "${line,,}")" \
 				"$(_unquote "$(_trim "$(cut -f 2- -s -d '=' <<< "${line}")")")" || \
 					return ${ERR}
 			else

@@ -1,4 +1,4 @@
 bin/setnewwinprops.sh			usr/bin
-bin/SetNewWinProps-waitfocus.sh			usr/bin
+lib/setnewwinprops-waitfocus.sh			usr/lib/setnewwinprops
 lib/libsetnewwinprops.sh			usr/lib/setnewwinprops
 desktop/setnewwinprops.desktop				etc/xdg/autostart

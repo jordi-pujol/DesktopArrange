@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.22 $
+#  $Revision: 0.23 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -44,7 +44,7 @@ _exit() {
 CmdWaitFocus() {
 	local windowId="${1}"
 	echo "xdotool behave ${windowId} focus" \
-		"exec --sync /usr/bin/SetNewWinProps-waitfocus.sh"
+		"exec --sync /usr/lib/setnewwinprops/setnewwinprops-waitfocus.sh"
 }
 
 ActionNeedsFocus() {
@@ -52,6 +52,10 @@ ActionNeedsFocus() {
 	case "${action}" in
 	set_delay | \
 	set_focus | \
+	set_minimized | \
+	set_closed | \
+	set_killed | \
+	set_desktop | \
 	set_active_desktop)
 		return ${ERR}
 		;;
@@ -62,16 +66,12 @@ ActionNeedsFocus() {
 	set_maximized_horizontally | \
 	set_maximized_vertically | \
 	set_fullscreen | \
-	set_minimized | \
 	set_shaded | \
 	set_decorated | \
 	set_pinned | \
 	set_sticky | \
 	set_above | \
 	set_below | \
-	set_desktop | \
-	set_closed | \
-	set_killed | \
 	set_pointer)
 		return ${OK}
 		;;
@@ -82,8 +82,8 @@ ActionNeedsFocus() {
 PointerMove() {
 	local windowId="${1}" \
 		val="${2}" \
-		windowWidth windowHeight windowX windowY windowScreen \
 		x y
+	local windowWidth windowHeight windowX windowY windowScreen
 	WindowGeometry ${windowId}
 	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
 	[ "${x//%}" != "${x}" ] && \
@@ -164,8 +164,11 @@ WindowTile() {
 	local windowId="${1}" \
 		rule="${2}" \
 		val="${3}" \
-		windowWidth windowHeight windowX windowY windowScreen \
-		w x y tile desktop desktopSize desktopW desktopH
+		w x y tile desktop
+	local windowWidth windowHeight windowX windowY windowScreen
+	local desktopNum desktopName desktopWidth desktopHeight \
+		desktopViewPosX desktopViewPosY \
+		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
 	if tile="$(awk -v rule="${rule}" \
 	'$1 == rule {print $0; rc=-1; exit}
@@ -181,24 +184,25 @@ WindowTile() {
 				"Error tiling, can't get geometry of previous tiled window"
 			return ${OK}
 		}
+		[ "${Debug}" != "xtrace" ] || \
+			LogPrio="debug" _log "window ${windowId}: Tiling:" \
+			"${tile:-${rule}} ${windowId}"
 		desktop="$(WindowDesktop ${w})"
-		desktopSize="$(DesktopSize ${desktop})"
-		desktopW="$(cut -f 1 -s -d 'x' <<< "${desktopSize}")"
-		desktopH="$(cut -f 2 -s -d 'x' <<< "${desktopSize}")"
+		DesktopSize ${desktop}
 		x="$(cut -f 1 -s -d ' ' <<< "${val}")"
 		if [ "${x}" = "x" ]; then
 			let "x=windowX,1"
 		else
 			if [ "${x//%}" != "${x}" ]; then
-				let "x=windowX+desktopW*${x//%/\/100},1"
+				let "x=windowX+desktopWidth*${x//%/\/100},1"
 			else
 				let "x=windowX+x,1"
 			fi
 			if [ -n "${x}" ]; then
 				if [ ${x} -lt 0 ]; then
 					x=0
-				elif [ ${x} -ge $((desktopW-windowWidth)) ]; then
-					let "x=desktopW-windowWidth-1,1"
+				elif [ ${x} -ge $((desktopWidth-windowWidth)) ]; then
+					let "x=desktopWidth-windowWidth-1,1"
 				fi
 			else
 				let "x=windowX,1"
@@ -209,15 +213,15 @@ WindowTile() {
 			let "y=windowY,1"
 		else
 			if [ "${y//%}" != "${y}" ]; then
-				let "y=windowY+desktopH*${y//%/\/100},1"
+				let "y=windowY+desktopHeight*${y//%/\/100},1"
 			else
 				let "y=windowY+y,1"
 			fi
 			if [ -n "${y}" ]; then
 				if [ ${y} -lt 0 ]; then
 					y=0
-				elif [ ${y} -ge $((desktopH-windowHeight)) ]; then
-					let "y=desktopH-windowHeight-1,1"
+				elif [ ${y} -ge $((desktopHeight-windowHeight)) ]; then
+					let "y=desktopHeight-windowHeight-1,1"
 				fi
 			else
 				let "y=windowY,1"
@@ -254,11 +258,11 @@ WindowTiling() {
 		rule="${2}" \
 		val="${3}" \
 		mypid
-	mypid=$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")
+	mypid="$(echo $(ps -o ppid= -C "ps -o ppid= -C ps -o ppid="))"
 	[ "${Debug}" != "xtrace" ] || \
 		LogPrio="debug" _log "Current process id ${mypid}:" \
 		"$(ps -h -l ${mypid})"
-	_lock_acquire "${TILESFILE}" "${mypid}"
+	_lock_acquire "${TILESFILE}" ${mypid}
 	WindowTile ${windowId} ${rule} "${val}"
 	_lock_release "${TILESFILE}"
 }
@@ -477,13 +481,21 @@ WindowSetupRule() {
 				IsWindowDecorated ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Decorating"
-					WindowTapKeys ${windowId} "alt+space" "d"
+					if [ -x /usr/bin/toggle-decorations ]; then
+						/usr/bin/toggle-decorations ${windowId}
+					else
+						WindowTapKeys ${windowId} "alt+space" "d"
+					fi
 				}
 			else
 				! IsWindowDecorated ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-decorating"
-					WindowTapKeys ${windowId} "alt+space" "d"
+					if [ -x /usr/bin/toggle-decorations ]; then
+						/usr/bin/toggle-decorations ${windowId}
+					else
+						WindowTapKeys ${windowId} "alt+space" "d"
+					fi
 				}
 			fi
 			;;
@@ -622,6 +634,9 @@ WindowSetup() {
 WindowNew() {
 	local windowId="${1}" \
 		rule setupRules
+	local desktopNum desktopName desktopWidth desktopHeight \
+		desktopViewPosX desktopViewPosY \
+		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
 	[ -z "${Debug}" ] || {
 		printf "%s='%s'\n" \
@@ -642,7 +657,9 @@ WindowNew() {
 			"window_is_shaded" "$(IsWindowShaded ${windowId} ".")" \
 			"window_is_decorated" "$(IsWindowDecorated ${windowId} ".")" \
 			"window_is_sticky" "$(IsWindowSticky ${windowId} ".")" \
-			"window_desktop_size" "$(DesktopSize)" \
+			"window_desktop_size" \
+				"$(DesktopSize $(WindowDesktop ${windowId}) && \
+				echo "${desktopWidth}x${desktopHeight}")" \
 			"window_desktop_workarea" "$(DesktopWorkarea)" \
 			"desktopsCount" "$(DesktopsCount)"
 	} >> "${LOGFILE}"
@@ -823,7 +840,8 @@ WindowNew() {
 				fi
 				;;
 			check_desktop_size)
-				if [ "${val}" = "$(DesktopSize)" ]; then
+				DesktopSize $(WindowDesktop ${windowId})
+				if [ "${val}" = "${desktopWidth}x${desktopHeight}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: matches window desktop size \"${val}\""
 				else
