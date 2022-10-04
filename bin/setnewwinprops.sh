@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.23 $
+#  $Revision: 0.24 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -67,7 +67,7 @@ ActionNeedsFocus() {
 	set_maximized_vertically | \
 	set_fullscreen | \
 	set_shaded | \
-	set_decorated | \
+	set_undecorated | \
 	set_pinned | \
 	set_sticky | \
 	set_above | \
@@ -100,10 +100,39 @@ PointerMove() {
 	[ ${y} -ge 0 -a ${y} -lt "${windowHeight}" ] || \
 		let "y=windowHeight/2,1"
 	[ -z "${Debug}" ] || \
-		_log "window ${windowId}: Setting up pointer to (${val})=(${x} ${y})"
+		_log "window ${windowId}: Setting pointer to (${val})=(${x} ${y})"
 	xdotool mousemove --window ${windowId} ${x} ${y} || \
 		LogPrio="err" _log "window ${windowId}:" \
-			"Error setting up pointer to (${val})=(${x} ${y})"
+			"Error setting pointer to (${val})=(${x} ${y})"
+}
+
+WindowToggleDecoration() {
+	local windowId="${1}" \
+		pgm
+	if pgm="$(type -Pp toggle-decorations)"; then
+		"${pgm}" ${windowId} || :
+	else
+		WindowTapKeys ${windowId} "alt+space" "d"
+	fi
+}
+
+WindowUndecorate() {
+	local windowId="${1}" \
+		val="${2}" \
+		rc=0
+	IsWindowUndecorated ${windowId} || \
+		rc=${?}
+	if [ "${val}" = "${AFFIRMATIVE}" -a \
+	\( ${rc} -eq 0 -o ${rc} -eq 2 \) ]; then
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}: Undecorating"
+		WindowToggleDecoration ${windowId}
+	elif [ "${val}" = "${NEGATIVE}"  -a \
+	\( ${rc} -eq 1 -o ${rc} -eq 2 \) ]; then
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}: Decorating"
+		WindowToggleDecoration ${windowId}
+	fi
 }
 
 WindowUnshade() {
@@ -199,8 +228,8 @@ WindowTile() {
 				let "x=windowX+x,1"
 			fi
 			if [ -n "${x}" ]; then
-				if [ ${x} -lt 0 ]; then
-					x=0
+				if [ ${x} -lt ${desktopWorkareaX} ]; then
+					x=${desktopWorkareaX}
 				elif [ ${x} -ge $((desktopWidth-windowWidth)) ]; then
 					let "x=desktopWidth-windowWidth-1,1"
 				fi
@@ -218,8 +247,8 @@ WindowTile() {
 				let "y=windowY+y,1"
 			fi
 			if [ -n "${y}" ]; then
-				if [ ${y} -lt 0 ]; then
-					y=0
+				if [ ${y} -lt ${desktopWorkareaY} ]; then
+					y=${desktopWorkareaY}
 				elif [ ${y} -ge $((desktopHeight-windowHeight)) ]; then
 					let "y=desktopHeight-windowHeight-1,1"
 				fi
@@ -230,7 +259,7 @@ WindowTile() {
 		WindowActivate ${windowId} || :
 		[ ${desktop} -eq $(WindowDesktop ${windowId}) ] || {
 			[ -z "${Debug}" ] || \
-				_log "window ${windowId}: Setting up tile, moving to desktop ${desktop}"
+				_log "window ${windowId}: Tiling, moving to desktop ${desktop}"
 			xdotool set_desktop_for_window ${windowId} ${desktop} || \
 				LogPrio="err" _log "window ${windowId}:" \
 				"Error tiling, can't set desktop to ${desktop}"
@@ -238,7 +267,7 @@ WindowTile() {
 			WindowActivate ${windowId} || :
 		}
 		[ -z "${Debug}" ] || \
-			_log "window ${windowId}: Setting up tile, moving to (${val})=(${x} ${y})"
+			_log "window ${windowId}: Tiling, moving to (${val})=(${x} ${y})"
 		xdotool windowmove --sync ${windowId} ${x} ${y} || \
 			LogPrio="err" _log "window ${windowId}:" \
 				"Error tiling, can't move to (${val})=(${x} ${y})"
@@ -265,6 +294,55 @@ WindowTiling() {
 	_lock_acquire "${TILESFILE}" ${mypid}
 	WindowTile ${windowId} ${rule} "${val}"
 	_lock_release "${TILESFILE}"
+}
+
+WindowPosition() {
+	local windowId="${1}" \
+		rule="${2}" \
+		val="${3}" \
+		x y desktop
+	local windowWidth windowHeight windowX windowY windowScreen
+	local desktopNum desktopName desktopWidth desktopHeight \
+		desktopViewPosX desktopViewPosY \
+		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
+
+	WindowGeometry ${windowId} || {
+		LogPrio="err" _log "window ${windowId}:" \
+			"Error setting position, can't get window geometry"
+		return ${OK}
+	}
+	desktop="$(WindowDesktop ${windowId})"
+	DesktopSize ${desktop}
+
+	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
+	case "${x}" in
+	left)
+		x=${desktopWorkareaX}
+		;;
+	right)
+		let "x=desktopWorkareaX+desktopWorkareaW-windowWidth,1"
+		;;
+	center)
+		let "x=desktopWorkareaX+(desktopWorkareaW-windowWidth)/2,1"
+		;;
+	esac
+
+	y="$(cut -f 2 -s -d ' ' <<< "${val}")"
+	case "${y,,}" in
+	top)
+		y=${desktopWorkareaY}
+		;;
+	bottom)
+		let "y=desktopWorkareaY+desktopWorkareaH-windowHeight,1"
+		;;
+	center)
+		let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight)/2,1"
+		;;
+	esac
+
+	xdotool windowmove --sync ${windowId} "${x}" "${y}" || \
+		LogPrio="err" _log "window ${windowId}:" \
+			"Error moving to (${val})=(${x} ${y})"
 }
 
 WindowWaitFocus() {
@@ -360,16 +438,14 @@ WindowSetupRule() {
 		set_position)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Moving to ${val}"
-			xdotool windowmove --sync ${windowId} ${val} || \
-				LogPrio="err" _log "window ${windowId}:" \
-					"Error moving to ${val}"
+			WindowPosition ${windowId} ${rule} "${val}"
 			;;
 		set_size)
 			[ -z "${Debug}" ] || \
-				_log "window ${windowId}: Setting up size to ${val}"
+				_log "window ${windowId}: Setting size to ${val}"
 			xdotool windowsize --sync ${windowId} ${val} || \
 				LogPrio="err" _log "window ${windowId}:" \
-					"Error setting up size to ${val}"
+					"Error setting size to ${val}"
 			;;
 		set_tile)
 			WindowTiling ${windowId} ${rule} "${val}"
@@ -395,7 +471,7 @@ WindowSetupRule() {
 			;;
 		set_maximized_horizontally)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowMaximizedHorz ${windowId} || {
+				IsWindowMaximized_horz ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing horizontally"
 					wmctrl -i -r ${windowId} -b add,maximized_horz || \
@@ -403,7 +479,7 @@ WindowSetupRule() {
 							"Error maximizing horizontally"
 				}
 			else
-				! IsWindowMaximizedHorz ${windowId} || {
+				! IsWindowMaximized_horz ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing horizontally"
 					wmctrl -i -r ${windowId} -b remove,maximized_horz || \
@@ -414,7 +490,7 @@ WindowSetupRule() {
 			;;
 		set_maximized_vertically)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowMaximizedVert ${windowId} || {
+				IsWindowMaximized_vert ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Maximizing vertically"
 					wmctrl -i -r ${windowId} -b add,maximized_vert || \
@@ -422,7 +498,7 @@ WindowSetupRule() {
 							"Error maximizing vertically"
 				}
 			else
-				! IsWindowMaximizedVert ${windowId} || {
+				! IsWindowMaximized_vert ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Un-maximizing vertically "
 					wmctrl -i -r ${windowId} -b remove,maximized_vert || \
@@ -464,55 +540,23 @@ WindowSetupRule() {
 			fi
 			;;
 		set_shaded)
-			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowShaded ${windowId} || {
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Shading"
-					wmctrl -i -r ${windowId} -b add,shade || \
-						LogPrio="err" _log "window ${windowId}:" \
-							"Error shading"
-				}
-			else
+			rc=0
+			IsWindowShaded ${windowId} || \
+				rc=${?}
+			if [ "${val}" = "${AFFIRMATIVE}"  -a \
+			\( ${rc} -eq 1 -o ${rc} -eq 2 \) ]; then
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId}: Shading"
+				wmctrl -i -r ${windowId} -b add,shade || \
+					LogPrio="err" _log "window ${windowId}:" \
+						"Error shading"
+			elif [ "${val}" = "${NEGATIVE}"  -a \
+			\( ${rc} -eq 0 -o ${rc} -eq 2 \) ]; then
 				WindowUnshade ${windowId}
 			fi
 			;;
-		set_decorated)
-			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				IsWindowDecorated ${windowId} || {
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Decorating"
-					if [ -x /usr/bin/toggle-decorations ]; then
-						/usr/bin/toggle-decorations ${windowId}
-					else
-						WindowTapKeys ${windowId} "alt+space" "d"
-					fi
-				}
-			else
-				! IsWindowDecorated ${windowId} || {
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Un-decorating"
-					if [ -x /usr/bin/toggle-decorations ]; then
-						/usr/bin/toggle-decorations ${windowId}
-					else
-						WindowTapKeys ${windowId} "alt+space" "d"
-					fi
-				}
-			fi
-			;;
-		set_pinned)
-			if [ "${val}" = "${AFFIRMATIVE}" ]; then
-				[ $(WindowDesktop ${windowId}) -eq -1 ] || {
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Pinning to all desktops"
-					xdotool set_desktop_for_window ${windowId} "-1"
-				}
-			else
-				[ $(WindowDesktop ${windowId}) -ne -1 ] || {
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: Un-pinning to all desktops"
-					xdotool set_desktop_for_window $(DesktopCurrent)
-				}
-			fi
+		set_undecorated)
+			WindowUndecorate ${windowId} "${val}"
 			;;
 		set_sticky)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
@@ -585,6 +629,21 @@ WindowSetupRule() {
 				}
 			fi
 			;;
+		set_pinned)
+			if [ "${val}" = "${AFFIRMATIVE}" ]; then
+				[ $(WindowDesktop ${windowId}) -eq -1 ] || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Pinning to all desktops"
+					xdotool set_desktop_for_window ${windowId} "-1"
+				}
+			else
+				[ $(WindowDesktop ${windowId}) -ne -1 ] || {
+					[ -z "${Debug}" ] || \
+						_log "window ${windowId}: Un-pinning to all desktops"
+					xdotool set_desktop_for_window $(DesktopCurrent)
+				}
+			fi
+			;;
 		set_closed)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Closing window"
@@ -621,7 +680,7 @@ WindowSetup() {
 		rule
 
 	[ -z "${Debug}" ] || \
-		_log "window ${windowId}: Setting up rules" \
+		_log "window ${windowId}: Setting rules" \
 		"$(tr -s '[:blank:],' ',' < <(echo ${setupRules}))"
 	for rule in ${setupRules}; do
 		WindowSetupRule ${windowId} ${rule}
@@ -633,7 +692,8 @@ WindowSetup() {
 
 WindowNew() {
 	local windowId="${1}" \
-		rule setupRules
+		rule setupRules \
+		propName netState
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
@@ -651,12 +711,12 @@ WindowNew() {
 			"window_role" "$(WindowRole ${windowId} || :)" \
 			"window_desktop" "$(WindowDesktop ${windowId})" \
 			"window_is_maximized" "$(IsWindowMaximized ${windowId} ".")" \
-			"window_is_maximized_horz" "$(IsWindowMaximizedHorz ${windowId} ".")" \
-			"window_is_maximized_vert" "$(IsWindowMaximizedVert ${windowId} ".")" \
+			"window_is_maximized_horz" "$(IsWindowMaximized_horz ${windowId} ".")" \
+			"window_is_maximized_vert" "$(IsWindowMaximized_vert ${windowId} ".")" \
 			"window_is_fullscreen" "$(IsWindowFullscreen ${windowId} ".")" \
 			"window_is_minimized" "$(IsWindowMinimized ${windowId} ".")" \
 			"window_is_shaded" "$(IsWindowShaded ${windowId} ".")" \
-			"window_is_decorated" "$(IsWindowDecorated ${windowId} ".")" \
+			"window_is_undecorated" "$(IsWindowUndecorated ${windowId} ".")" \
 			"window_is_sticky" "$(IsWindowSticky ${windowId} ".")" \
 			"window_desktop_size" "${desktopWidth}x${desktopHeight}" \
 			"window_desktop_workarea" \
@@ -759,85 +819,33 @@ WindowNew() {
 					rc=""
 				fi
 				;;
-			check_is_maximized)
-				if [ "${val}" = "$(IsWindowMaximized ${windowId} ".")" ]; then
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: is \"${val}\" maximized"
-				else
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: doesn't match window is maximized \"${val}\""
-					rc=""
-				fi
-				;;
-			check_is_maximized_horz)
-				if [ "${val}" = "$(IsWindowMaximizedHorz ${windowId} ".")" ]; then
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: is \"${val}\" maximized horizontally"
-				else
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: doesn't match window is maximized_horz \"${val}\""
-					rc=""
-				fi
-				;;
-			check_is_maximized_vert)
-				if [ "${val}" = "$(IsWindowMaximizedVert ${windowId} ".")" ]; then
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: is \"${val}\" maximized vertically"
-				else
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: doesn't match window is maximized vert \"${val}\""
-					rc=""
-				fi
-				;;
-			check_is_fullscreen)
-				if [ "${val}" = "$(IsWindowFullscreen ${windowId} ".")" ]; then
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: is \"${val}\" fullscreen"
-				else
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: doesn't match window_is_fullscreen \"${val}\""
-					rc=""
-				fi
-				;;
-			check_is_minimized)
-				if [ "${val}" = "$(IsWindowMinimized ${windowId} ".")" ]; then
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: is \"${val}\" minimized"
-				else
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: doesn't match window is minimized \"${val}\""
-					rc=""
-				fi
-				;;
-			check_is_shaded)
-				if [ "${val}" = "$(IsWindowShaded ${windowId} ".")" ]; then
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: is \"${val}\" shaded"
-				else
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: doesn't match window is shaded \"${val}\""
-					rc=""
-				fi
-				;;
-			check_is_decorated)
-				if [ "${val}" = "$(IsWindowDecorated ${windowId} ".")" ]; then
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: is \"${val}\" decorated"
-				else
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: doesn't match window is decorated \"${val}\""
-					rc=""
-				fi
-				;;
+			check_is_maximized | \
+			check_is_maximized_horz | \
+			check_is_maximized_vert | \
+			check_is_fullscreen | \
+			check_is_minimized | \
+			check_is_shaded | \
+			check_is_undecorated | \
 			check_is_sticky)
-				if [ "${val}" = "$(IsWindowSticky ${windowId} ".")" ]; then
+				propName="$(cut -f 3 -s -d '_' <<< "${prop}")"
+				netState="$(IsWindow${propName^} ${windowId} ".")"
+				case "${netState}" in
+				${AFFIRMATIVE} | \
+				${NEGATIVE})
+					if [ "${val}" != "${netState}" ]; then
+						[ -z "${Debug}" ] || \
+						_log "window ${windowId}: ${propName} is \"${val}\""
+					else
+						[ -z "${Debug}" ] || \
+						_log "window ${windowId}: ${propName} is not \"${val}\""
+						rc=""
+					fi
+					;;
+				*)
 					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: matches sticky \"${val}\""
-				else
-					[ -z "${Debug}" ] || \
-						_log "window ${windowId}: doesn't match window is sticky \"${val}\""
-					rc=""
-				fi
+						_log "window ${windowId}: ${propName} is unknown"
+					;;
+				esac
 				;;
 			check_desktop_size)
 				DesktopSize $(WindowDesktop ${windowId})

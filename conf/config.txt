@@ -4,7 +4,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.23 $
+#  $Revision: 0.24 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -58,13 +58,16 @@ Rule {
 	check_desktop_size="1920x1080"
 	# Check workarea for current desktop
 	check_desktop_workarea="1920x1080"
-
 	## Get the position of the mouse pointer.
 	#get_pointer=
-	## Depth ##
+	# After applying these properties continue checking next rules
+	check_others=y
 
+	## Control ##
 	# When the window is created wait 30 seconds to apply these properties
 	set_delay=30
+
+	## Depth ##
 	# Make the window appear in the foreground and give focus.
 	set_active="y|yes|enable|true|1"
 	# Make the window "always on top" when value is "y".
@@ -73,6 +76,7 @@ Rule {
 	# Make the window "always below" when value is "y".
 	# Remove the "always below" flag when value is "n".
 	set_bottom=
+
 	## Max/Min ##
 	# Maximize the window.
 	set_maximized="y|yes|enable|true|1  n|no|disable|false|0"
@@ -86,20 +90,30 @@ Rule {
 	set_focus="y|yes|enable|true|1"
 	# Minimize the window.
 	set_minimized="y|yes|enable|true|1"
+
 	## Workspace ##
 	# Pin on all workspaces when value is "y".
 	# Don't pin on all workspaces when value is "n".
 	set_pin="y|yes|enable|true|1  n|no|disable|false|0"
+
 	## Movement ##
 	# Set the X/Y coordinates of a window.
+	# Characters "x" or "y" means preserve current window position in x or y.
+	# Specify names to calculate position, it means:
+	#   position to the left or right, top or bottom, or central point of the workarea.
 	set_position="400|20%|x,200|10%|y"
+	set_position="left|right|center,top|bottom|center"
 	# Set the width/height of a window.
 	set_size="400|20%|x,200|10%|y"
+	# Tile windows that are set with this rule. Incremental values.
+	set_tile="40|5%|-40|-5%,80|10%|-80|-10%"
+
 	## Workspaces ##
 	# Change to the given workspace/virtual-desktop.
 	set_active_desktop="0..(n-1)"
 	# Set the workspace the window is active on.
 	set_desktop="0..(n-1)"
+
 	## Misc ##
 	# Set/Unset the decorations for the window.
 	set_decoration="y|yes|enable|true|1  n|no|disable|false|0"
@@ -107,6 +121,7 @@ Rule {
 	set_killed="y|yes|enable|true|1"
 	# Set the position of the mouse pointer.
 	set_pointer="400|20%|x,200|10%|y"
+
 	# add this rule to the list of rules
 }
 

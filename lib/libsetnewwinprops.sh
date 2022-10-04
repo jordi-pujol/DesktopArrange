@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.23 $
+#  $Revision: 0.24 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -238,6 +238,14 @@ DesktopSetCurrent() {
 		}
 }
 
+WindowStateAction() {
+	local state="${1}"
+	awk -v state="${state}" -v s="${TAB}" \
+		'BEGIN{RS=s}
+		$2 == state {print $1; rc=-1; exit}
+		END{exit rc+1}' <<< "${ACTIONSTATES}"
+}
+
 WindowDesktop() {
 	local windowId="${1}" \
 		desktop
@@ -283,7 +291,7 @@ WindowPropAtom() {
 	local windowId="${1}" \
 		atom="${2}"
 	WindowProp ${windowId} "${atom}" | \
-		sed -nre '\|.*[=] (.*)$|!{q1};s//\1/p'
+		sed -nre '\|.*[=] (.*)$|!{q1};{s//\1/;s/[[:blank:],]+/ /g;p}'
 }
 
 WindowState() {
@@ -292,18 +300,54 @@ WindowState() {
 		awk '$0 ~ "window state:" {print $NF}'
 }
 
-WindowNetstate() {
+WindowNetState() {
 	local windowId="${1}"
 	WindowPropAtom ${windowId} "_NET_WM_STATE"
 }
 
-IsWindowNetstateActive() {
-	local windowId="${1}" wmstate
-	wmstate="$(WindowNetstate ${windowId})" || \
+WindowNetAllowedActions() {
+	local windowId="${1}"
+	WindowPropAtom ${windowId} "_NET_WM_ALLOWED_ACTIONS"
+}
+
+IsWindowNetStateActive() {
+	local windowId="${1}" \
+		netState netAllowedActions state
+	netState="$(WindowNetState ${windowId})" || \
+		return ${ERR}
+	netAllowedActions="$(WindowNetAllowedActions ${windowId})" || \
 		return ${ERR}
 	shift
-	[ $(printf '%s\n' ${wmstate} | \
+	for state in "${@}"; do
+		action="$(WindowStateAction "${state}")" || \
+			return 2
+		grep -qswF "${action}" <<< "${netAllowedActions}" || \
+			return 2
+	done
+	[ $(printf '%s\n' ${netState} | \
 	grep -s --count -wF "$(printf '%s\n' "${@}")") -eq ${#} ]
+}
+
+IsWindowNetStateKnown() {
+	local windowId="${1}" \
+		answer="${2:-}" \
+		rc=0
+	shift 2
+	IsWindowNetStateActive ${windowId} "${@}" || \
+		rc=${?}
+	[ -n "${answer}" ] || \
+		return ${rc}
+	case ${rc} in
+	1)
+		echo "${NEGATIVE}"
+		;;
+	2)
+		echo "${UNKNOWN}"
+		;;
+	*)
+		echo "${AFFIRMATIVE}"
+		;;
+	esac
 }
 
 WindowTitle() {
@@ -321,7 +365,8 @@ WindowAppName() {
 
 WindowType() {
 	local windowId="${1}"
-	WindowPropAtom ${windowId} "_NET_WM_WINDOW_TYPE"
+	WindowPropAtom ${windowId} "_NET_WM_WINDOW_TYPE" | \
+		sed -re '/_NET_WM_WINDOW_TYPE_/s///g'
 }
 
 WindowApplication() {
@@ -343,123 +388,96 @@ WindowRole() {
 IsWindowMaximized() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} \
+	IsWindowNetStateKnown ${windowId} "${answer}" \
 	'_NET_WM_STATE_MAXIMIZED_HORZ' \
-	'_NET_WM_STATE_MAXIMIZED_VERT' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	'_NET_WM_STATE_MAXIMIZED_VERT' || \
+		return ${?}
 }
 
-IsWindowMaximizedHorz() {
+IsWindowMaximized_horz() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_MAXIMIZED_HORZ' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	IsWindowNetStateKnown ${windowId} "${answer}" \
+	'_NET_WM_STATE_MAXIMIZED_HORZ' || \
+		return ${?}
 }
 
-IsWindowMaximizedVert() {
+IsWindowMaximized_vert() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_MAXIMIZED_VERT' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	IsWindowNetStateKnown ${windowId} "${answer}" \
+	'_NET_WM_STATE_MAXIMIZED_VERT' || \
+		return ${?}
 }
 
 IsWindowFullscreen() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_FULLSCREEN' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	IsWindowNetStateKnown ${windowId} "${answer}" \
+	'_NET_WM_STATE_FULLSCREEN' || \
+		return ${?}
 }
 
 IsWindowMinimized() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_HIDDEN' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	IsWindowNetStateKnown ${windowId} "${answer}" \
+	'_NET_WM_STATE_HIDDEN' || \
+		return ${?}
 }
 
 IsWindowShaded() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_SHADED' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	IsWindowNetStateKnown ${windowId} "${answer}" \
+	'_NET_WM_STATE_SHADED' || \
+		return ${?}
 }
 
-IsWindowDecorated() {
+IsWindowUndecorated() {
 	local windowId="${1}" \
-		answer="${2:-}"
-	! IsWindowNetstateActive ${windowId} '_OB_WM_STATE_UNDECORATED' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+		answer="${2:-}" \
+		pgm decoration
+	if pgm="$(type -Pp toggle-decorations)" && \
+	decoration="$("${pgm}" ${windowId} "status")"; then
+		if [ ${decoration##* } -ne 0 ]; then
+			[ -n "${answer}" ] && \
+				echo "${NEGATIVE}" || \
+				return ${ERR}
+		else
+			[ -n "${answer}" ] && \
+				echo "${AFFIRMATIVE}" || \
+				return ${OK}
+		fi
+	else
+		IsWindowNetStateKnown ${windowId} "${answer}" \
+		'_OB_WM_STATE_UNDECORATED' || \
+			return ${?}
+	fi
 }
 
 IsWindowSticky() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_STICKY' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	IsWindowNetStateKnown ${windowId} "${answer}" \
+	'_NET_WM_STATE_STICKY' || \
+		return ${?}
 }
 
 IsWindowAbove() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_ABOVE' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	IsWindowNetStateKnown ${windowId} "${answer}" \
+	'_NET_WM_STATE_ABOVE' || \
+		return ${?}
 }
 
 IsWindowBelow() {
 	local windowId="${1}" \
 		answer="${2:-}"
-	IsWindowNetstateActive ${windowId} '_NET_WM_STATE_BELOW' || {
-		[ -z "${answer}" ] || \
-			echo "${NEGATIVE}"
-		return ${ERR}
-	}
-	[ -z "${answer}" ] || \
-		echo "${AFFIRMATIVE}"
+	IsWindowNetStateKnown ${windowId} "${answer}" \
+	'_NET_WM_STATE_BELOW' || \
+		return ${?}
 }
 
 RuleLine() {
@@ -489,7 +507,7 @@ RuleLine() {
 	check_is_fullscreen | \
 	check_is_minimized | \
 	check_is_shaded | \
-	check_is_decorated | \
+	check_is_undecorated | \
 	check_is_sticky)
 		_check_yn "rule${Rules}_${prop}" "${val}"
 		;;
@@ -534,7 +552,7 @@ RuleLine() {
 	set_fullscreen | \
 	set_sticky | \
 	set_shaded | \
-	set_decorated | \
+	set_undecorated | \
 	set_pinned | \
 	set_above | \
 	set_below)
@@ -715,6 +733,21 @@ readonly LF=$'\n' TAB=$'\t' OK=0 ERR=1 NONE=0 \
 	PATTERN_NO="^(n.*|false|off|0|disable.*)$" \
 	PATTERN_FIXEDSIZE="^[0-9]+x[0-9]+$" \
 	AFFIRMATIVE="y" \
-	NEGATIVE="n"
+	NEGATIVE="n" \
+	UNKNOWN="unknown" \
+	ACTIONSTATES="_NET_WM_ACTION_ABOVE _NET_WM_STATE_ABOVE\
+	_NET_WM_ACTION_BELOW _NET_WM_STATE_BELOW\
+	_NET_WM_ACTION_FULLSCREEN _NET_WM_STATE_FULLSCREEN\
+	_NET_WM_ACTION_MAXIMIZE_HORZ _NET_WM_STATE_MAXIMIZED_HORZ\
+	_NET_WM_ACTION_MAXIMIZE_VERT _NET_WM_STATE_MAXIMIZED_VERT\
+	_NET_WM_ACTION_SHADE _NET_WM_STATE_SHADED\
+	_NET_WM_ACTION_MINIMIZE _NET_WM_STATE_HIDDEN\
+	_NET_WM_ACTION_STICK _NET_WM_STATE_STICKY\
+	_NET_WM_ACTION_SKIP_TASKBAR _NET_WM_STATE_SKIP_TASKBAR\
+	_NET_WM_ACTION_SKIP_PAGER _NET_WM_STATE_SKIP_PAGER\
+	_OB_WM_ACTION_UNDECORATE _OB_WM_STATE_UNDECORATED\
+	"
+# _NET_WM_STATE_MODAL
+# _NET_WM_STATE_DEMANDS_ATTENTION
 
 :
