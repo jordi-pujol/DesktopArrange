@@ -81,9 +81,9 @@ Rule {
 	# Maximize the window.
 	set_maximized="y|yes|enable|true|1  n|no|disable|false|0"
 	# Maximize horizontally.
-	set_maximized_horizontally="y|yes|enable|true|1  n|no|disable|false|0"
+	set_maximized_horz="y|yes|enable|true|1  n|no|disable|false|0"
 	# Maximize vertically.
-	set_maximized_vertically="y|yes|enable|true|1  n|no|disable|false|0"
+	set_maximized_vert="y|yes|enable|true|1  n|no|disable|false|0"
 	# Make the window "fullscreen".
 	set_fullscreen="y|yes|enable|true|1  n|no|disable|false|0"
 	# Focus the window and change to the desktop that contains this window.

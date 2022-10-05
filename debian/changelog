@@ -1,6 +1,20 @@
 setnewwinprops (0.24) unstable; urgency=medium
 
-  * l
+  * parse better the config file, parser accepts:
+    - set[_ ]property
+    - set[_ ]property[= ]["']*value["']*
+    - unset[_ ]property
+    - check[_ ]property
+    - check[_ ]property[= ]["']*value["']*
+    - uncheck[_ ]property
+  * Right controlling decorate/undecorate windows
+    when using version 1.2 of toggle-decorations.
+  * undecorate and redecorate windows to:
+    - set accurate position in bottom 
+    - tile windows
+  * rename properties:
+    - maximized_horizontally has been renamed to maximized_horz
+    - maximized_vertically has been renamed to maximized_vert
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 03 Oct 2022 13:44:07 +0200
 

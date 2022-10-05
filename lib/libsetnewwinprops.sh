@@ -439,7 +439,7 @@ IsWindowUndecorated() {
 		answer="${2:-}" \
 		pgm decoration
 	if pgm="$(type -Pp toggle-decorations)" && \
-	decoration="$("${pgm}" ${windowId} "status")"; then
+	decoration="$("${pgm}" -s ${windowId})"; then
 		if [ ${decoration##* } -ne 0 ]; then
 			[ -n "${answer}" ] && \
 				echo "${NEGATIVE}" || \
@@ -482,7 +482,41 @@ IsWindowBelow() {
 
 RuleLine() {
 	local prop="${1}" \
-		val="${2}"
+		val="${2}" \
+		v
+	[ -n "${prop}" ] || \
+		return ${OK}
+	[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
+		LogPrio="err" _log "Rule ${Rules}: \"${prop}\" with a value." \
+			"Value \"${val}\" is ignored"
+		val=""
+	}
+	if [ -z "${val}" ]; then
+		v="${AFFIRMATIVE}"
+		if [ "${prop:0:2}" = "un" ]; then
+			prop="${prop:2}"
+			v="${NEGATIVE}"
+		fi
+		case "${prop}" in
+		check_others | \
+		set_maximized | \
+		set_maximized_horz | \
+		set_maximized_vert | \
+		set_minimized | \
+		set_fullscreen | \
+		set_sticky | \
+		set_shaded | \
+		set_undecorated | \
+		set_pinned | \
+		set_above | \
+		set_below | \
+		set_focus | \
+		set_closed | \
+		set_killed)
+			val="${v}"
+			;;
+		esac
+	fi
 	[ -n "${val}" ] || {
 		LogPrio="err" _log "Rule ${Rules}: Property \"${prop}\" has not a value"
 		return ${ERR}
@@ -501,27 +535,12 @@ RuleLine() {
 	check_desktops)
 		_check_natural "rule${Rules}_${prop}" "${val}"
 		;;
-	check_is_maximized | \
-	check_is_maximized_horz | \
-	check_is_maximized_vert | \
-	check_is_fullscreen | \
-	check_is_minimized | \
-	check_is_shaded | \
-	check_is_undecorated | \
-	check_is_sticky)
-		_check_yn "rule${Rules}_${prop}" "${val}"
-		;;
 	check_desktop_size | \
 	check_desktop_workarea)
 		_check_fixedsize "rule${Rules}_${prop}" "${val}"
 		;;
 	check_others)
 		_check_y "rule${Rules}_${prop}" "${val}"
-		;;
-	set_focus | \
-	set_closed | \
-	set_killed)
-		_check_y "rule${Rules}_$((++ruleIndex))_${prop}" "${val}"
 		;;
 	set_delay)
 		_check_natural val ${NONE}
@@ -546,8 +565,8 @@ RuleLine() {
 		fi
 		;;
 	set_maximized | \
-	set_maximized_horizontally | \
-	set_maximized_vertically | \
+	set_maximized_horz | \
+	set_maximized_vert | \
 	set_minimized | \
 	set_fullscreen | \
 	set_sticky | \
@@ -558,6 +577,11 @@ RuleLine() {
 	set_below)
 		_check_yn "rule${Rules}_$((++ruleIndex))_${prop}" "${val}"
 		;;
+	set_focus | \
+	set_closed | \
+	set_killed)
+		_check_y "rule${Rules}_$((++ruleIndex))_${prop}" "${val}"
+		;;
 	*)
 		_log "Property \"${prop}\" is not implemented yet"
 		return ${ERR}
@@ -566,7 +590,8 @@ RuleLine() {
 }
 
 ReadConfig() {
-	local foundParm="" foundRule="" ruleIndex
+	local foundParm="" foundRule="" ruleIndex \
+		prop val
 	Rules=${NONE}
 	rm -f "${TILESFILE}"*
 	: > "${TILESFILE}"
@@ -593,9 +618,12 @@ ReadConfig() {
 		else
 			printf '\t%s\n' "${line}"
 			if [ -n "${foundParm}" ]; then
-				case "$(_trim "${line,,}")" in
-				debug=*)
-					Debug="$(_unquote "$(_trim "$(cut -f 2- -s -d '=' <<< "${line}")")")"
+				case "$(sed -nre '/^([^[:blank:]=]+).*/s//\1/p' \
+				<<< "${line,,}")" in
+				debug)
+					Debug="$(_unquote "$(_trim "$( \
+					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
+					<<< "${line,,}")")")"
 					;;
 				emptylist)
 					EmptyList="y"
@@ -605,9 +633,18 @@ ReadConfig() {
 					;;
 				esac
 			elif [ -n "${foundRule}" ]; then
-				RuleLine \
-				"$(cut -f 1 -d '=' <<< "${line,,}")" \
-				"$(_unquote "$(_trim "$(cut -f 2- -s -d '=' <<< "${line}")")")" || \
+				prop="$(sed -nr -e '/^(check|unckeck|set|unset)[[:blank:]]+/s//\1_/' \
+					-e '/^([^[:blank:]=]+).*/s//\1/p' \
+					<<< "${line,,}")"
+				! sed -nr -e '/^(check|unckeck|set|unset)[[:blank:]]+/!q1' \
+				<<< "${line,,}" || \
+					line="$(sed -r \
+					-e '/^[^[:blank:]]+[[:blank:]]+/s///' \
+					<<< "${line}")"
+				val="$(_unquote "$(_trim "$( \
+					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
+					<<< "${line}")")")"
+				RuleLine "${prop}" "${val}" || \
 					return ${ERR}
 			else
 				return ${ERR}

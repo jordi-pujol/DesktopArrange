@@ -63,8 +63,8 @@ ActionNeedsFocus() {
 	set_size | \
 	set_tile | \
 	set_maximized | \
-	set_maximized_horizontally | \
-	set_maximized_vertically | \
+	set_maximized_horz | \
+	set_maximized_vert | \
 	set_fullscreen | \
 	set_shaded | \
 	set_undecorated | \
@@ -119,7 +119,26 @@ WindowToggleDecoration() {
 WindowUndecorate() {
 	local windowId="${1}" \
 		val="${2}" \
-		rc=0
+		rc=0 \
+		pgm state
+	if pgm="$(type -Pp toggle-decorations)"; then
+		state="$("${pgm}" -s ${windowId})" || \
+			return ${OK}
+		state="${state##* }"
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}:" \
+				"Is $([ ${state} -gt 0 ] || echo "un")decorated"
+		if [ "${val}" = "${AFFIRMATIVE}" -a ${state} -gt 0 ]; then
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Undecorating"
+			"${pgm}" -d ${windowId} || :
+		elif [ "${val}" = "${NEGATIVE}" -a ${state} -eq 0 ]; then
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId}: Decorating"
+			"${pgm}" -e ${windowId} || :
+		fi
+		return ${OK}
+	fi
 	IsWindowUndecorated ${windowId} || \
 		rc=${?}
 	if [ "${val}" = "${AFFIRMATIVE}" -a \
@@ -193,7 +212,7 @@ WindowTile() {
 	local windowId="${1}" \
 		rule="${2}" \
 		val="${3}" \
-		w x y tile desktop
+		w x y tile desktop undecorated
 	local windowWidth windowHeight windowX windowY windowScreen
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
@@ -266,11 +285,18 @@ WindowTile() {
 			sleep 1
 			WindowActivate ${windowId} || :
 		}
+		undecorated="$(IsWindowUndecorated ${windowId} ".")"
+		[ "${undecorated}" = "${AFFIRMATIVE}" \
+		-o "${undecorated}" = "${UNKNOWN}" ] || \
+			WindowUndecorate ${windowId} "${AFFIRMATIVE}"
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId}: Tiling, moving to (${val})=(${x} ${y})"
 		xdotool windowmove --sync ${windowId} ${x} ${y} || \
 			LogPrio="err" _log "window ${windowId}:" \
 				"Error tiling, can't move to (${val})=(${x} ${y})"
+		[ "${undecorated}" = "${AFFIRMATIVE}" \
+		-o "${undecorated}" = "${UNKNOWN}" ] || \
+			WindowUndecorate ${windowId} "${NEGATIVE}"
 	fi
 	{ awk -v rule="${rule}" \
 		'$1 != rule {print $0}' < "${TILESFILE}"
@@ -300,7 +326,7 @@ WindowPosition() {
 	local windowId="${1}" \
 		rule="${2}" \
 		val="${3}" \
-		x y desktop
+		x y desktop undecorated
 	local windowWidth windowHeight windowX windowY windowScreen
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
@@ -328,21 +354,33 @@ WindowPosition() {
 	esac
 
 	y="$(cut -f 2 -s -d ' ' <<< "${val}")"
+	undecorated=""
 	case "${y,,}" in
 	top)
 		y=${desktopWorkareaY}
 		;;
 	bottom)
 		let "y=desktopWorkareaY+desktopWorkareaH-windowHeight,1"
+		undecorated="$(IsWindowUndecorated ${windowId} ".")"
 		;;
 	center)
 		let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight)/2,1"
 		;;
 	esac
 
+	[ -z "${undecorated}" \
+	-o "${undecorated}" = "${AFFIRMATIVE}" \
+	-o "${undecorated}" = "${UNKNOWN}" ] || \
+		WindowUndecorate ${windowId} "${AFFIRMATIVE}"
+	[ -z "${Debug}" ] || \
+		_log "window ${windowId}: Moving to (${val})=(${x} ${y})"
 	xdotool windowmove --sync ${windowId} "${x}" "${y}" || \
 		LogPrio="err" _log "window ${windowId}:" \
 			"Error moving to (${val})=(${x} ${y})"
+	[ -z "${undecorated}" \
+	-o "${undecorated}" = "${AFFIRMATIVE}" \
+	-o "${undecorated}" = "${UNKNOWN}" ] || \
+		WindowUndecorate ${windowId} "${NEGATIVE}"
 }
 
 WindowWaitFocus() {
@@ -436,8 +474,6 @@ WindowSetupRule() {
 					"Can't move window to desktop ${val}"
 			;;
 		set_position)
-			[ -z "${Debug}" ] || \
-				_log "window ${windowId}: Moving to ${val}"
 			WindowPosition ${windowId} ${rule} "${val}"
 			;;
 		set_size)
@@ -469,7 +505,7 @@ WindowSetupRule() {
 				}
 			fi
 			;;
-		set_maximized_horizontally)
+		set_maximized_horz)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowMaximized_horz ${windowId} || {
 					[ -z "${Debug}" ] || \
@@ -488,7 +524,7 @@ WindowSetupRule() {
 				}
 			fi
 			;;
-		set_maximized_vertically)
+		set_maximized_vert)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowMaximized_vert ${windowId} || {
 					[ -z "${Debug}" ] || \
