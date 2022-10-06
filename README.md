@@ -9,3 +9,7 @@ by a desktop entry placed in the **~/.config/autostart** directory
 and also the user may issue a command in the same X session
 to start, stop or restart the daemon;
 the user also may reload the configuration.
+
+For further information please visit the <a href='https://github.com/jordi-pujol/SetNewWinProps/wiki'>SetNewWinProps Wiki</a>
+
+Spanish speeking users may prefer the <a href='https://github.com/jordi-pujol/SetNewWinProps/wiki/Home-espa%C3%B1ol'>SetNewWinProps Wiki  en español</a>
