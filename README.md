@@ -10,6 +10,6 @@ and also the user may issue a command in the same X session
 to start, stop or restart the daemon;
 the user also may reload the configuration.
 
-For further information please visit the <a href='https://github.com/jordi-pujol/SetNewWinProps/wiki' target="_blank">SetNewWinProps Wiki</a>
+For further information please visit the <a target="_blank" href='https://github.com/jordi-pujol/SetNewWinProps/wiki'>SetNewWinProps Wiki</a>
 
-Spanish speeking users may prefer the <a href='https://github.com/jordi-pujol/SetNewWinProps/wiki/Home-espa%C3%B1ol' target="_blank">SetNewWinProps Wiki  en español</a>
+Spanish speeking users may prefer the <a target="_blank" href='https://github.com/jordi-pujol/SetNewWinProps/wiki/Home-espa%C3%B1ol'>SetNewWinProps Wiki  en español</a>
