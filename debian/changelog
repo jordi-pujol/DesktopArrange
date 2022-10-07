@@ -1,3 +1,18 @@
+setnewwinprops (0.25) unstable; urgency=medium
+
+  * The package toggle-decorations is now a dependency to install this tool.
+  * take account of window decorations
+    to acurately positioning the window vertically centered,
+    also when positioning the window to bottom.
+  * temporary values will be stored in a single file.
+    - desktop or window properties
+    - tiles
+    - mosaics
+  * developing new actions:
+    - set_mosaicked
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 05 Oct 2022 12:14:20 +0200
+
 setnewwinprops (0.24) unstable; urgency=medium
 
   * parse better the config file, parser accepts:

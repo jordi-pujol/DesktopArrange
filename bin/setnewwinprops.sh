@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.24 $
+#  $Revision: 0.25 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -44,7 +44,7 @@ _exit() {
 CmdWaitFocus() {
 	local windowId="${1}"
 	echo "xdotool behave ${windowId} focus" \
-		"exec --sync /usr/lib/setnewwinprops/setnewwinprops-waitfocus.sh"
+		"exec /usr/lib/setnewwinprops/setnewwinprops-waitfocus.sh"
 }
 
 ActionNeedsFocus() {
@@ -61,11 +61,12 @@ ActionNeedsFocus() {
 		;;
 	set_position | \
 	set_size | \
-	set_tile | \
+	set_tiled | \
 	set_maximized | \
 	set_maximized_horz | \
 	set_maximized_vert | \
 	set_fullscreen | \
+	set_mosaicked | \
 	set_shaded | \
 	set_undecorated | \
 	set_pinned | \
@@ -77,6 +78,36 @@ ActionNeedsFocus() {
 		;;
 	esac
 	LogPrio="err" _log "Invalid action \"${action}\""
+}
+
+GetMenuBarHeight() {
+	local windowId="${1}" \
+		mypid undecorated=0 wY
+	[ -z "${MenuBarHeight}" ] || \
+		return ${OK}
+	MenuBarHeight="$(awk -v var="MenuBarHeight" -F '=' \
+		'$1 == var {print $2; exit}' < "${VARSFILE}")"
+	[ -z "${MenuBarHeight}" ] || \
+		return ${OK}
+	IsWindowUndecorated ${windowId} || \
+		undecorated="${?}"
+	[ ${undecorated} -ne 2 ] || \
+		return ${ERR}
+	DesktopSize
+	WindowGeometry ${windowId}
+	wY=${windowY}
+	[ ${undecorated} -eq 1 ] || \
+		toggle-decorations -e ${windowId}
+	xdotool windowmove ${windowId} x ${desktopWorkareaY}
+	WindowGeometry ${windowId}
+	[ ${undecorated} -eq 1 ] || \
+		toggle-decorations -d ${windowId}
+	xdotool windowmove ${windowId} x ${wY}
+	let "MenuBarHeight=windowY-desktopWorkareaY,1"
+	awk -v var="MenuBarHeight" -F '=' \
+	'$1 == var {rc=-1; exit}
+	END{exit rc+1}' < "${VARSFILE}" || \
+		echo "MenuBarHeight=${MenuBarHeight}" >> "${VARSFILE}"
 }
 
 PointerMove() {
@@ -106,51 +137,25 @@ PointerMove() {
 			"Error setting pointer to (${val})=(${x} ${y})"
 }
 
-WindowToggleDecoration() {
-	local windowId="${1}" \
-		pgm
-	if pgm="$(type -Pp toggle-decorations)"; then
-		"${pgm}" ${windowId} || :
-	else
-		WindowTapKeys ${windowId} "alt+space" "d"
-	fi
-}
-
 WindowUndecorate() {
 	local windowId="${1}" \
 		val="${2}" \
 		rc=0 \
-		pgm state
-	if pgm="$(type -Pp toggle-decorations)"; then
-		state="$("${pgm}" -s ${windowId})" || \
-			return ${OK}
-		state="${state##* }"
-		[ -z "${Debug}" ] || \
-			_log "window ${windowId}:" \
-				"Is $([ ${state} -gt 0 ] || echo "un")decorated"
-		if [ "${val}" = "${AFFIRMATIVE}" -a ${state} -gt 0 ]; then
-			[ -z "${Debug}" ] || \
-				_log "window ${windowId}: Undecorating"
-			"${pgm}" -d ${windowId} || :
-		elif [ "${val}" = "${NEGATIVE}" -a ${state} -eq 0 ]; then
-			[ -z "${Debug}" ] || \
-				_log "window ${windowId}: Decorating"
-			"${pgm}" -e ${windowId} || :
-		fi
+		state
+	state="$(toggle-decorations -s ${windowId})" || \
 		return ${OK}
-	fi
-	IsWindowUndecorated ${windowId} || \
-		rc=${?}
-	if [ "${val}" = "${AFFIRMATIVE}" -a \
-	\( ${rc} -eq 0 -o ${rc} -eq 2 \) ]; then
+	state="${state##* }"
+	[ -z "${Debug}" ] || \
+		_log "window ${windowId}:" \
+			"Is $([ ${state} -gt 0 ] || echo "un")decorated"
+	if [ "${val}" = "${AFFIRMATIVE}" -a ${state} -gt 0 ]; then
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId}: Undecorating"
-		WindowToggleDecoration ${windowId}
-	elif [ "${val}" = "${NEGATIVE}"  -a \
-	\( ${rc} -eq 1 -o ${rc} -eq 2 \) ]; then
+		toggle-decorations -d ${windowId} || :
+	elif [ "${val}" = "${NEGATIVE}" -a ${state} -eq 0 ]; then
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId}: Decorating"
-		WindowToggleDecoration ${windowId}
+		toggle-decorations -e ${windowId} || :
 	fi
 }
 
@@ -182,7 +187,7 @@ WindowActivate() {
 	WindowUnminimize ${windowId}
 	WindowUnshade ${windowId}
 	[[ $(WindowActive) -eq ${windowId} ]] || \
-		xdotool windowactivate --sync ${windowId} || \
+		xdotool windowactivate ${windowId} || \
 			WindowExists ${windowId} || \
 				return ${ERR}
 	xdotool mousemove --window ${windowId} 0 0 || :
@@ -218,9 +223,10 @@ WindowTile() {
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
+	GetMenuBarHeight ${windowId}
 	if tile="$(awk -v rule="${rule}" \
-	'$1 == rule {print $0; rc=-1; exit}
-	END{exit rc+1}' < "${TILESFILE}")"; then
+	'$1 == "tile_" rule {print $0; rc=-1; exit}
+	END{exit rc+1}' < "${VARSFILE}")"; then
 		w="$(awk 'NF > 1 {print $NF; rc=-1}
 		END{exit rc+1}' <<< "${tile}")" || {
 			LogPrio="err" _log "window ${w}:" \
@@ -285,24 +291,24 @@ WindowTile() {
 			sleep 1
 			WindowActivate ${windowId} || :
 		}
-		undecorated="$(IsWindowUndecorated ${windowId} ".")"
-		[ "${undecorated}" = "${AFFIRMATIVE}" \
-		-o "${undecorated}" = "${UNKNOWN}" ] || \
-			WindowUndecorate ${windowId} "${AFFIRMATIVE}"
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId}: Tiling, moving to (${val})=(${x} ${y})"
-		xdotool windowmove --sync ${windowId} ${x} ${y} || \
+		undecorated=0
+		IsWindowUndecorated ${windowId} || \
+			undecorated="${?}"
+		[ ${undecorated} -ne 2 ] || \
+			return ${ERR}
+		[ ${undecorated} -eq 0 ] || \
+			let "y-=MenuBarHeight,1"
+		xdotool windowmove ${windowId} ${x} ${y} || \
 			LogPrio="err" _log "window ${windowId}:" \
 				"Error tiling, can't move to (${val})=(${x} ${y})"
-		[ "${undecorated}" = "${AFFIRMATIVE}" \
-		-o "${undecorated}" = "${UNKNOWN}" ] || \
-			WindowUndecorate ${windowId} "${NEGATIVE}"
 	fi
 	{ awk -v rule="${rule}" \
-		'$1 != rule {print $0}' < "${TILESFILE}"
-	printf '%s\n' "${tile:-${rule}} ${windowId}"
-	} > "${TILESFILE}.part"
-	mv -f "${TILESFILE}.part" "${TILESFILE}"
+		'$1 != "tile_" rule {print $0}' < "${VARSFILE}"
+	printf '%s\n' "${tile:-"tile_${rule}"} ${windowId}"
+	} > "${VARSFILE}.part"
+	mv -f "${VARSFILE}.part" "${VARSFILE}"
 	[ "${Debug}" != "xtrace" ] || \
 		LogPrio="debug" _log "window ${windowId}: Tiling:" \
 		"${tile:-${rule}} ${windowId}"
@@ -317,16 +323,119 @@ WindowTiling() {
 	[ "${Debug}" != "xtrace" ] || \
 		LogPrio="debug" _log "Current process id ${mypid}:" \
 		"$(ps -h -l ${mypid})"
-	_lock_acquire "${TILESFILE}" ${mypid}
+	_lock_acquire "${VARSFILE}" ${mypid}
 	WindowTile ${windowId} ${rule} "${val}"
-	_lock_release "${TILESFILE}"
+	_lock_release "${VARSFILE}"
+}
+
+WindowMosaic() {
+	local windowId="${1}" \
+		rule="${2}"  \
+		val="${3}" \
+		win winCount \
+		w h m x y mosaic desktop undecorated \
+		maxrows maxcols rows cols row col
+	local windowWidth windowHeight windowX windowY windowScreen
+	local desktopNum desktopName desktopWidth desktopHeight \
+		desktopViewPosX desktopViewPosY \
+		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
+
+	GetMenuBarHeight ${windowId}
+	if mosaic="$(awk -v rule="${rule}" \
+	'$1 == "mosaic_" rule {print $0; rc=-1; exit}
+	END{exit rc+1}' < "${VARSFILE}")"; then
+		let "winCount=$(wc -w <<< "${mosaic}"),1"
+	else
+		winCount=1
+	fi
+	maxrows="$(cut -f 1 -s -d ' ' <<< "${val}")"
+	maxcols="$(cut -f 2 -s -d ' ' <<< "${val}")"
+	rows=0
+	cols=0
+	[ ${winCount} -gt ${maxcols} ] && \
+		rows=2 || \
+		rows=1
+	let "cols = winCount%rows == 0 ? winCount/rows : (winCount/rows)+1 ,1"
+	[ "${Debug}" != "xtrace" ] || \
+		LogPrio="debug" _log "window ${windowId}: Mosaic:" \
+		"${tile:-${rule}} ${windowId}"
+	DesktopSize
+	desktop=""
+	x=${desktopWorkareaX}
+	y=${desktopWorkareaY}
+	col=0
+	row=0
+	for win in ${mosaic#* } ${windowId}; do
+		[ -n "${desktop}" ] || \
+			desktop="$(WindowDesktop ${win})"
+		if [ ${col} -eq 0 ]; then
+			let "row++,1"
+		fi
+		let "col++,1"
+		WindowActivate ${win} || :
+		[ ${desktop} -eq $(WindowDesktop ${win}) ] || {
+			[ -z "${Debug}" ] || \
+				_log "window ${win}: Mosaic, moving to desktop ${desktop}"
+			xdotool set_desktop_for_window ${win} ${desktop} || \
+				LogPrio="err" _log "window ${win}:" \
+				"Error mosaic, can't move to desktop ${desktop}"
+			sleep 1
+			WindowActivate ${win} || :
+		}
+		undecorated=0
+		IsWindowUndecorated ${win} || \
+			undecorated="${?}"
+		[ ${undecorated} -ne 2 ] || \
+			continue
+		m=0
+		[ ${undecorated} -eq 0 ] || {
+			[ ${rows} -eq 1 ] && \
+			let "m=1+(100*MenuBarHeight/desktopWorkareaH/2),1" || \
+			let "m=1+(100*MenuBarHeight/desktopWorkareaH),1"
+		}
+		wmctrl -i -r ${win} -b remove,maximized_horz,maximized_vert,minimized || \
+			LogPrio="err" _log "window ${windowId}:" \
+				"Error mosaic remove,maximized_horz,maximized_vert,minimized"
+		let "w=(100/cols),1"
+		let "h=((100-m)/rows)"
+		xdotool windowsize ${win} "${w}%" "${h}%" || \
+				LogPrio="err" _log "window ${win}:" \
+					"Error setting size to (${w}% ${h}%)"
+		let "x=(100*(col-1)/cols),1"
+		let "y=(100*(row-1)/rows),1"
+		xdotool windowmove ${win} "${x}%" "${y}%" || \
+			LogPrio="err" _log "window ${win}:" \
+				"Error mosaic, can't move to (${x}% ${y}%)"
+		if [ ${col} -ge ${cols} ]; then
+			col=0
+		fi
+	done
+	{ awk -v rule="${rule}" \
+		'$1 != "mosaic_" rule {print $0}' < "${VARSFILE}"
+	printf '%s\n' "${mosaic:-"mosaic_${rule}"} ${windowId}"
+	} > "${VARSFILE}.part"
+	mv -f "${VARSFILE}.part" "${VARSFILE}"
+	[ "${Debug}" != "xtrace" ] || \
+		LogPrio="debug" _log "window ${windowId}: Mosaic:" \
+		"${mosaic:-${rule}} ${windowId}"
+}
+
+WindowEnmossay() {
+	local windowId="${1}" \
+		rule="${2}" \
+		val="${3}" \
+		mypid
+	mypid="$(echo $(ps -o ppid= -C "ps -o ppid= -C ps -o ppid="))"
+	_lock_acquire "${VARSFILE}" ${mypid}
+	WindowMosaic ${windowId} ${rule} "${val}"
+	_lock_release "${VARSFILE}"
 }
 
 WindowPosition() {
 	local windowId="${1}" \
 		rule="${2}" \
 		val="${3}" \
-		x y desktop undecorated
+		x y desktop
 	local windowWidth windowHeight windowX windowY windowScreen
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
@@ -339,6 +448,8 @@ WindowPosition() {
 	}
 	desktop="$(WindowDesktop ${windowId})"
 	DesktopSize ${desktop}
+
+	GetMenuBarHeight ${windowId}
 
 	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
 	case "${x}" in
@@ -354,33 +465,30 @@ WindowPosition() {
 	esac
 
 	y="$(cut -f 2 -s -d ' ' <<< "${val}")"
-	undecorated=""
 	case "${y,,}" in
 	top)
 		y=${desktopWorkareaY}
 		;;
 	bottom)
-		let "y=desktopWorkareaY+desktopWorkareaH-windowHeight,1"
-		undecorated="$(IsWindowUndecorated ${windowId} ".")"
+		if IsWindowUndecorated ${windowId} "."; then
+			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight,1"
+		else
+			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight+MenuBarHeight,1"
+		fi
 		;;
 	center)
-		let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight)/2,1"
+		if IsWindowUndecorated ${windowId} "."; then
+			let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight)/2,1"
+		else
+			let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight+MenuBarHeight)/2,1"
+		fi
 		;;
 	esac
-
-	[ -z "${undecorated}" \
-	-o "${undecorated}" = "${AFFIRMATIVE}" \
-	-o "${undecorated}" = "${UNKNOWN}" ] || \
-		WindowUndecorate ${windowId} "${AFFIRMATIVE}"
 	[ -z "${Debug}" ] || \
 		_log "window ${windowId}: Moving to (${val})=(${x} ${y})"
-	xdotool windowmove --sync ${windowId} "${x}" "${y}" || \
+	xdotool windowmove ${windowId} "${x}" "${y}" || \
 		LogPrio="err" _log "window ${windowId}:" \
 			"Error moving to (${val})=(${x} ${y})"
-	[ -z "${undecorated}" \
-	-o "${undecorated}" = "${AFFIRMATIVE}" \
-	-o "${undecorated}" = "${UNKNOWN}" ] || \
-		WindowUndecorate ${windowId} "${NEGATIVE}"
 }
 
 WindowWaitFocus() {
@@ -479,11 +587,11 @@ WindowSetupRule() {
 		set_size)
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId}: Setting size to ${val}"
-			xdotool windowsize --sync ${windowId} ${val} || \
+			xdotool windowsize ${windowId} ${val} || \
 				LogPrio="err" _log "window ${windowId}:" \
 					"Error setting size to ${val}"
 			;;
-		set_tile)
+		set_tiled)
 			WindowTiling ${windowId} ${rule} "${val}"
 			;;
 		set_maximized)
@@ -562,12 +670,15 @@ WindowSetupRule() {
 				}
 			fi
 			;;
+		set_mosaicked)
+			WindowEnmossay ${windowId} ${rule} "${val}"
+			;;
 		set_minimized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
 				IsWindowMinimized ${windowId} || {
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId}: Minimizing"
-					xdotool windowminimize --sync ${windowId} || \
+					xdotool windowminimize ${windowId} || \
 					LogPrio="err" _log "window ${windowId}:" \
 						"Error minimizing"
 				}
@@ -973,11 +1084,11 @@ WindowsUpdate() {
 		END{exit rc+1}')"; then
 			kill ${pids} 2> /dev/null || :
 		fi
-		_lock_acquire "${TILESFILE}" "${$}"
-		if grep -qswF "${windowId}" < "${TILESFILE}"; then
+		_lock_acquire "${VARSFILE}" "${$}"
+		if grep -qswF "${windowId}" < "${VARSFILE}"; then
 			[ "${Debug}" != "xtrace" ] || \
 				LogPrio="debug" _log "window ${windowId}: Tile info:" \
-				"$(grep -swF "${windowId}" < "${TILESFILE}")"
+				"$(grep -swF "${windowId}" < "${VARSFILE}")"
 			awk -v windowId="${windowId}" \
 			'{for (i=2; i <= NF; i++)
 				if ($i == windowId) {
@@ -986,10 +1097,10 @@ WindowsUpdate() {
 					NF--
 					break
 				}
-			if (NF > 1) print $0}' < "${TILESFILE}" > "${TILESFILE}.part"
-			mv -f "${TILESFILE}.part" "${TILESFILE}"
+			if (NF > 1) print $0}' < "${VARSFILE}" > "${VARSFILE}.part"
+			mv -f "${VARSFILE}.part" "${VARSFILE}"
 		fi
-		_lock_release "${TILESFILE}"
+		_lock_release "${VARSFILE}"
 	done
 
 	WindowIds="${@}"
@@ -999,7 +1110,7 @@ WindowsUpdate() {
 Main() {
 	# internal variables, daemon scope
 	local Rules Debug EmptyList LogPrio IgnoreWindowTypes txt \
-		WindowIds=""
+		WindowIds="" MenuBarHeight=""
 
 	trap '_exit' EXIT
 	trap 'exit' INT
@@ -1043,6 +1154,13 @@ Main() {
 				LoadConfig "${@}"
 				;;
 			esac
+			if [ -z "${MenuBarHeight}" ]; then
+				_lock_acquire "${VARSFILE}" ${$}
+				MenuBarHeight="$(awk \
+				-v var="MenuBarHeight" -F '=' \
+				'$1 == var {print $2; exit}' < "${VARSFILE}")"
+				_lock_release "${VARSFILE}"
+			fi
 		elif ! xprop -root "_NET_SUPPORTING_WM_CHECK"; then
 			exit ${OK}
 		fi
@@ -1060,7 +1178,7 @@ readonly XROOT \
 	LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
 	PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid" \
 	PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe" \
-	TILESFILE="/tmp/${APPNAME}/${USER}/${XROOT}.tiles"
+	VARSFILE="/tmp/${APPNAME}/${USER}/${XROOT}.vars"
 
 case "${1:-}" in
 start)

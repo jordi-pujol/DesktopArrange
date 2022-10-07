@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.24 $
+#  $Revision: 0.25 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -60,10 +60,10 @@ _lock_acquire() {
 		pid="${2}" \
 		pidw
 	while (set -o noclobber;
-	! echo ${pid} > "${lockfile}" 2> /dev/null); do
+	! echo ${pid} > "${lockfile}"); do
 		sleep 1 &
 		pidw=${!}
-		kill -s 0 $(cat "${lockfile}") 2> /dev/null || {
+		kill -s 0 $(cat "${lockfile}") || {
 			rm -f "${lockfile}"
 			kill ${pidw} 2> /dev/null || :
 		}
@@ -437,22 +437,20 @@ IsWindowShaded() {
 IsWindowUndecorated() {
 	local windowId="${1}" \
 		answer="${2:-}" \
-		pgm decoration
-	if pgm="$(type -Pp toggle-decorations)" && \
-	decoration="$("${pgm}" -s ${windowId})"; then
-		if [ ${decoration##* } -ne 0 ]; then
-			[ -n "${answer}" ] && \
-				echo "${NEGATIVE}" || \
-				return ${ERR}
-		else
-			[ -n "${answer}" ] && \
-				echo "${AFFIRMATIVE}" || \
-				return ${OK}
-		fi
+		decoration
+	decoration="$(toggle-decorations -s ${windowId})" || {
+		[ -n "${answer}" ] && \
+			echo "${UNKNOWN}" || \
+			return 2
+	}
+	if [ ${decoration##* } -ne 0 ]; then
+		[ -n "${answer}" ] && \
+			echo "${NEGATIVE}" || \
+			return ${ERR}
 	else
-		IsWindowNetStateKnown ${windowId} "${answer}" \
-		'_OB_WM_STATE_UNDECORATED' || \
-			return ${?}
+		[ -n "${answer}" ] && \
+			echo "${AFFIRMATIVE}" || \
+			return ${OK}
 	fi
 }
 
@@ -497,6 +495,11 @@ RuleLine() {
 			prop="${prop:2}"
 			v="${NEGATIVE}"
 		fi
+		case "${prop}" in
+		set_mosaicked)
+			val="3 2"
+			;;
+		esac
 		case "${prop}" in
 		check_others | \
 		set_maximized | \
@@ -554,7 +557,8 @@ RuleLine() {
 		;;
 	set_position | \
 	set_size | \
-	set_tile | \
+	set_tiled | \
+	set_mosaicked | \
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
@@ -593,8 +597,8 @@ ReadConfig() {
 	local foundParm="" foundRule="" ruleIndex \
 		prop val
 	Rules=${NONE}
-	rm -f "${TILESFILE}"*
-	: > "${TILESFILE}"
+	rm -f "${VARSFILE}"*
+	: > "${VARSFILE}"
 	while read -r line; do
 		[ -n "${line}" ] && \
 		[ "${line:0:1}" != "#" ] || \
@@ -618,12 +622,15 @@ ReadConfig() {
 		else
 			printf '\t%s\n' "${line}"
 			if [ -n "${foundParm}" ]; then
-				case "$(sed -nre '/^([^[:blank:]=]+).*/s//\1/p' \
-				<<< "${line,,}")" in
-				debug)
-					Debug="$(_unquote "$(_trim "$( \
-					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
-					<<< "${line,,}")")")"
+				case "${line,,}" in
+				silent)
+					Debug=""
+					;;
+				debug|verbose)
+					Debug="verbose"
+					;;
+				xtrace)
+					Debug="xtrace"
 					;;
 				emptylist)
 					EmptyList="y"
