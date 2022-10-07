@@ -470,17 +470,17 @@ WindowPosition() {
 		y=${desktopWorkareaY}
 		;;
 	bottom)
-		if IsWindowUndecorated ${windowId} "."; then
+		if IsWindowUndecorated ${windowId}; then
 			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight,1"
 		else
-			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight+MenuBarHeight,1"
+			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight-MenuBarHeight/2,1"
 		fi
 		;;
 	center)
-		if IsWindowUndecorated ${windowId} "."; then
+		if IsWindowUndecorated ${windowId}; then
 			let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight)/2,1"
 		else
-			let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight+MenuBarHeight)/2,1"
+			let "y=desktopWorkareaY-MenuBarHeight+(desktopWorkareaH-windowHeight)/2,1"
 		fi
 		;;
 	esac
