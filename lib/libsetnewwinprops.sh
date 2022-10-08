@@ -496,11 +496,6 @@ RuleLine() {
 			v="${NEGATIVE}"
 		fi
 		case "${prop}" in
-		set_mosaicked)
-			val="3 2"
-			;;
-		esac
-		case "${prop}" in
 		check_others | \
 		set_maximized | \
 		set_maximized_horz | \
@@ -557,14 +552,34 @@ RuleLine() {
 		;;
 	set_position | \
 	set_size | \
-	set_tiled | \
-	set_mosaicked | \
-	set_pointer)
+	set_tiled)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
 			_log "Property \"${prop}\" invalid value \"${val}\""
 		else
 			_check_integer_pair val "x" "y"
+			eval rule${Rules}_$((++ruleIndex))_${prop}=\'${val}\'
+		fi
+		;;
+	set_mosaicked)
+		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
+		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+			_log "Property \"${prop}\" invalid value \"${val}\""
+		else
+			_check_integer_pair val "0" "0"
+			if [ "${val}" = "0 0" ]; then
+				val="0 2"
+				_log "Property \"${prop}\" invalid value. Assuming \"${val}\""
+			fi
+			eval rule${Rules}_$((++ruleIndex))_${prop}=\'${val}\'
+		fi
+		;;
+	set_pointer)
+		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
+		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+			_log "Property \"${prop}\" invalid value \"${val}\""
+		else
+			_check_integer_pair val "0" "0"
 			eval rule${Rules}_$((++ruleIndex))_${prop}=\'${val}\'
 		fi
 		;;

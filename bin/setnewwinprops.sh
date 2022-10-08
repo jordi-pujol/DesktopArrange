@@ -333,8 +333,8 @@ WindowMosaic() {
 		rule="${2}"  \
 		val="${3}" \
 		win winCount \
-		w h m x y mosaic desktop undecorated \
-		maxrows maxcols rows cols row col
+		wW wH w h wX wY mosaic desktop undecorated \
+		maxRows maxCols rows cols row col
 	local windowWidth windowHeight windowX windowY windowScreen
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
@@ -348,23 +348,26 @@ WindowMosaic() {
 	else
 		winCount=1
 	fi
-	maxrows="$(cut -f 1 -s -d ' ' <<< "${val}")"
-	maxcols="$(cut -f 2 -s -d ' ' <<< "${val}")"
+	maxCols="$(cut -f 1 -s -d ' ' <<< "${val}")"
+	maxRows="$(cut -f 2 -s -d ' ' <<< "${val}")"
 	rows=0
 	cols=0
-	[ ${winCount} -gt ${maxcols} ] && \
-		rows=2 || \
-		rows=1
-	let "cols = winCount%rows == 0 ? winCount/rows : (winCount/rows)+1 ,1"
+	if [ ${maxCols} -ne 0 ]; then
+		let "rows = winCount%maxCols == 0 ? winCount/maxCols : (winCount/maxCols)+1 ,1"
+		let "cols = winCount%rows == 0 ? winCount/rows : (winCount/rows)+1 ,1"
+	elif [ ${maxRows} -ne 0 ]; then
+		let "cols = winCount%maxRows == 0 ? winCount/maxRows : (winCount/maxRows)+1 ,1"
+		let "rows = winCount%cols == 0 ? winCount/cols : (winCount/cols)+1 ,1"
+	fi
 	[ "${Debug}" != "xtrace" ] || \
 		LogPrio="debug" _log "window ${windowId}: Mosaic:" \
-		"${tile:-${rule}} ${windowId}"
+		"${cols} columns, ${rows} rows"
 	DesktopSize
 	desktop=""
-	x=${desktopWorkareaX}
-	y=${desktopWorkareaY}
 	col=0
 	row=0
+	let "wW=(desktopWorkareaW/cols)-1,1"
+	let "wH=(desktopWorkareaH/rows)-1,1"
 	for win in ${mosaic#* } ${windowId}; do
 		[ -n "${desktop}" ] || \
 			desktop="$(WindowDesktop ${win})"
@@ -372,6 +375,8 @@ WindowMosaic() {
 			let "row++,1"
 		fi
 		let "col++,1"
+		let "wX=desktopWorkareaX+wW*(col-1),1"
+		let "wY=desktopWorkareaY+wH*(row-1),1"
 		WindowActivate ${win} || :
 		[ ${desktop} -eq $(WindowDesktop ${win}) ] || {
 			[ -z "${Debug}" ] || \
@@ -387,25 +392,19 @@ WindowMosaic() {
 			undecorated="${?}"
 		[ ${undecorated} -ne 2 ] || \
 			continue
-		m=0
-		[ ${undecorated} -eq 0 ] || {
-			[ ${rows} -eq 1 ] && \
-			let "m=1+(100*MenuBarHeight/desktopWorkareaH/2),1" || \
-			let "m=1+(100*MenuBarHeight/desktopWorkareaH),1"
-		}
+		w="${wW}"
+		[ ${undecorated} -ne 0 ] && \
+			let "h=wH-(MenuBarHeight/2),1" || \
+			h=${wH}
 		wmctrl -i -r ${win} -b remove,maximized_horz,maximized_vert,minimized || \
 			LogPrio="err" _log "window ${windowId}:" \
 				"Error mosaic remove,maximized_horz,maximized_vert,minimized"
-		let "w=(100/cols),1"
-		let "h=((100-m)/rows)"
-		xdotool windowsize ${win} "${w}%" "${h}%" || \
+		xdotool windowsize ${win} "${w}" "${h}" || \
 				LogPrio="err" _log "window ${win}:" \
-					"Error setting size to (${w}% ${h}%)"
-		let "x=(100*(col-1)/cols),1"
-		let "y=(100*(row-1)/rows),1"
-		xdotool windowmove ${win} "${x}%" "${y}%" || \
+					"Error setting size to (${w} ${h})"
+		xdotool windowmove ${win} "${wX}" "${wY}" || \
 			LogPrio="err" _log "window ${win}:" \
-				"Error mosaic, can't move to (${x}% ${y}%)"
+				"Error mosaic, can't move to (${wX} ${wY})"
 		if [ ${col} -ge ${cols} ]; then
 			col=0
 		fi
@@ -427,7 +426,7 @@ WindowEnmossay() {
 		mypid
 	mypid="$(echo $(ps -o ppid= -C "ps -o ppid= -C ps -o ppid="))"
 	_lock_acquire "${VARSFILE}" ${mypid}
-	WindowMosaic ${windowId} ${rule} "${val}"
+	WindowMosaic ${windowId} ${rule} "${val}" || :
 	_lock_release "${VARSFILE}"
 }
 
