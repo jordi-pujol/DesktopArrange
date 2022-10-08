@@ -51,7 +51,13 @@ _ps_children() {
 }
 
 _lock_release() {
-	local lockfile="${1}.lock"
+	local lockfile="${1}.lock" \
+		pid="${2}"
+	if [ ! -e "${lockfile}" ]; then
+		LogPrio="err" _log "_lock_release: file \"${lockfile}\" doesn't exist"
+	elif [ $(cat "${lockfile}") != ${pid} ]; then
+		LogPrio="err" _log "_lock_release: another pid releases \"${lockfile}\""
+	fi
 	rm -f "${lockfile}"
 }
 
@@ -60,10 +66,10 @@ _lock_acquire() {
 		pid="${2}" \
 		pidw
 	while (set -o noclobber;
-	! echo ${pid} > "${lockfile}"); do
+	! echo ${pid} > "${lockfile}") 2> /dev/null; do
 		sleep 1 &
 		pidw=${!}
-		kill -s 0 $(cat "${lockfile}") || {
+		kill -s 0 $(cat "${lockfile}") 2> /dev/null || {
 			rm -f "${lockfile}"
 			kill ${pidw} 2> /dev/null || :
 		}

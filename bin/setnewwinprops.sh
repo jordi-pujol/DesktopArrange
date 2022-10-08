@@ -82,7 +82,7 @@ ActionNeedsFocus() {
 
 GetMenuBarHeight() {
 	local windowId="${1}" \
-		mypid undecorated=0 wY
+		undecorated=0 wY
 	[ -z "${MenuBarHeight}" ] || \
 		return ${OK}
 	MenuBarHeight="$(awk -v var="MenuBarHeight" -F '=' \
@@ -291,8 +291,6 @@ WindowTile() {
 			sleep 1
 			WindowActivate ${windowId} || :
 		}
-		[ -z "${Debug}" ] || \
-			_log "window ${windowId}: Tiling, moving to (${val})=(${x} ${y})"
 		undecorated=0
 		IsWindowUndecorated ${windowId} || \
 			undecorated="${?}"
@@ -300,6 +298,8 @@ WindowTile() {
 			return ${ERR}
 		[ ${undecorated} -eq 0 ] || \
 			let "y-=MenuBarHeight,1"
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId}: Tiling, moving to (${val})=(${x} ${y})"
 		xdotool windowmove ${windowId} ${x} ${y} || \
 			LogPrio="err" _log "window ${windowId}:" \
 				"Error tiling, can't move to (${val})=(${x} ${y})"
@@ -317,15 +317,10 @@ WindowTile() {
 WindowTiling() {
 	local windowId="${1}" \
 		rule="${2}" \
-		val="${3}" \
-		mypid
-	mypid="$(echo $(ps -o ppid= -C "ps -o ppid= -C ps -o ppid="))"
-	[ "${Debug}" != "xtrace" ] || \
-		LogPrio="debug" _log "Current process id ${mypid}:" \
-		"$(ps -h -l ${mypid})"
+		val="${3}"
 	_lock_acquire "${VARSFILE}" ${mypid}
 	WindowTile ${windowId} ${rule} "${val}"
-	_lock_release "${VARSFILE}"
+	_lock_release "${VARSFILE}" ${mypid}
 }
 
 WindowMosaic() {
@@ -366,8 +361,8 @@ WindowMosaic() {
 	desktop=""
 	col=0
 	row=0
-	let "wW=(desktopWorkareaW/cols)-1,1"
-	let "wH=(desktopWorkareaH/rows)-1,1"
+	let "wW=(desktopWorkareaW/cols)-5,1"
+	let "wH=(desktopWorkareaH/rows)-5,1"
 	for win in ${mosaic#* } ${windowId}; do
 		[ -n "${desktop}" ] || \
 			desktop="$(WindowDesktop ${win})"
@@ -375,8 +370,8 @@ WindowMosaic() {
 			let "row++,1"
 		fi
 		let "col++,1"
-		let "wX=desktopWorkareaX+wW*(col-1),1"
-		let "wY=desktopWorkareaY+wH*(row-1),1"
+		let "wX=desktopWorkareaX+(wW+5)*(col-1),1"
+		let "wY=desktopWorkareaY+(wH+3)*(row-1),1"
 		WindowActivate ${win} || :
 		[ ${desktop} -eq $(WindowDesktop ${win}) ] || {
 			[ -z "${Debug}" ] || \
@@ -422,12 +417,10 @@ WindowMosaic() {
 WindowEnmossay() {
 	local windowId="${1}" \
 		rule="${2}" \
-		val="${3}" \
-		mypid
-	mypid="$(echo $(ps -o ppid= -C "ps -o ppid= -C ps -o ppid="))"
+		val="${3}"
 	_lock_acquire "${VARSFILE}" ${mypid}
 	WindowMosaic ${windowId} ${rule} "${val}" || :
-	_lock_release "${VARSFILE}"
+	_lock_release "${VARSFILE}" ${mypid}
 }
 
 WindowPosition() {
@@ -448,7 +441,9 @@ WindowPosition() {
 	desktop="$(WindowDesktop ${windowId})"
 	DesktopSize ${desktop}
 
+	_lock_acquire "${VARSFILE}" ${mypid}
 	GetMenuBarHeight ${windowId}
+	_lock_release "${VARSFILE}" ${mypid}
 
 	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
 	case "${x}" in
@@ -823,16 +818,21 @@ WindowSetupRule() {
 WindowSetup() {
 	local windowId="${1}" \
 		setupRules="${2}" \
-		rule
+		rule mypid
+
+	mypid="$(echo $(ps -o ppid= -C "ps -o ppid= -C ps -o ppid="))"
 
 	[ -z "${Debug}" ] || \
-		_log "window ${windowId}: Setting rules" \
+		_log "window ${windowId}: Applying rules" \
 		"$(tr -s '[:blank:],' ',' < <(echo ${setupRules}))"
 	for rule in ${setupRules}; do
-		WindowSetupRule ${windowId} ${rule}
+		WindowSetupRule ${windowId} ${rule} || {
+			_log "window ${windowId}: Error setting rule ${rule}"
+			break
+		}
 	done
 	[ -z "${Debug}" ] || \
-		_log "window ${windowId}: End setup rules" \
+		_log "window ${windowId}: End applying rules" \
 		"$(tr -s '[:blank:],' ',' < <(echo ${setupRules}))"
 }
 
@@ -1083,7 +1083,7 @@ WindowsUpdate() {
 		END{exit rc+1}')"; then
 			kill ${pids} 2> /dev/null || :
 		fi
-		_lock_acquire "${VARSFILE}" "${$}"
+		_lock_acquire "${VARSFILE}" ${$}
 		if grep -qswF "${windowId}" < "${VARSFILE}"; then
 			[ "${Debug}" != "xtrace" ] || \
 				LogPrio="debug" _log "window ${windowId}: Tile info:" \
@@ -1099,7 +1099,7 @@ WindowsUpdate() {
 			if (NF > 1) print $0}' < "${VARSFILE}" > "${VARSFILE}.part"
 			mv -f "${VARSFILE}.part" "${VARSFILE}"
 		fi
-		_lock_release "${VARSFILE}"
+		_lock_release "${VARSFILE}" ${$}
 	done
 
 	WindowIds="${@}"
@@ -1119,7 +1119,7 @@ Main() {
 	mkdir -p "/tmp/${APPNAME}/${USER}"
 	rm -f "${LOGFILE}"*
 
-	echo "${$}" > "${PIDFILE}"
+	echo ${$} > "${PIDFILE}"
 
 	[ -e "${PIPE}" ] || \
 		mkfifo "${PIPE}"
@@ -1158,7 +1158,7 @@ Main() {
 				MenuBarHeight="$(awk \
 				-v var="MenuBarHeight" -F '=' \
 				'$1 == var {print $2; exit}' < "${VARSFILE}")"
-				_lock_release "${VARSFILE}"
+				_lock_release "${VARSFILE}" ${$}
 			fi
 		elif ! xprop -root "_NET_SUPPORTING_WM_CHECK"; then
 			exit ${OK}
