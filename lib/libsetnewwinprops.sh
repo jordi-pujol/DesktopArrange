@@ -129,7 +129,8 @@ _check_integer_pair() {
 
 _check_natural() {
 	local n="${1}" \
-		d="${2}" \
+		d="${2:-0}" \
+		prefix="${3:-}" \
 		v="" w rc=${OK}
 	eval w=\"\${${n}:-}\"
 	let "v=${w}" 2> /dev/null || \
@@ -141,6 +142,8 @@ _check_natural() {
 		v="${d}"
 	fi
 	let "${n}=${v},1"
+	[ -z "{prefix}" ] || \
+		eval "${n}=${prefix}${v}"
 	return ${OK}
 }
 
@@ -171,11 +174,13 @@ _check_y() {
 
 _check_fixedsize() {
 	local var="${1}" \
-		val="${2,,}"
+		val="${2,,}" \
+		d="${3:-0}" \
+		prefix="${4:-}"
 	if [[ "${val}" =~ ${PATTERN_FIXEDSIZE} ]]; then
-		eval ${var}=\'${val}\'
+		eval ${var}=\'${prefix}${val}\'
 	else
-		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\""
+		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${prefix}${val}\""
 	fi
 }
 
@@ -195,7 +200,7 @@ GetXroot() {
 AlreadyRunning() {
 	local pid
 	[ -e "${PIDFILE}" -a -f "${PIDFILE}" -a -s "${PIDFILE}" ] && \
-	pid="$(cat "${PIDFILE}")" 2> /dev/null && \
+	pid="$(cat "${PIDFILE}" 2> /dev/null)" && \
 	kill -s 0 "${pid}" 2> /dev/null || \
 		return ${ERR}
 	echo "Info: ${APPNAME} is running in pid ${pid}" >&2
@@ -487,63 +492,120 @@ IsWindowBelow() {
 RuleLine() {
 	local prop="${1}" \
 		val="${2}" \
-		v
+		v unselected
 	[ -n "${prop}" ] || \
 		return ${OK}
-	[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
-		LogPrio="err" _log "Rule ${Rules}: \"${prop}\" with a value." \
-			"Value \"${val}\" is ignored"
-		val=""
-	}
-	if [ -z "${val}" ]; then
-		v="${AFFIRMATIVE}"
-		if [ "${prop:0:2}" = "un" ]; then
-			prop="${prop:2}"
-			v="${NEGATIVE}"
+	if [ "${prop:0:8}" = "unselect" ]; then
+		if [ -n "${val}" ];then
+			if [ "${val:0:1}" = "!" ];then
+				LogPrio="err" _log "Rule ${Rules}: \"${prop}\" wrong value \"${val}\"."
+				val=""
+			else
+				prop="${prop:2}"
+				val="!${val}"
+			fi
+		else
+			case "${prop:2}" in
+			select_maximized | \
+			select_maximized_horz | \
+			select_maximized_vert | \
+			select_minimized | \
+			select_fullscreen | \
+			select_sticky | \
+			select_shaded | \
+			select_undecorated | \
+			select_pinned | \
+			select_above | \
+			select_below | \
+			select_active)
+				prop="${prop:2}"
+				val="${NEGATIVE}"
+				;;
+			*)
+				LogPrio="err" _log "Rule ${Rules}: \"${prop}\" without a value."
+				;;
+			esac
 		fi
-		case "${prop}" in
-		check_others | \
-		set_maximized | \
-		set_maximized_horz | \
-		set_maximized_vert | \
-		set_minimized | \
-		set_fullscreen | \
-		set_sticky | \
-		set_shaded | \
-		set_undecorated | \
-		set_pinned | \
-		set_above | \
-		set_below | \
-		set_focus | \
-		set_closed | \
-		set_killed)
-			val="${v}"
-			;;
-		esac
+	else
+		[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
+			LogPrio="err" _log "Rule ${Rules}: \"${prop}\" with a value." \
+				"Value \"${val}\" is ignored"
+			val=""
+		}
+		if [ -z "${val}" ]; then
+			v="${AFFIRMATIVE}"
+			if [ "${prop:0:2}" = "un" ]; then
+				prop="${prop:2}"
+				v="${NEGATIVE}"
+			fi
+			case "${prop}" in
+			select_others | \
+			set_maximized | \
+			set_maximized_horz | \
+			set_maximized_vert | \
+			set_minimized | \
+			set_fullscreen | \
+			set_sticky | \
+			set_shaded | \
+			set_undecorated | \
+			set_pinned | \
+			set_above | \
+			set_below | \
+			set_focus | \
+			set_closed | \
+			set_killed)
+				val="${v}"
+				;;
+			esac
+		fi
 	fi
 	[ -n "${val}" ] || {
 		LogPrio="err" _log "Rule ${Rules}: Property \"${prop}\" has not a value"
 		return ${ERR}
 	}
+	unselected=""
+	[ "${val:0:1}" != "!" ] || {
+		unselected="!"
+		val="${val:1}"
+	}
 	case "${prop}" in
-	check_title | \
-	check_state | \
-	check_type | \
-	check_app_name | \
-	check_application | \
-	check_class | \
-	check_role)
+	select_title | \
+	select_state | \
+	select_type | \
+	select_app_name | \
+	select_application | \
+	select_class | \
+	select_role)
+		eval rule${Rules}_${prop}=\'${unselected}${val}\'
+		;;
+	select_desktop | \
+	select_desktops)
+		_check_natural val ${NONE} "${unselected}"
 		eval rule${Rules}_${prop}=\'${val}\'
 		;;
-	check_desktop | \
-	check_desktops)
-		_check_natural "rule${Rules}_${prop}" "${val}"
+	select_desktop_size | \
+	select_desktop_workarea)
+		_check_fixedsize "rule${Rules}_${prop}" "${val}" "" "${unselected}"
 		;;
-	check_desktop_size | \
-	check_desktop_workarea)
-		_check_fixedsize "rule${Rules}_${prop}" "${val}"
+	select_maximized | \
+	select_maximized_horz | \
+	select_maximized_vert | \
+	select_fullscreen | \
+	select_minimized | \
+	select_shaded | \
+	select_undecorated | \
+	select_sticky)
+		[ -z "${unselected}" ] || {
+			LogPrio="err" _log "Property \"${prop}\" wrong value \"${val}\""
+			return ${ERR}
+		}
+		_check_yn "rule${Rules}_${prop}" "${val}"
 		;;
-	check_others)
+	select_others)
+		[ -z "${unselected}" ] || {
+			LogPrio="err" _log "Property \"${prop}\" wrong value \"${unselected}${val}\""
+			return ${ERR}
+		}
 		_check_y "rule${Rules}_${prop}" "${val}"
 		;;
 	set_delay)
@@ -661,10 +723,10 @@ ReadConfig() {
 					;;
 				esac
 			elif [ -n "${foundRule}" ]; then
-				prop="$(sed -nr -e '/^(check|unckeck|set|unset)[[:blank:]]+/s//\1_/' \
+				prop="$(sed -nr -e '/^(select|unselect|set|unset)[[:blank:]]+/s//\1_/' \
 					-e '/^([^[:blank:]=]+).*/s//\1/p' \
 					<<< "${line,,}")"
-				! sed -nr -e '/^(check|unckeck|set|unset)[[:blank:]]+/!q1' \
+				! sed -nr -e '/^(select|unselect|set|unset)[[:blank:]]+/!q1' \
 				<<< "${line,,}" || \
 					line="$(sed -r \
 					-e '/^[^[:blank:]]+[[:blank:]]+/s///' \
@@ -777,9 +839,9 @@ LoadConfig() {
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
 			set | \
-			grep -se "^rule${rule}_check_.*=" || \
+			grep -se "^rule${rule}_select_.*=" || \
 				LogPrio="err" \
-				_log "hasn't defined any property to check for rule ${rule}"
+				_log "hasn't defined any property to select for rule ${rule}"
 			set | \
 			grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2 || \
