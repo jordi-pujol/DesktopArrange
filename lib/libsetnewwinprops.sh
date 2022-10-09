@@ -492,10 +492,10 @@ IsWindowBelow() {
 RuleLine() {
 	local prop="${1}" \
 		val="${2}" \
-		v unselected
+		v deselected
 	[ -n "${prop}" ] || \
 		return ${OK}
-	if [ "${prop:0:8}" = "unselect" ]; then
+	if [ "${prop:0:8}" = "deselect" ]; then
 		if [ -n "${val}" ];then
 			if [ "${val:0:1}" = "!" ];then
 				LogPrio="err" _log "Rule ${Rules}: \"${prop}\" wrong value \"${val}\"."
@@ -563,9 +563,9 @@ RuleLine() {
 		LogPrio="err" _log "Rule ${Rules}: Property \"${prop}\" has not a value"
 		return ${ERR}
 	}
-	unselected=""
+	deselected=""
 	[ "${val:0:1}" != "!" ] || {
-		unselected="!"
+		deselected="!"
 		val="${val:1}"
 	}
 	case "${prop}" in
@@ -576,16 +576,16 @@ RuleLine() {
 	select_application | \
 	select_class | \
 	select_role)
-		eval rule${Rules}_${prop}=\'${unselected}${val}\'
+		eval rule${Rules}_${prop}=\'${deselected}${val}\'
 		;;
 	select_desktop | \
 	select_desktops)
-		_check_natural val ${NONE} "${unselected}"
+		_check_natural val ${NONE} "${deselected}"
 		eval rule${Rules}_${prop}=\'${val}\'
 		;;
 	select_desktop_size | \
 	select_desktop_workarea)
-		_check_fixedsize "rule${Rules}_${prop}" "${val}" "" "${unselected}"
+		_check_fixedsize "rule${Rules}_${prop}" "${val}" "" "${deselected}"
 		;;
 	select_maximized | \
 	select_maximized_horz | \
@@ -595,15 +595,15 @@ RuleLine() {
 	select_shaded | \
 	select_undecorated | \
 	select_sticky)
-		[ -z "${unselected}" ] || {
+		[ -z "${deselected}" ] || {
 			LogPrio="err" _log "Property \"${prop}\" wrong value \"${val}\""
 			return ${ERR}
 		}
 		_check_yn "rule${Rules}_${prop}" "${val}"
 		;;
 	select_others)
-		[ -z "${unselected}" ] || {
-			LogPrio="err" _log "Property \"${prop}\" wrong value \"${unselected}${val}\""
+		[ -z "${deselected}" ] || {
+			LogPrio="err" _log "Property \"${prop}\" wrong value \"${deselected}${val}\""
 			return ${ERR}
 		}
 		_check_y "rule${Rules}_${prop}" "${val}"
@@ -723,10 +723,10 @@ ReadConfig() {
 					;;
 				esac
 			elif [ -n "${foundRule}" ]; then
-				prop="$(sed -nr -e '/^(select|unselect|set|unset)[[:blank:]]+/s//\1_/' \
+				prop="$(sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/s//\1_/' \
 					-e '/^([^[:blank:]=]+).*/s//\1/p' \
 					<<< "${line,,}")"
-				! sed -nr -e '/^(select|unselect|set|unset)[[:blank:]]+/!q1' \
+				! sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/!q1' \
 				<<< "${line,,}" || \
 					line="$(sed -r \
 					-e '/^[^[:blank:]]+[[:blank:]]+/s///' \

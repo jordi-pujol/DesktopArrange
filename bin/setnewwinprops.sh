@@ -846,7 +846,7 @@ WindowNew() {
 	local windowId="${1}" \
 		rule setupRules \
 		propName netState \
-		prop val unselected \
+		prop val deselected \
 		rc selectOthers
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
@@ -892,28 +892,28 @@ WindowNew() {
 		IFS="=" read -r prop val; do
 			val="$(_unquote "${val}")"
 			if [ "${prop}" = "select_title" ]; then
-				unselected=""
+				deselected=""
 				[ "${val:0:1}" != "!" ] || {
-					unselected="!"
+					deselected="!"
 					val="${val:1}"
 				}
 				if [ "${val}" = "$(WindowTitle ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window title \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window title \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				continue
 			fi
 			val="$(_trim "${val,,}")"
-			unselected=""
+			deselected=""
 			[ "${val:0:1}" != "!" ] || {
-				unselected="!"
+				deselected="!"
 				val="$(_trim "${val:1}")"
 			}
 			case "${prop}" in
@@ -921,12 +921,12 @@ WindowNew() {
 				if [ "${val}" = "$(WindowState ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window state \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window state \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -934,12 +934,12 @@ WindowNew() {
 				if grep -qs -iF "${val}" <<< "$(WindowType ${windowId})" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window type \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window type \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -947,12 +947,12 @@ WindowNew() {
 				if [ "${val}" = "$(WindowAppName ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window app name \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window app name \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -961,12 +961,12 @@ WindowNew() {
 				<<< "$(WindowApplication ${windowId} 2> /dev/null)" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window application \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window application \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -974,12 +974,12 @@ WindowNew() {
 				if grep -qs -iwF "${val}" <<< "$(WindowClass ${windowId})" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window class \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window class \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -987,12 +987,12 @@ WindowNew() {
 				if grep -qs -iwF "${val}" <<< "$(WindowRole ${windowId})"; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window role \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window role \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -1000,12 +1000,12 @@ WindowNew() {
 				if [ "${val}" = "$(WindowDesktop ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window desktop \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window desktop \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -1043,12 +1043,12 @@ WindowNew() {
 				if [ "${val}" = "${desktopWidth}x${desktopHeight}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window desktop size \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window desktop size \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -1058,12 +1058,12 @@ WindowNew() {
 				]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches window desktop workarea \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match window desktop workarea \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -1071,12 +1071,12 @@ WindowNew() {
 				if [ "${val}" = "$(DesktopsCount)" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: matches desktopsCount \"${val}\""
-					[ -z "${unselected}" ] || \
+					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}: doesn't match desktopsCount \"${val}\""
-					[ -n "${unselected}" ] || \
+					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
@@ -1084,7 +1084,7 @@ WindowNew() {
 				selectOthers="y"
 				;;
 			*)
-				LogPrio="err" _log "rule ${rule}: invalid property \"${prop}\" \"${unselected}${val}\""
+				LogPrio="err" _log "rule ${rule}: invalid property \"${prop}\" \"${deselected}${val}\""
 				rc=""
 				;;
 			esac
@@ -1094,7 +1094,7 @@ WindowNew() {
 
 		if [ -n "${rc}" ]; then
 			[ -z "${Debug}" ] || \
-				_log "window ${windowId} rule ${rule}: End check, matches"
+				_log "window ${windowId} rule ${rule}: End check, this rule is selected"
 			setupRules="${setupRules}${rule}${TAB}"
 			[ -n "${selectOthers}" ] || \
 				break

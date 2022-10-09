@@ -35,33 +35,33 @@ Parameters {
 #
 Rule {
 	# Title of the window.
-	check_title="title"
+	select_title="title"
 	# Type of the window.
-	check_type="WINDOW_NORMAL", "WINDOW_TOOLBAR", etc.
+	select_type="WINDOW_NORMAL", "WINDOW_TOOLBAR", etc.
 	# Application which created the window.
-	check_application="/usr/bin/qemu"
+	select_application="/usr/bin/qemu"
 	# Class of the window.
-	check_class="QEMU"
+	select_class="QEMU"
 	# Get the role of the new window, via WM_WINDOW_ROLE.
 	# This may return an empty string.
-	check_role=""
+	select_role=""
 	# Get the workspace the window is active on.
 	# The return value may be -1 if the window is pinned, or invisible.
-	check_desktop="0..(n-1)"
+	select_desktop="0..(n-1)"
 	# Is the window focussed?
-	check_is_focussed=
+	select_focussed=
 	# Is the window maximized?
-	check_is_maximized=
+	select_maximized=
 	# Is the window fullscreen?
-	check_is_fullscreen=
+	select_fullscreen=
 	# Check size for current desktop
-	check_desktop_size="1920x1080"
+	select_desktop_size="1920x1080"
 	# Check workarea for current desktop
-	check_desktop_workarea="1920x1080"
+	select_desktop_workarea="1920x1080"
 	## Get the position of the mouse pointer.
 	#get_pointer=
 	# After applying these properties continue checking next rules
-	check_others=y
+	select_others=y
 
 	## Control ##
 	# When the window is created wait 30 seconds to apply these properties
@@ -129,7 +129,7 @@ Rule {
 #
 Rule {
 	# Title of the window.
-	check_title="title"
+	select_title="title"
 	# Close the window, forcibly.
 	set_killed="y|yes|enable|true|1"
 }

@@ -4,12 +4,12 @@ Parameters {
 
 # ignore all libreoffice windows, when applied don't continue checking other rules
 Rule {
-	check_app_name='libreoffice'
+	select_app_name='libreoffice'
 }
 
 # all qemu windows must be undecorated and moved to desktop 3
 Rule {
-	check_class="qemu"
+	select_class="qemu"
 	# Undecorate.
 	set_decorated='n'
 	# Minimize
@@ -17,12 +17,12 @@ Rule {
 	# Move immediately this window to the desktop num 3
 	set_desktop=3
 	# Continue checking other rules also
-	check_others='y'
+	select_others='y'
 }
 
 Rule {
 	# Compare the title of the new window with this string.
-	check_title="QEMU (BlissOS9-overlay)"
+	select_title="QEMU (BlissOS9-overlay)"
 
 	# Wait 30 seconds to apply the following properties
 	set_delay=30
@@ -37,9 +37,9 @@ Rule {
 
 rule {
 	# Get the title of the new window.
-	check_title="QEMU (BlissOS9-persistent)"
+	select_title="QEMU (BlissOS9-persistent)"
 	# Check size for current desktop
-	check_desktop_size="1920x1080"
+	select_desktop_size="1920x1080"
 
 	set_delay=30
 	# Set the X/Y coordinates of a window.
@@ -73,7 +73,7 @@ rule {
 }
 
 Rule {
-	check_app_name='galculator'
+	select_app_name='galculator'
 	set_position='5%,10%'
 	set_tile='3%,2%'
 }
