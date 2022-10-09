@@ -1,5 +1,6 @@
 setnewwinprops (0.25) unstable; urgency=medium
 
+  * The keyword "check" has been renamed to "select" and "unselect"
   * The package toggle-decorations is now a dependency to install this tool.
   * take account of window decorations
     to acurately positioning the window vertically centered,
