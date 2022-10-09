@@ -1082,6 +1082,8 @@ WindowNew() {
 				;;
 			select_others)
 				selectOthers="y"
+				[ -z "${Debug}" ] || \
+					_log "window ${windowId} rule ${rule}: enabling \"select others\""
 				;;
 			*)
 				LogPrio="err" _log "rule ${rule}: invalid property \"${prop}\" \"${deselected}${val}\""
@@ -1098,6 +1100,8 @@ WindowNew() {
 			setupRules="${setupRules}${rule}${TAB}"
 			[ -n "${selectOthers}" ] || \
 				break
+			[ -z "${Debug}" ] || \
+				_log "window ${windowId} rule ${rule}: continue checking other rules"
 		else
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId} rule ${rule}: End check, doesn't match"
