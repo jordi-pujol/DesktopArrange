@@ -54,9 +54,9 @@ _lock_release() {
 	local lockfile="${1}.lock" \
 		pid="${2}"
 	if [ ! -e "${lockfile}" ]; then
-		LogPrio="err" _log "_lock_release: file \"${lockfile}\" doesn't exist"
+		LogPrio="debug" _log "_lock_release: file \"${lockfile}\" doesn't exist"
 	elif [ $(cat "${lockfile}") != ${pid} ]; then
-		LogPrio="err" _log "_lock_release: another pid releases \"${lockfile}\""
+			LogPrio="debug" _log "_lock_release: another pid releases \"${lockfile}\""
 	fi
 	rm -f "${lockfile}"
 }
@@ -65,11 +65,22 @@ _lock_acquire() {
 	local lockfile="${1}.lock" \
 		pid="${2}" \
 		pidw
+	[ ! -e "${lockfile}" ] || \
+	[ $(cat "${lockfile}") != ${pid} ] || \
+		LogPrio="debug" \
+		_log "_lock_acquire: same pid \"${pid}\"" \
+			"requests already existent lock \"${lockfile}\""
 	while (set -o noclobber;
 	! echo ${pid} > "${lockfile}") 2> /dev/null; do
 		sleep 1 &
 		pidw=${!}
+		[ "${Debug}" != "xtrace" ] || \
+			LogPrio="debug" \
+			_log "_lock_acquire: pid \"${pid}\" is waiting for a lock \"${lockfile}\""
 		kill -s 0 $(cat "${lockfile}") 2> /dev/null || {
+			LogPrio="debug" \
+			_log "_lock_acquire: pid \"$(cat "${lockfile}")\"" \
+				"has not released his lock \"${lockfile}\""
 			rm -f "${lockfile}"
 			kill ${pidw} 2> /dev/null || :
 		}
@@ -240,11 +251,12 @@ DesktopsCount() {
 
 DesktopSetCurrent() {
 	local windowId="${1}" \
-		desktop="${2}"
+		rule="${2}" \
+		desktop="${3}"
 	[ ${desktop} -eq $(DesktopCurrent) ] || \
 		xdotool set_desktop ${desktop} 2> /dev/null || {
 			LogPrio="err" \
-				_log "window ${windowId}: can't set current desktop to ${desktop}"
+				_log "window ${windowId} rule ${rule}: can't set current desktop to ${desktop}"
 			return ${ERR}
 		}
 }
@@ -259,11 +271,12 @@ WindowStateAction() {
 
 WindowDesktop() {
 	local windowId="${1}" \
+		rule="${2:-}" \
 		desktop
 	desktop="$(xdotool get_desktop_for_window ${windowId} 2> /dev/null)" || :
 	[ -n "${desktop}" ] || \
 		LogPrio="err" \
-			_log "window ${windowId}: can't get desktop for this window"
+			_log "window ${windowId}${rule:+" rule ${rule}"}: can't get desktop for this window"
 	printf '%d\n' ${desktop:-"-1"}
 }
 
@@ -498,7 +511,7 @@ RuleLine() {
 	if [ "${prop:0:8}" = "deselect" ]; then
 		if [ -n "${val}" ];then
 			if [ "${val:0:1}" = "!" ];then
-				LogPrio="err" _log "Rule ${Rules}: \"${prop}\" wrong value \"${val}\"."
+				LogPrio="err" _log "rule ${Rules}: \"${prop}\" wrong value \"${val}\"."
 				val=""
 			else
 				prop="${prop:2}"
@@ -522,13 +535,13 @@ RuleLine() {
 				val="${NEGATIVE}"
 				;;
 			*)
-				LogPrio="err" _log "Rule ${Rules}: \"${prop}\" without a value."
+				LogPrio="err" _log "rule ${Rules}: \"${prop}\" without a value."
 				;;
 			esac
 		fi
 	else
 		[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
-			LogPrio="err" _log "Rule ${Rules}: \"${prop}\" with a value." \
+			LogPrio="err" _log "rule ${Rules}: \"${prop}\" with a value." \
 				"Value \"${val}\" is ignored"
 			val=""
 		}
@@ -560,7 +573,7 @@ RuleLine() {
 		fi
 	fi
 	[ -n "${val}" ] || {
-		LogPrio="err" _log "Rule ${Rules}: Property \"${prop}\" has not a value"
+		LogPrio="err" _log "rule ${Rules}: Property \"${prop}\" has not a value"
 		return ${ERR}
 	}
 	deselected=""
@@ -596,14 +609,14 @@ RuleLine() {
 	select_undecorated | \
 	select_sticky)
 		[ -z "${deselected}" ] || {
-			LogPrio="err" _log "Property \"${prop}\" wrong value \"${val}\""
+			LogPrio="err" _log "rule ${Rules}: Property \"${prop}\" wrong value \"${val}\""
 			return ${ERR}
 		}
 		_check_yn "rule${Rules}_$((++indexSelect))_${prop}" "${val}"
 		;;
 	select_others)
 		[ -z "${deselected}" ] || {
-			LogPrio="err" _log "Property \"${prop}\" wrong value \"${deselected}${val}\""
+			LogPrio="err" _log "rule ${Rules}: Property \"${prop}\" wrong value \"${deselected}${val}\""
 			return ${ERR}
 		}
 		_check_y "rule${Rules}_0_${prop}" "${val}"
@@ -623,7 +636,7 @@ RuleLine() {
 	set_tiled)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
-			_log "Property \"${prop}\" invalid value \"${val}\""
+			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
 		else
 			_check_integer_pair val "x" "y"
 			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
@@ -632,12 +645,12 @@ RuleLine() {
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
-			_log "Property \"${prop}\" invalid value \"${val}\""
+			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
 		else
 			_check_integer_pair val "0" "0"
 			if [ "${val}" = "0 0" ]; then
 				val="0 2"
-				_log "Property \"${prop}\" invalid value. Assuming \"${val}\""
+				_log "rule ${Rules}: Property \"${prop}\" invalid value. Assuming \"${val}\""
 			fi
 			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
 		fi
@@ -645,7 +658,7 @@ RuleLine() {
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
-			_log "Property \"${prop}\" invalid value \"${val}\""
+			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
 		else
 			_check_integer_pair val "0" "0"
 			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
@@ -670,7 +683,7 @@ RuleLine() {
 		_check_y "rule${Rules}_$((++indexSet))_${prop}" "${val}"
 		;;
 	*)
-		_log "Property \"${prop}\" is not implemented yet"
+		_log "rule ${Rules}: Property \"${prop}\" is not implemented yet"
 		return ${ERR}
 		;;
 	esac
@@ -843,12 +856,12 @@ LoadConfig() {
 			grep -sEe "^rule${rule}_[[:digit:]]+_select_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2 || \
 				LogPrio="err" \
-				_log "hasn't defined any property to select for rule ${rule}"
+				_log "rule ${rule}: hasn't defined any property to select"
 			set | \
 			grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2 || \
 				LogPrio="warn" \
-				_log "hasn't defined any property to set for rule ${rule}"
+				_log "rule ${rule}: hasn't defined any property to set"
 		done
 		echo
 	fi >> "${LOGFILE}"

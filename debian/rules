@@ -25,9 +25,7 @@ debian-%:
 	@bash -n debian/$*
 	-@checkbashisms -f debian/$*
 
-
-override_dh_install:
-	dh_install
+execute_after_dh_fixperms:
 	chmod 0755 debian/setnewwinprops/usr/lib/setnewwinprops/setnewwinprops-waitfocus.sh
 
 %:
