@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.25 $
+#  $Revision: 0.26 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -576,16 +576,16 @@ RuleLine() {
 	select_application | \
 	select_class | \
 	select_role)
-		eval rule${Rules}_${prop}=\'${deselected}${val}\'
+		eval rule${Rules}_$((++indexSelect))_${prop}=\'${deselected}${val}\'
 		;;
 	select_desktop | \
 	select_desktops)
 		_check_natural val ${NONE} "${deselected}"
-		eval rule${Rules}_${prop}=\'${val}\'
+		eval rule${Rules}_$((++indexSelect))_${prop}=\'${val}\'
 		;;
 	select_desktop_size | \
 	select_desktop_workarea)
-		_check_fixedsize "rule${Rules}_${prop}" "${val}" "" "${deselected}"
+		_check_fixedsize "rule${Rules}_$((++indexSelect))_${prop}" "${val}" "" "${deselected}"
 		;;
 	select_maximized | \
 	select_maximized_horz | \
@@ -599,24 +599,24 @@ RuleLine() {
 			LogPrio="err" _log "Property \"${prop}\" wrong value \"${val}\""
 			return ${ERR}
 		}
-		_check_yn "rule${Rules}_${prop}" "${val}"
+		_check_yn "rule${Rules}_$((++indexSelect))_${prop}" "${val}"
 		;;
 	select_others)
 		[ -z "${deselected}" ] || {
 			LogPrio="err" _log "Property \"${prop}\" wrong value \"${deselected}${val}\""
 			return ${ERR}
 		}
-		_check_y "rule${Rules}_${prop}" "${val}"
+		_check_y "rule${Rules}_0_${prop}" "${val}"
 		;;
 	set_delay)
 		_check_natural val ${NONE}
 		[ "${val}" -eq ${NONE} ] || \
-			eval rule${Rules}_$((++ruleIndex))_${prop}=\'${val}\'
+			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
 		;;
 	set_active_desktop | \
 	set_desktop)
 		_check_natural val ${NONE}
-		eval rule${Rules}_$((++ruleIndex))_${prop}=\'${val}\'
+		eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
 		;;
 	set_position | \
 	set_size | \
@@ -626,7 +626,7 @@ RuleLine() {
 			_log "Property \"${prop}\" invalid value \"${val}\""
 		else
 			_check_integer_pair val "x" "y"
-			eval rule${Rules}_$((++ruleIndex))_${prop}=\'${val}\'
+			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_mosaicked)
@@ -639,7 +639,7 @@ RuleLine() {
 				val="0 2"
 				_log "Property \"${prop}\" invalid value. Assuming \"${val}\""
 			fi
-			eval rule${Rules}_$((++ruleIndex))_${prop}=\'${val}\'
+			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_pointer)
@@ -648,7 +648,7 @@ RuleLine() {
 			_log "Property \"${prop}\" invalid value \"${val}\""
 		else
 			_check_integer_pair val "0" "0"
-			eval rule${Rules}_$((++ruleIndex))_${prop}=\'${val}\'
+			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_maximized | \
@@ -662,12 +662,12 @@ RuleLine() {
 	set_pinned | \
 	set_above | \
 	set_below)
-		_check_yn "rule${Rules}_$((++ruleIndex))_${prop}" "${val}"
+		_check_yn "rule${Rules}_$((++indexSet))_${prop}" "${val}"
 		;;
 	set_focus | \
 	set_closed | \
 	set_killed)
-		_check_y "rule${Rules}_$((++ruleIndex))_${prop}" "${val}"
+		_check_y "rule${Rules}_$((++indexSet))_${prop}" "${val}"
 		;;
 	*)
 		_log "Property \"${prop}\" is not implemented yet"
@@ -677,7 +677,7 @@ RuleLine() {
 }
 
 ReadConfig() {
-	local foundParm="" foundRule="" ruleIndex \
+	local foundParm="" foundRule="" indexSet indexSelect \
 		prop val
 	Rules=${NONE}
 	rm -f "${VARSFILE}"*
@@ -697,7 +697,8 @@ ReadConfig() {
 				return ${ERR}
 			foundRule="y"
 			let Rules++,1
-			ruleIndex=0
+			indexSet=0
+			indexSelect=0
 		elif grep -qsxiEe '\}[[:blank:]]*' <<< "${line,,}"; then
 			printf '%s\n' "}" ""
 			foundParm=""
@@ -839,7 +840,8 @@ LoadConfig() {
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
 			set | \
-			grep -se "^rule${rule}_select_.*=" || \
+			grep -sEe "^rule${rule}_[[:digit:]]+_select_.*=" | \
+			sort --numeric --field-separator="_" --key 2,2 || \
 				LogPrio="err" \
 				_log "hasn't defined any property to select for rule ${rule}"
 			set | \

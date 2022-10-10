@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.25 $
+#  $Revision: 0.26 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -846,7 +846,7 @@ WindowNew() {
 	local windowId="${1}" \
 		rule setupRules \
 		propName netState \
-		prop val deselected \
+		index prop val deselected \
 		rc selectOthers
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
@@ -889,7 +889,7 @@ WindowNew() {
 		[ -z "${Debug}" ] || \
 			_log "window ${windowId} rule ${rule}: Checking"
 		while [ -n "${rc}" ] && \
-		IFS="=" read -r prop val; do
+		IFS="[= ]" read -r index prop val; do
 			val="$(_unquote "${val}")"
 			if [ "${prop}" = "select_title" ]; then
 				deselected=""
@@ -1090,8 +1090,8 @@ WindowNew() {
 				rc=""
 				;;
 			esac
-		done < <(sort \
-		< <(sed -ne "/^rule${rule}_select_/ {/^rule${rule}_/s///p}" \
+		done < <(sort --numeric --key 1,1 \
+		< <(sed -nre "\|^rule${rule}_([[:digit:]]+)_(select_.*)|s||\1 \2|p" \
 		< <(set)))
 
 		if [ -n "${rc}" ]; then

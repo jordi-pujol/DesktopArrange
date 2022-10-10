@@ -1,3 +1,10 @@
+setnewwinprops (0.26) unstable; urgency=medium
+
+  * for each Rule the conditions "select" and "deselect" will be executed
+    in order of appearance
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 10 Oct 2022 04:55:54 +0200
+
 setnewwinprops (0.25) unstable; urgency=medium
 
   * The keywords "check" and "uncheck" have been renamed to "select" and "deselect"
