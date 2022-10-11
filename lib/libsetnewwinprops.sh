@@ -54,9 +54,11 @@ _lock_release() {
 	local lockfile="${1}.lock" \
 		pid="${2}"
 	if [ ! -e "${lockfile}" ]; then
-		LogPrio="debug" _log "_lock_release: file \"${lockfile}\" doesn't exist"
+		LogPrio="debug" \
+		_log "_lock_release: file \"${lockfile}\" does not exist"
 	elif [ $(cat "${lockfile}") != ${pid} ]; then
-		LogPrio="debug" _log "_lock_release: another pid releases \"${lockfile}\""
+		LogPrio="debug" \
+		_log "_lock_release: another pid releases \"${lockfile}\""
 	fi
 	rm -f "${lockfile}"
 }
@@ -91,7 +93,7 @@ _lock_acquire() {
 # priority: info notice warn err debug
 _log() {
 	local msg \
-		p="${LogPrio:-"notice"}"
+		p="${LogPrio:-"info"}"
 	LogPrio=""
 	msg="$(_datetime) ${p}: ${@}"
 	printf '%s\n' "${msg}" >> "${LOGFILE}"
@@ -167,7 +169,8 @@ _check_yn() {
 	elif [[ "${val,,}" =~ ${PATTERN_NO} ]]; then
 		eval ${var}=\'${NEGATIVE}\'
 	else
-		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\"," \
+		LogPrio="warn" \
+		_log "Variable \"${var}\" invalid value \"${val}\"," \
 			"assuming default \"${dft}\""
 		eval ${var}=\'${dft}\'
 	fi
@@ -178,7 +181,8 @@ _check_y() {
 		val="${2}" \
 		dft="${3:-${AFFIRMATIVE}}"
 	[[ "${val,,}" =~ ${PATTERN_YES} ]] || \
-		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${val}\"," \
+		LogPrio="warn" \
+		_log "Variable \"${var}\" invalid value \"${val}\"," \
 			"assuming default \"${dft}\""
 	eval ${var}=\'${dft}\'
 }
@@ -191,7 +195,8 @@ _check_fixedsize() {
 	if [[ "${val}" =~ ${PATTERN_FIXEDSIZE} ]]; then
 		eval ${var}=\'${prefix}${val}\'
 	else
-		LogPrio="warn" _log "Variable \"${var}\" invalid value \"${prefix}${val}\""
+		LogPrio="warn" \
+		_log "Variable \"${var}\" invalid value \"${prefix}${val}\""
 	fi
 }
 
@@ -256,7 +261,7 @@ DesktopSetCurrent() {
 	[ ${desktop} -eq $(DesktopCurrent) ] || \
 		xdotool set_desktop ${desktop} 2> /dev/null || {
 			LogPrio="err" \
-				_log "window ${windowId} rule ${rule}:" \
+			_log "window ${windowId} rule ${rule}:" \
 				"can't set current desktop to ${desktop}"
 			return ${ERR}
 		}
@@ -277,7 +282,8 @@ WindowDesktop() {
 	desktop="$(xdotool get_desktop_for_window ${windowId} 2> /dev/null)" || :
 	[ -n "${desktop}" ] || \
 		LogPrio="err" \
-			_log "window ${windowId}${rule:+" rule ${rule}"}: can't get desktop for this window"
+		_log "window ${windowId}${rule:+" rule ${rule}"}:" \
+			"can't get desktop for this window"
 	printf '%d\n' ${desktop:-"-1"}
 }
 
@@ -512,7 +518,8 @@ RuleLine() {
 	if [ "${prop:0:8}" = "deselect" ]; then
 		if [ -n "${val}" ];then
 			if [ "${val:0:1}" = "!" ];then
-				LogPrio="err" _log "rule ${Rules}: \"${prop}\" wrong value \"${val}\"."
+				LogPrio="err" \
+				_log "rule ${Rules}: \"${prop}\" wrong value \"${val}\"."
 				val=""
 			else
 				prop="${prop:2}"
@@ -536,13 +543,15 @@ RuleLine() {
 				val="${NEGATIVE}"
 				;;
 			*)
-				LogPrio="err" _log "rule ${Rules}: \"${prop}\" without a value."
+				LogPrio="err" \
+				_log "rule ${Rules}: \"${prop}\" without a value."
 				;;
 			esac
 		fi
 	else
 		[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
-			LogPrio="err" _log "rule ${Rules}: \"${prop}\" with a value." \
+			LogPrio="err" \
+			_log "rule ${Rules}: \"${prop}\" with a value." \
 				"Value \"${val}\" is ignored"
 			val=""
 		}
@@ -574,7 +583,8 @@ RuleLine() {
 		fi
 	fi
 	[ -n "${val}" ] || {
-		LogPrio="err" _log "rule ${Rules}: Property \"${prop}\" has not a value"
+		LogPrio="err" \
+		_log "rule ${Rules}: Property \"${prop}\" has not a value"
 		return ${ERR}
 	}
 	deselected=""
@@ -610,14 +620,16 @@ RuleLine() {
 	select_undecorated | \
 	select_sticky)
 		[ -z "${deselected}" ] || {
-			LogPrio="err" _log "rule ${Rules}: Property \"${prop}\" wrong value \"${val}\""
+			LogPrio="err" \
+			_log "rule ${Rules}: Property \"${prop}\" wrong value \"${val}\""
 			return ${ERR}
 		}
 		_check_yn "rule${Rules}_$((++indexSelect))_${prop}" "${val}"
 		;;
 	select_others)
 		[ -z "${deselected}" ] || {
-			LogPrio="err" _log "rule ${Rules}: Property \"${prop}\" wrong value \"${deselected}${val}\""
+			LogPrio="err" \
+			_log "rule ${Rules}: Property \"${prop}\" wrong value \"${deselected}${val}\""
 			return ${ERR}
 		}
 		_check_y "rule${Rules}_0_${prop}" "${val}"
@@ -800,20 +812,23 @@ LoadConfig() {
 				emptylist="y"
 				;;
 			*)
-				LogPrio="warn" _log "Invalid command line option:" \
+				LogPrio="warn" \
+				_log "Invalid command line option:" \
 					"\"${option}\""
 				;;
 			esac
 	done
 
 	[ -f "${config}" -a -s "${config}" ] || {
-		LogPrio="err" _log "Invalid config file:" \
+		LogPrio="err" \
+		_log "Invalid config file:" \
 			"\"${config}\""
 		exit ${ERR}
 	}
 
 	ReadConfig || {
-		LogPrio="err" _log "Syntax error in config file:" \
+		LogPrio="err" \
+		_log "Syntax error in config file:" \
 			"\"${config}\""
 		exit ${ERR}
 	}
@@ -852,7 +867,8 @@ LoadConfig() {
 	}
 
 	if [ ${Rules} -eq ${NONE} ]; then
-		LogPrio="warn" _log "Have not configured any rule"
+		LogPrio="warn" \
+		_log "Have not configured any rule"
 	else
 		rule=${NONE}
 		while [ $((rule++)) -lt ${Rules} ]; do

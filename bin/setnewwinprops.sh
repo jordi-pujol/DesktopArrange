@@ -31,7 +31,8 @@ _exit() {
 	local pidsChildren
 	trap - EXIT INT HUP
 	set +o xtrace
-	LogPrio="warn" _log "Exit"
+	LogPrio="warn" \
+	_log "Exit"
 	rm -f "${PIPE}" "${PIDFILE}"
 	pidsChildren=""; _ps_children
 	[ -z "${pidsChildren}" ] || \
@@ -79,7 +80,8 @@ ActionNeedsFocus() {
 		return ${OK}
 		;;
 	esac
-	LogPrio="err" _log "Invalid action \"${action}\""
+	LogPrio="err" \
+	_log "Invalid action \"${action}\""
 }
 
 GetMenuBarHeight() {
@@ -137,7 +139,8 @@ PointerMove() {
 		_log "window ${windowId} rule ${rule}:" \
 			"Setting pointer to (${val})=(${x} ${y})"
 	xdotool mousemove --window ${windowId} ${x} ${y} || \
-		LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+		LogPrio="err" \
+		_log "window ${windowId} rule ${rule}:" \
 			"Error setting pointer to (${val})=(${x} ${y})"
 }
 
@@ -175,7 +178,8 @@ WindowUnshade() {
 		_log "window ${windowId} rule ${rule}:" \
 			"Un-shading"
 	wmctrl -i -r ${windowId} -b remove,shade || \
-		LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+		LogPrio="err" \
+		_log "window ${windowId} rule ${rule}:" \
 			"Error un-shading"
 }
 
@@ -188,7 +192,8 @@ WindowUnminimize() {
 		_log "window ${windowId} rule ${rule}:" \
 			"Un-minimizing"
 	wmctrl -i -r ${windowId} -b remove,hidden || \
-		LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+		LogPrio="err" \
+		_log "window ${windowId} rule ${rule}:" \
 			"Error un-minimizing"
 }
 
@@ -224,7 +229,8 @@ WindowTapKeys() {
 		WindowActivate ${windowId} ${rule} || \
 			break
 		xdotool type --clearmodifiers "${val}" || \
-			LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+			LogPrio="err" \
+			_log "window ${windowId} rule ${rule}:" \
 				"Error typing text"
 		;;
 	keys)
@@ -239,7 +245,8 @@ WindowTapKeys() {
 			WindowActivate ${windowId} ${rule} || \
 				break
 			xdotool key --clearmodifiers "${key}" || \
-				LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+				LogPrio="err" \
+				_log "window ${windowId} rule ${rule}:" \
 					"Error tapping keys"
 		done
 		;;
@@ -263,18 +270,21 @@ WindowTile() {
 	END{exit rc+1}' < "${VARSFILE}")"; then
 		win="$(awk 'NF > 1 {print $NF; rc=-1}
 		END{exit rc+1}' <<< "${tile}")" || {
-			LogPrio="err" _log "window ${win} rule ${rule}:" \
+			LogPrio="err" \
+			_log "window ${win} rule ${rule}:" \
 				"WindowTile can't get ID of previous tiled window"
 			return ${OK}
 		}
 		WindowGeometry ${win} || {
-			LogPrio="err" _log "window ${win} rule ${rule}:" \
+			LogPrio="err" \
+			_log "window ${win} rule ${rule}:" \
 				"WindowTile can't get geometry of previous tiled window"
 			return ${OK}
 		}
 		[ "${Debug}" != "xtrace" ] || \
-			LogPrio="debug" _log "window ${windowId} rule ${rule}:" \
-				"Tiling: ${tile:-${rule}} ${windowId}"
+			LogPrio="debug" \
+			_log "window ${windowId} rule ${rule}:" \
+				"WindowTile: ${tile:-${rule}} ${windowId}"
 		desktop="$(WindowDesktop ${win} ${rule})"
 		DesktopSize ${desktop}
 		x="$(cut -f 1 -s -d ' ' <<< "${val}")"
@@ -321,8 +331,9 @@ WindowTile() {
 				_log "window ${windowId} rule ${rule}:" \
 					"WindowTile moving to desktop ${desktop}"
 			xdotool set_desktop_for_window ${windowId} ${desktop} || \
-				LogPrio="err" _log "window ${windowId} rule ${rule}:" \
-				"WindowTile can't set desktop to ${desktop}"
+				LogPrio="err" \
+				_log "window ${windowId} rule ${rule}:" \
+					"WindowTile can't set desktop to ${desktop}"
 			sleep 1
 			WindowActivate ${windowId} ${rule} || :
 		}
@@ -337,7 +348,8 @@ WindowTile() {
 			_log "window ${windowId} rule ${rule}:" \
 				"WindowTile moving to (${val})=(${x} ${y})"
 		xdotool windowmove ${windowId} ${x} ${y} || \
-			LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+			LogPrio="err" \
+			_log "window ${windowId} rule ${rule}:" \
 				"WindowTile can't move to (${val})=(${x} ${y})"
 	else
 		_log "window ${windowId} rule ${rule}:" \
@@ -349,7 +361,8 @@ WindowTile() {
 	} > "${VARSFILE}.part"
 	mv -f "${VARSFILE}.part" "${VARSFILE}"
 	[ "${Debug}" != "xtrace" ] || \
-		LogPrio="debug" _log "window ${windowId} rule ${rule}:" \
+		LogPrio="debug" \
+		_log "window ${windowId} rule ${rule}:" \
 			"WindowTile:" \
 		"${tile:-${rule}} ${windowId}"
 }
@@ -416,10 +429,11 @@ WindowMosaic() {
 		[ ${desktop} -eq $(WindowDesktop ${win} ${rule}) ] || {
 			[ -z "${Debug}" ] || \
 				_log "window ${win} rule ${rule}:" \
-				"Mosaic, moving to desktop ${desktop}"
+				"WindowMosaic: moving to desktop ${desktop}"
 			xdotool set_desktop_for_window ${win} ${desktop} || \
-				LogPrio="err" _log "window ${win} rule ${rule}:" \
-				"Error mosaic, can't move to desktop ${desktop}"
+				LogPrio="err" \
+				_log "window ${win} rule ${rule}:" \
+					"WindowMosaic: can't move to desktop ${desktop}"
 			sleep 1
 			WindowActivate ${win} ${rule} || :
 		}
@@ -433,13 +447,15 @@ WindowMosaic() {
 			let "h=wH-(MenuBarHeight/2),1" || \
 			h=${wH}
 		wmctrl -i -r ${win} -b remove,maximized_horz,maximized_vert,minimized || \
-			LogPrio="err" _log "window ${windowId} rule ${rule}:" \
-				"Error mosaic remove,maximized_horz,maximized_vert,minimized"
+			LogPrio="err" \
+			_log "window ${windowId} rule ${rule}:" \
+				"WindowMosaic: remove,maximized_horz,maximized_vert,minimized"
 		_log "window ${win} rule ${rule}:" \
-			"WindowMosaic, moving to (${wX} ${wY}), resizing to (${w} ${h})"
+			"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 		wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
-				LogPrio="err" _log "window ${win} rule ${rule}:" \
-					"WindowMosaic, moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				LogPrio="err" \
+				_log "window ${win} rule ${rule}:" \
+					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 		if [ ${col} -ge ${cols} ]; then
 			col=0
 		fi
@@ -450,8 +466,9 @@ WindowMosaic() {
 	} > "${VARSFILE}.part"
 	mv -f "${VARSFILE}.part" "${VARSFILE}"
 	[ "${Debug}" != "xtrace" ] || \
-		LogPrio="debug" _log "window ${windowId} rule ${rule}:" \
-			"Mosaic: ${mosaic:-${rule}} ${windowId}"
+		LogPrio="debug" \
+		_log "window ${windowId} rule ${rule}:" \
+			"WindowMosaic: ${mosaic:-${rule}} ${windowId}"
 }
 
 WindowEnmossay() {
@@ -474,7 +491,8 @@ WindowPosition() {
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
 	WindowGeometry ${windowId} || {
-		LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+		LogPrio="err" \
+		_log "window ${windowId} rule ${rule}:" \
 			"Error setting position, can't get window geometry"
 		return ${OK}
 	}
@@ -522,7 +540,8 @@ WindowPosition() {
 		_log "window ${windowId} rule ${rule}:" \
 			"Moving to (${val})=(${x} ${y})"
 	xdotool windowmove ${windowId} "${x}" "${y}" || \
-		LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+		LogPrio="err" \
+		_log "window ${windowId} rule ${rule}:" \
 			"Error moving to (${val})=(${x} ${y})"
 }
 
@@ -589,18 +608,21 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Setting up active desktop ${val}"
 					xdotool set_desktop ${val} || {
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error setting active desktop ${val}"
 					}
 				fi
 			else
-				LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+				LogPrio="err" \
+				_log "window ${windowId} rule ${rule}:" \
 					"Can't set invalid active desktop ${val}"
 			fi
 			;;
 		set_desktop)
 			[ $(WindowDesktop ${windowId} ${rule}) -ge 0 ] || \
-				LogPrio="warn" _log "window ${windowId} rule ${rule}:" \
+				LogPrio="warn" \
+				_log "window ${windowId} rule ${rule}:" \
 					"window is pinned to all desktops"
 			if [ ${val} -lt $(DesktopsCount) ]; then
 				c=0
@@ -617,7 +639,8 @@ WindowSetupRule() {
 				done
 			fi
 			[ ${val} -eq $(WindowDesktop ${windowId} ${rule}) ] || \
-				LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+				LogPrio="err" \
+				_log "window ${windowId} rule ${rule}:" \
 					"Can't move window to desktop ${val}"
 			;;
 		set_position)
@@ -628,7 +651,8 @@ WindowSetupRule() {
 				_log "window ${windowId} rule ${rule}:" \
 					"Setting size to ${val}"
 			xdotool windowsize ${windowId} ${val} || \
-				LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+				LogPrio="err" \
+				_log "window ${windowId} rule ${rule}:" \
 					"Error setting size to ${val}"
 			;;
 		set_tiled)
@@ -641,7 +665,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Maximizing"
 					wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error maximizing"
 				}
 			else
@@ -650,7 +675,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Un-maximizing"
 					wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error un-maximizing"
 				}
 			fi
@@ -662,7 +688,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Maximizing horizontally"
 					wmctrl -i -r ${windowId} -b add,maximized_horz || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error maximizing horizontally"
 				}
 			else
@@ -671,7 +698,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Un-maximizing horizontally"
 					wmctrl -i -r ${windowId} -b remove,maximized_horz || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error un-maximizing horizontally"
 				}
 			fi
@@ -683,7 +711,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Maximizing vertically"
 					wmctrl -i -r ${windowId} -b add,maximized_vert || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error maximizing vertically"
 				}
 			else
@@ -692,7 +721,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Un-maximizing vertically "
 					wmctrl -i -r ${windowId} -b remove,maximized_vert || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error un-maximizing vertically"
 				}
 			fi
@@ -704,7 +734,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Enabling fullscreen"
 					wmctrl -i -r ${windowId} -b add,fullscreen || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error enabling fullscreen"
 				}
 			else
@@ -713,7 +744,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Disabling fullscreen"
 					wmctrl -i -r ${windowId} -b remove,fullscreen || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error disabling fullscreen"
 				}
 			fi
@@ -728,7 +760,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Minimizing"
 					xdotool windowminimize ${windowId} || \
-					LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+					LogPrio="err" \
+					_log "window ${windowId} rule ${rule}:" \
 						"Error minimizing"
 				}
 			else
@@ -745,7 +778,8 @@ WindowSetupRule() {
 					_log "window ${windowId} rule ${rule}:" \
 						"Shading"
 				wmctrl -i -r ${windowId} -b add,shade || \
-					LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+					LogPrio="err" \
+					_log "window ${windowId} rule ${rule}:" \
 						"Error shading"
 			elif [ "${val}" = "${NEGATIVE}"  -a \
 			\( ${rc} -eq 0 -o ${rc} -eq 2 \) ]; then
@@ -762,7 +796,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Sticking"
 					wmctrl -i -r ${windowId} -b add,sticky || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error sticking"
 				}
 			else
@@ -771,7 +806,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Un-sticking"
 					wmctrl -i -r ${windowId} -b remove,sticky || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error un-sticking"
 				}
 			fi
@@ -783,7 +819,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Disabling below"
 					wmctrl -i -r ${windowId} -b remove,below || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error disabling below"
 				}
 				IsWindowAbove ${windowId} || {
@@ -791,7 +828,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Enabling above"
 					wmctrl -i -r ${windowId} -b add,above || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error enabling above"
 				}
 			else
@@ -800,7 +838,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Disabling above"
 					wmctrl -i -r ${windowId} -b remove,above || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error disabling above"
 				}
 			fi
@@ -812,7 +851,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Disabling above"
 					wmctrl -i -r ${windowId} -b remove,above || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error disabling above"
 				}
 				IsWindowBelow ${windowId} || {
@@ -820,7 +860,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Enabling below"
 					wmctrl -i -r ${windowId} -b add,below || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error enabling below"
 				}
 			else
@@ -829,7 +870,8 @@ WindowSetupRule() {
 						_log "window ${windowId} rule ${rule}:" \
 							"Disabling below"
 					wmctrl -i -r ${windowId} -b remove,below || \
-						LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+						LogPrio="err" \
+						_log "window ${windowId} rule ${rule}:" \
 							"Error disabling below"
 				}
 			fi
@@ -856,7 +898,8 @@ WindowSetupRule() {
 				_log "window ${windowId} rule ${rule}:" \
 					"Closing window"
 			xdotool windowclose ${windowId} || \
-				LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+				LogPrio="err" \
+				_log "window ${windowId} rule ${rule}:" \
 					"Error closing window"
 			;;
 		set_killed)
@@ -864,7 +907,8 @@ WindowSetupRule() {
 				_log "window ${windowId} rule ${rule}:" \
 					"Killing window"
 			xdotool windowkill ${windowId} || \
-				LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+				LogPrio="err" \
+				_log "window ${windowId} rule ${rule}:" \
 					"Error killing window"
 			;;
 		set_pointer)
@@ -877,7 +921,8 @@ WindowSetupRule() {
 			WindowTapKeys ${windowId} ${rule} "text" "${val}"
 			;;
 		*)
-			LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+			LogPrio="err" \
+			_log "window ${windowId} rule ${rule}:" \
 				"Rule ${rule}, invalid action ${action}='${val}'"
 			;;
 		esac
@@ -895,7 +940,7 @@ WindowSetup() {
 		setupRules="${2}" \
 		rule mypid
 
-	mypid="$(echo $(ps -o ppid= -C "ps -o ppid= -C ps -o ppid="))"
+	mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")"
 
 	[ -z "${Debug}" ] || \
 		_log "window ${windowId}: Applying rules" \
@@ -971,14 +1016,14 @@ WindowNew() {
 				if [ "${val}" = "$(WindowTitle ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"title \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"title \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -996,31 +1041,31 @@ WindowNew() {
 				if [ "${val}" = "$(WindowState ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"state \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"state \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
 			select_type)
-				if grep -qs -iEe "${val}" <<< "$(WindowType ${windowId})" ; then
+				if grep -qs -iwEe "${val}" <<< "$(WindowType ${windowId})" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"type \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"type \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -1030,14 +1075,14 @@ WindowNew() {
 				if [ "${val}" = "$(WindowAppName ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"app name \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"app name \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -1048,31 +1093,31 @@ WindowNew() {
 				<<< "$(WindowApplication ${windowId} 2> /dev/null)" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"application \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"application \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
 			select_class)
-				if grep -qs -iwF "${val}" <<< "$(WindowClass ${windowId})" ; then
+				if grep -qs -iwEe "${val}" <<< "$(WindowClass ${windowId})" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"class \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"class \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -1082,14 +1127,14 @@ WindowNew() {
 				if grep -qs -iwF "${val}" <<< "$(WindowRole ${windowId})"; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"role \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"role \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -1099,14 +1144,14 @@ WindowNew() {
 				if [ "${val}" = "$(WindowDesktop ${windowId} ${rule})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"desktop \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"desktop \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -1149,14 +1194,14 @@ WindowNew() {
 				if [ "${val}" = "${desktopWidth}x${desktopHeight}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"desktop size \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"desktop size \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -1168,14 +1213,14 @@ WindowNew() {
 				]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"desktop workarea \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"desktop workarea \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -1185,14 +1230,14 @@ WindowNew() {
 				if [ "${val}" = "$(DesktopsCount)" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${deselected:+"doesn't "}match" \
+							"${deselected:+"does not "}match" \
 							"desktops count \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"$([ -n "${deselected}" ] || echo "does not ")match" \
 							"desktopsCount \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
@@ -1205,8 +1250,9 @@ WindowNew() {
 							"enabling \"select others\""
 				;;
 			*)
-				LogPrio="err" _log "rule ${rule}:" \
-							"invalid property \"${prop}\" \"${deselected}${val}\""
+				LogPrio="err" \
+				_log "rule ${rule}:" \
+					"invalid property \"${prop}\" \"${deselected}${val}\""
 				rc=""
 				;;
 			esac
@@ -1227,7 +1273,7 @@ WindowNew() {
 		else
 			[ -z "${Debug}" ] || \
 				_log "window ${windowId} rule ${rule}:" \
-					"End check, doesn't match"
+					"End check, does not match"
 		fi
 	done
 	if [ -n "${setupRules}" ]; then
@@ -1272,8 +1318,9 @@ WindowsUpdate() {
 		_lock_acquire "${VARSFILE}" ${$}
 		if grep -qswF "${windowId}" < "${VARSFILE}"; then
 			[ "${Debug}" != "xtrace" ] || \
-				LogPrio="debug" _log "window ${windowId}: Tile info:" \
-				"$(grep -swF "${windowId}" < "${VARSFILE}")"
+				LogPrio="debug" \
+				_log "window ${windowId}: Tile info:" \
+					"$(grep -swF "${windowId}" < "${VARSFILE}")"
 			awk -v windowId="${windowId}" \
 			'{for (i=2; i <= NF; i++)
 				if ($i == windowId) {
