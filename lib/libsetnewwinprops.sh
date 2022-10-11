@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.26 $
+#  $Revision: 0.27 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -50,6 +50,20 @@ _ps_children() {
 	done
 }
 
+# priority: info notice warn err debug
+_log() {
+	local msg \
+		LogPrio="${LogPrio:-"notice"}"
+	if [ "${LogPrio}" = "info" -o "${LogPrio}" = "warn" -o "${LogPrio}" = "err" ] || \
+	[ "${LogPrio}" = "notice" -a "${Debug}" != "info" ] || \
+	[ "${LogPrio}" = "debug" -a \
+	\( "${Debug}" = "debug" -o "${Debug}" = "xtrace" \) ]; then
+		msg="$(_datetime) ${LogPrio}: ${@}"
+		printf '%s\n' "${msg}" >> "${LOGFILE}"
+	fi
+	LogPrio=""
+}
+
 _lock_release() {
 	local lockfile="${1}.lock" \
 		pid="${2}"
@@ -90,16 +104,6 @@ _lock_acquire() {
 	done
 }
 
-# priority: info notice warn err debug
-_log() {
-	local msg \
-		p="${LogPrio:-"info"}"
-	LogPrio=""
-	msg="$(_datetime) ${p}: ${@}"
-	printf '%s\n' "${msg}" >> "${LOGFILE}"
-	return ${OK}
-}
-
 _check_integer() {
 	local n="${1}" \
 		d="${2}" \
@@ -108,7 +112,8 @@ _check_integer() {
 	let "v=${w}" 2> /dev/null || \
 		rc=${?}
 	if [ ${rc} -gt 1 ] || [ -z "${v}" ]; then
-		_log "Config error:" \
+		LogPrio="err" \
+		_log "Config:" \
 			"Invalid integer value \"${w}\" for \"${n}\"," \
 			"assuming default \"${d}\""
 		v="${d}"
@@ -149,6 +154,7 @@ _check_natural() {
 	let "v=${w}" 2> /dev/null || \
 		rc=${?}
 	if [ ${rc} -gt 1 ] || [ -z "${v}" ] || [ "${v}" -lt 0 ]; then
+		LogPrio="err" \
 		_log "Config error:" \
 			"Invalid integer value \"${w}\" for \"${n}\"," \
 			"assuming default \"${d}\""
@@ -303,6 +309,7 @@ WindowExists() {
 	cut -f 2- -s -d '#' | \
 	tr -s '[:blank:],' ' ' | \
 	grep -qswF "${windowId}" || {
+		LogPrio="err" \
 		_log "window ${windowId}: can't set up this window, has been closed"
 		return ${ERR}
 	}
@@ -518,8 +525,8 @@ RuleLine() {
 	if [ "${prop:0:8}" = "deselect" ]; then
 		if [ -n "${val}" ];then
 			if [ "${val:0:1}" = "!" ];then
-				LogPrio="err" \
-				_log "rule ${Rules}: \"${prop}\" wrong value \"${val}\"."
+				LogPrio="warn" \
+				_log "rule ${Rules}: \"${prop}\" ignoring wrong value \"${val}\"."
 				val=""
 			else
 				prop="${prop:2}"
@@ -545,12 +552,13 @@ RuleLine() {
 			*)
 				LogPrio="err" \
 				_log "rule ${Rules}: \"${prop}\" without a value."
+				return ${ERR}
 				;;
 			esac
 		fi
 	else
 		[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
-			LogPrio="err" \
+			LogPrio="warn" \
 			_log "rule ${Rules}: \"${prop}\" with a value." \
 				"Value \"${val}\" is ignored"
 			val=""
@@ -649,7 +657,9 @@ RuleLine() {
 	set_tiled)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+			LogPrio="err" \
 			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
+			return ${ERR}
 		else
 			_check_integer_pair val "x" "y"
 			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
@@ -658,11 +668,14 @@ RuleLine() {
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+			LogPrio="err" \
 			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
+			return ${ERR}
 		else
 			_check_integer_pair val "0" "0"
 			if [ "${val}" = "0 0" ]; then
 				val="0 2"
+				LogPrio="warn" \
 				_log "rule ${Rules}: Property \"${prop}\" invalid value. Assuming \"${val}\""
 			fi
 			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
@@ -671,7 +684,9 @@ RuleLine() {
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+			LogPrio="err" \
 			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
+			return ${ERR}
 		else
 			_check_integer_pair val "0" "0"
 			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
@@ -700,6 +715,7 @@ RuleLine() {
 		_check_y "rule${Rules}_$((++indexSet))_${prop}" "${val}"
 		;;
 	*)
+		LogPrio="err" \
 		_log "rule ${Rules}: Property \"${prop}\" is not implemented yet"
 		return ${ERR}
 		;;
@@ -738,10 +754,13 @@ ReadConfig() {
 			if [ -n "${foundParm}" ]; then
 				case "${line,,}" in
 				silent)
-					Debug=""
+					Debug="info"
 					;;
-				debug|verbose)
-					Debug="verbose"
+				verbose)
+					Debug="notice"
+					;;
+				debug)
+					Debug="debug"
 					;;
 				xtrace)
 					Debug="xtrace"
@@ -791,22 +810,26 @@ LoadConfig() {
 		'$1 ~ "^rule[[:digit:]]*_" {print $1}' \
 		< <(set)) 2> /dev/null || :
 
+	LogPrio="info" \
 	_log "${msg}"
 
 	for option in "${@}"; do
-		[ -z "${option,,}" ] || \
+		[ -z "${option}" ] || \
 			case "${option,,}" in
+			silent)
+				dbg="info"
+				;;
+			verbose)
+				dbg="verbose"
+				;;
+			debug)
+				dbg="debug"
+				;;
 			xtrace)
 				dbg="xtrace"
 				;;
 			config=*)
 				config="$(cut -f 2- -s -d '=' <<< "${option}")"
-				;;
-			debug|verbose)
-				dbg="verbose"
-				;;
-			silent)
-				dbg=""
 				;;
 			emptylist)
 				emptylist="y"
@@ -852,19 +875,17 @@ LoadConfig() {
 		exec >> "${LOGFILE}" 2>&1
 	fi
 
-	if [ -n "${Debug}" -o ${#} -gt ${NONE} ]; then
+	if [ ${#} -gt ${NONE} ]; then
 		msg="daemon's command line"
 		[ ${#} -gt ${NONE} ] && \
 			msg="${msg} options:$(printf ' "%s"' "${@}")" || \
 			msg="${msg} is empty"
+		LogPrio="info" \
 		_log "${msg}"
 	fi
 
-	[ -z "${Debug}" ] || {
-		[ "${Debug}" = "xtrace" ] || \
-			Debug="verbose"
-		_log "debug level is \"${Debug}\""
-	}
+	LogPrio="info" \
+	_log "debug level is \"${Debug}\""
 
 	if [ ${Rules} -eq ${NONE} ]; then
 		LogPrio="warn" \
@@ -875,10 +896,12 @@ LoadConfig() {
 			echo
 			set | \
 			grep -sEe "^rule${rule}_[[:digit:]]+_select_.*=" | \
-			sort --numeric --field-separator="_" --key 2,2 || \
+			sort --numeric --field-separator="_" --key 2,2 || {
 				LogPrio="err" \
 				_log "rule ${rule}:" \
 					"hasn't defined any property to select"
+				exit ${ERR}
+			}
 			set | \
 			grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2 || \
@@ -893,7 +916,7 @@ LoadConfig() {
 	return ${OK}
 }
 
-readonly LF=$'\n' TAB=$'\t' OK=0 ERR=1 NONE=0 \
+readonly LF=$'\n' TAB=$'\t' SEP=$'\t' OK=0 ERR=1 NONE=0 \
 	PATTERN_YES="^(y.*|true|on|1|enable.*)$" \
 	PATTERN_NO="^(n.*|false|off|0|disable.*)$" \
 	PATTERN_FIXEDSIZE="^[0-9]+x[0-9]+$" \

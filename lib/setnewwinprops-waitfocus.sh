@@ -6,7 +6,7 @@
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.26 $
+#  $Revision: 0.27 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -39,7 +39,7 @@ else
 	exec >> "${LOGFILE}" 2>&1
 fi
 
-ppid="$(echo $(ps -o ppid= ${$}))"
+ppid="$(ps -o ppid= ${$}))"
 
 kill -0 ${ppid} 2> /dev/null || \
 	exit 0
@@ -52,7 +52,7 @@ kill -0 ${ppid} 2> /dev/null || \
 [ "${Debug}" != "xtrace" ] || \
 	echo "$(date +'%F %X') debug:" \
 		"window ${windowId}:" \
-		"killing process ${ppid} of user ${USER}" >> "${LOGFILE}"
+		"killing process id ${ppid} of user ${USER}" >> "${LOGFILE}"
 
 kill ${ppid} 2> /dev/null
 
