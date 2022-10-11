@@ -56,7 +56,7 @@ _lock_release() {
 	if [ ! -e "${lockfile}" ]; then
 		LogPrio="debug" _log "_lock_release: file \"${lockfile}\" doesn't exist"
 	elif [ $(cat "${lockfile}") != ${pid} ]; then
-			LogPrio="debug" _log "_lock_release: another pid releases \"${lockfile}\""
+		LogPrio="debug" _log "_lock_release: another pid releases \"${lockfile}\""
 	fi
 	rm -f "${lockfile}"
 }
@@ -256,7 +256,8 @@ DesktopSetCurrent() {
 	[ ${desktop} -eq $(DesktopCurrent) ] || \
 		xdotool set_desktop ${desktop} 2> /dev/null || {
 			LogPrio="err" \
-				_log "window ${windowId} rule ${rule}: can't set current desktop to ${desktop}"
+				_log "window ${windowId} rule ${rule}:" \
+				"can't set current desktop to ${desktop}"
 			return ${ERR}
 		}
 }
@@ -664,6 +665,10 @@ RuleLine() {
 			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
 		fi
 		;;
+	set_tap_keys | \
+	set_type_text)
+		eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
+		;;
 	set_maximized | \
 	set_maximized_horz | \
 	set_maximized_vert | \
@@ -856,12 +861,14 @@ LoadConfig() {
 			grep -sEe "^rule${rule}_[[:digit:]]+_select_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2 || \
 				LogPrio="err" \
-				_log "rule ${rule}: hasn't defined any property to select"
+				_log "rule ${rule}:" \
+					"hasn't defined any property to select"
 			set | \
 			grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2 || \
 				LogPrio="warn" \
-				_log "rule ${rule}: hasn't defined any property to set"
+				_log "rule ${rule}:" \
+					"hasn't defined any property to set"
 		done
 		echo
 	fi >> "${LOGFILE}"

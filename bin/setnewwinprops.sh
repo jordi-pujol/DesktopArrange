@@ -73,7 +73,9 @@ ActionNeedsFocus() {
 	set_sticky | \
 	set_above | \
 	set_below | \
-	set_pointer)
+	set_pointer | \
+	set_tap_keys | \
+	set_type_text)
 		return ${OK}
 		;;
 	esac
@@ -207,21 +209,41 @@ WindowActivate() {
 WindowTapKeys() {
 	local windowId="${1}" \
 		rule="${2}" \
+		type="${3}" \
+		val="${4}" \
 		xkbmap key first
-	shift
 	xkbmap="$(setxkbmap -query | \
 		sed -nre '\|^options| s||option|' \
 		-e '\|([^:[:blank:]]+)[:[:blank:]]+(.*)| s||-\1 \2|p')"
 	setxkbmap us dvorak -rules xorg -model pc105 -option
-	first="y"
-	for key in "${@}"; do
-		[ -n "${first}" ] || \
-			sleep 1
-		first=""
+	case "${type}" in
+	text)
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId} rule ${rule}:" \
+			"Typing text \"${val}\""
 		WindowActivate ${windowId} ${rule} || \
 			break
-		xdotool key --clearmodifiers "${key}"
-	done
+		xdotool type --clearmodifiers "${val}" || \
+			LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+				"Error typing text"
+		;;
+	keys)
+		[ -z "${Debug}" ] || \
+			_log "window ${windowId} rule ${rule}:" \
+			"Tapping keys \"${val}\""
+		first="y"
+		for key in $(tr -s '[:blank:]' ' ' <<< "${val}"); do
+			[ -n "${first}" ] || \
+				sleep 1
+			first=""
+			WindowActivate ${windowId} ${rule} || \
+				break
+			xdotool key --clearmodifiers "${key}" || \
+				LogPrio="err" _log "window ${windowId} rule ${rule}:" \
+					"Error tapping keys"
+		done
+		;;
+	esac
 	setxkbmap ${xkbmap}
 }
 
@@ -848,6 +870,12 @@ WindowSetupRule() {
 		set_pointer)
 			PointerMove ${windowId} ${rule} "${val}"
 			;;
+		set_tap_keys)
+			WindowTapKeys ${windowId} ${rule} "keys" "${val}"
+			;;
+		set_type_text)
+			WindowTapKeys ${windowId} ${rule} "text" "${val}"
+			;;
 		*)
 			LogPrio="err" _log "window ${windowId} rule ${rule}:" \
 				"Rule ${rule}, invalid action ${action}='${val}'"
@@ -921,7 +949,7 @@ WindowNew() {
 	} >> "${LOGFILE}"
 
 	# checking properties of this window
-	# we'll set up only the first rule that matches,
+	# we'll set up only the first rule that match,
 	# unless that this rule contains the command "select others"
 	setupRules=""
 	rule=${NONE}
@@ -943,13 +971,15 @@ WindowNew() {
 				if [ "${val}" = "$(WindowTitle ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window title \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"title \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window title \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"title \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -966,28 +996,32 @@ WindowNew() {
 				if [ "${val}" = "$(WindowState ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window state \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"state \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window state \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"state \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
 				;;
 			select_type)
-				if grep -qs -iF "${val}" <<< "$(WindowType ${windowId})" ; then
+				if grep -qs -iEe "${val}" <<< "$(WindowType ${windowId})" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window type \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"type \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window type \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"type \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -996,13 +1030,15 @@ WindowNew() {
 				if [ "${val}" = "$(WindowAppName ${windowId})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window app name \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"app name \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window app name \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"app name \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -1012,13 +1048,15 @@ WindowNew() {
 				<<< "$(WindowApplication ${windowId} 2> /dev/null)" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window application \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"application \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window application \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"application \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -1027,13 +1065,15 @@ WindowNew() {
 				if grep -qs -iwF "${val}" <<< "$(WindowClass ${windowId})" ; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window class \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"class \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window class \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"class \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -1042,13 +1082,15 @@ WindowNew() {
 				if grep -qs -iwF "${val}" <<< "$(WindowRole ${windowId})"; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window role \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"role \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window role \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"role \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -1057,13 +1099,15 @@ WindowNew() {
 				if [ "${val}" = "$(WindowDesktop ${windowId} ${rule})" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window desktop \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"desktop \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window desktop \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"desktop \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -1084,11 +1128,11 @@ WindowNew() {
 					if [ "${val}" = "${netState}" ]; then
 						[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${propName} is \"${val}\""
+							"${propName} is \"${deselected}${val}\""
 					else
 						[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"${propName} is not \"${val}\""
+							"${propName} is not \"${deselected}${val}\""
 						rc=""
 					fi
 					;;
@@ -1105,13 +1149,15 @@ WindowNew() {
 				if [ "${val}" = "${desktopWidth}x${desktopHeight}" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window desktop size \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"desktop size \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window desktop size \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"desktop size \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -1122,13 +1168,15 @@ WindowNew() {
 				]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches window desktop workarea \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"desktop workarea \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match window desktop workarea \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"desktop workarea \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi
@@ -1137,13 +1185,15 @@ WindowNew() {
 				if [ "${val}" = "$(DesktopsCount)" ]; then
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"matches desktopsCount \"${val}\""
+							"${deselected:+"doesn't "}match" \
+							"desktops count \"${deselected}${val}\""
 					[ -z "${deselected}" ] || \
 						rc=""
 				else
 					[ -z "${Debug}" ] || \
 						_log "window ${windowId} rule ${rule}:" \
-							"doesn't match desktopsCount \"${val}\""
+							"$([ -n "${deselected}" ] || echo "doesn't ")match" \
+							"desktopsCount \"${deselected}${val}\""
 					[ -n "${deselected}" ] || \
 						rc=""
 				fi

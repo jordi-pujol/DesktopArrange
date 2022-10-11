@@ -2,6 +2,11 @@ setnewwinprops (0.26) unstable; urgency=medium
 
   * for each Rule the conditions "select" and "deselect" will be executed
     in order of appearance
+  * configuration file, section "Rule {"
+    - developing new actions to send keystrokes to a window:
+      "set tap_keys" and "set type_text"
+    - "select window type" admits regular expressions, allways case independent.
+      Example: select type "splash|dialog"
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 10 Oct 2022 04:55:54 +0200
 
