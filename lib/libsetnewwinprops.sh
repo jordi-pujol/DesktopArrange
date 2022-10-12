@@ -285,12 +285,13 @@ WindowDesktop() {
 	local windowId="${1}" \
 		rule="${2:-}" \
 		desktop
-	desktop="$(xdotool get_desktop_for_window ${windowId} 2> /dev/null)" || :
+	desktop="$(xdotool get_desktop_for_window ${windowId} 2> /dev/null)" || \
+		desktop=-2
 	[ -n "${desktop}" ] || \
 		LogPrio="err" \
 		_log "window ${windowId}${rule:+" rule ${rule}"}:" \
 			"can't get desktop for this window"
-	printf '%d\n' ${desktop:-"-1"}
+	printf '%d\n' ${desktop:-"-2"}
 }
 
 WindowGeometry() {
@@ -904,10 +905,12 @@ LoadConfig() {
 			}
 			set | \
 			grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" | \
-			sort --numeric --field-separator="_" --key 2,2 || \
+			sort --numeric --field-separator="_" --key 2,2 || {
+				eval rule${rule}_0_select_noactions='y'
 				LogPrio="warn" \
 				_log "rule ${rule}:" \
 					"hasn't defined any property to set"
+			}
 		done
 		echo
 	fi >> "${LOGFILE}"
@@ -937,5 +940,6 @@ readonly LF=$'\n' TAB=$'\t' SEP=$'\t' OK=0 ERR=1 NONE=0 \
 	"
 # _NET_WM_STATE_MODAL
 # _NET_WM_STATE_DEMANDS_ATTENTION
+# ACTIONSTATES: TAB after each record is a list separator
 
 :

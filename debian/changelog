@@ -1,13 +1,16 @@
 setnewwinprops (0.27) unstable; urgency=medium
 
-  * Change Log level parameters that are valid in the command line
+  * Log level parameters valid in the command line
   and in the configuration file in section "Parameters {"
+  are the following:
     - silent
-    - verbose 
-    - debug 
+    - verbose (default)
+    - debug
     - xtrace
-  * when a rule organizes mosaic and tile
-    will consider only windows in the same desktop/workspace
+  * when a rule performs actions: mosaic and tile
+    considers only windows that reside in the same desktop/workspace
+  * detect when a rule doesn't perform any action
+    and avoid setting up the corresponding window.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 11 Oct 2022 06:32:13 +0200
 

@@ -275,15 +275,15 @@ WindowTile() {
 					break
 				}
 			print $0}' <<< "${tile}")"
-			LogPrio="err" \
-			_log "window ${win} rule ${rule} desktop ${desktop}:" \
-				"WindowTile: previous tiled window ${win} has been moved to another desktop"
+			LogPrio="warn" \
+			_log "window ${windowId} rule ${rule} desktop ${desktop}:" \
+				"WindowTile: previous tiled window ${win} is not in current desktop"
 		done
 		if [ $(wc -w <<< "${tile}") -gt 1 ]; then
 			WindowGeometry ${win} || {
 				LogPrio="err" \
-				_log "window ${win} rule ${rule} desktop ${desktop}:" \
-					"WindowTile: can't get geometry of previous tiled window"
+				_log "window ${windowId} rule ${rule} desktop ${desktop}:" \
+					"WindowTile: can't get geometry of previous tiled window ${win}"
 				return ${OK}
 			}
 			LogPrio="debug" \
@@ -329,16 +329,6 @@ WindowTile() {
 				fi
 			fi
 			WindowActivate ${windowId} ${rule} || :
-			[ ${desktop} -eq $(WindowDesktop ${windowId} ${rule}) ] || {
-				_log "window ${windowId} rule ${rule} desktop ${desktop}:" \
-					"WindowTile: moving to desktop ${desktop}"
-				xdotool set_desktop_for_window ${windowId} ${desktop} || \
-					LogPrio="err" \
-					_log "window ${windowId} rule ${rule} desktop ${desktop}:" \
-						"WindowTile: can't set desktop to ${desktop}"
-				sleep 1
-				WindowActivate ${windowId} ${rule} || :
-			}
 			undecorated=0
 			IsWindowUndecorated ${windowId} || \
 				undecorated="${?}"
@@ -395,7 +385,7 @@ WindowMosaic() {
 			[ ${desktop} -ne $(WindowDesktop ${win} ${rule}) ] && \
 				LogPrio="warn" \
 				_log "window ${windowId} rule ${rule} desktop ${desktop}:" \
-					"WindowMosaic: window ${win} has been moved to another desktop" || \
+					"WindowMosaic: window ${win} is not in current desktop" || \
 				m="${m}${win}${SEP}"
 		done
 		mosaic="${m}"
@@ -896,7 +886,7 @@ WindowSetup() {
 		setupRules="${2}" \
 		rule mypid
 
-	mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")"
+	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
 
 	_log "window ${windowId}: Applying rules" \
 		"( $(tr -s '[:blank:],' ',' < <(echo ${setupRules})) )"
@@ -917,7 +907,7 @@ WindowNew() {
 		rule setupRules \
 		propName netState \
 		index prop val deselected \
-		rc selectOthers
+		rc selectOthers selectNoactions
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
@@ -956,6 +946,7 @@ WindowNew() {
 	while [ $((rule++)) -lt ${Rules} ]; do
 		rc="${AFFIRMATIVE}"
 		selectOthers=""
+		selectNoactions=""
 		_log "window ${windowId} rule ${rule}:" \
 			"Checking"
 		while [ -n "${rc}" ] && \
@@ -1177,6 +1168,12 @@ WindowNew() {
 				_log "window ${windowId} rule ${rule}:" \
 					"enabling \"select others\""
 				;;
+			select_noactions)
+				selectNoactions="y"
+				LogPrio="debug" \
+				_log "window ${windowId} rule ${rule}:" \
+					"enabling \"select noactions\""
+				;;
 			*)
 				LogPrio="err" \
 				_log "rule ${rule}:" \
@@ -1191,7 +1188,10 @@ WindowNew() {
 		if [ -n "${rc}" ]; then
 			_log "window ${windowId} rule ${rule}:" \
 				"End check, this rule is selected"
-			setupRules="${setupRules}${rule}${TAB}"
+			[ -n "${selectNoactions}" ] && \
+				_log "window ${windowId} rule ${rule}:" \
+					"rule without actions to setup" || \
+				setupRules="${setupRules}${rule}${TAB}"
 			[ -n "${selectOthers}" ] || \
 				break
 			_log "window ${windowId} rule ${rule}:" \
@@ -1204,7 +1204,7 @@ WindowNew() {
 	if [ -n "${setupRules}" ]; then
 		(WindowSetup ${windowId} "${setupRules}") &
 	else
-		_log "window ${windowId}: Doesn't match any rule"
+		_log "window ${windowId}: There is not any rule to setup"
 	fi
 	return ${OK}
 }
