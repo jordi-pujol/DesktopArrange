@@ -3,10 +3,10 @@
 #************************************************************************
 #  DesktopArrange
 #
-#  Change window properties for opening windows
+#  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.28 $
+#  $Revision: 0.30 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #

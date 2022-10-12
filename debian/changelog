@@ -1,3 +1,15 @@
+desktoparrange (0.30) unstable; urgency=medium
+
+  * introduce global rules.
+    - new configuration section "Global Rule {"
+    This section specifies conditions and actions to be met for any desktop or window
+    to be setup by DesktopArrange
+  * new configuration condition "select stop"
+    - "select stop" means don't continue processing the following rules
+    - the condition "select others" has been removed
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 12 Oct 2022 12:08:51 +0200
+
 desktoparrange (0.28) unstable; urgency=medium
 
   * before this project was named "setnewwinprops"

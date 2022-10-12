@@ -1,5 +1,5 @@
 Source: desktoparrange
-Section: X11
+Section: x11
 Priority: optional
 Maintainer: Jordi Pujol <jordi-pujol@telefonica.net>
 Build-Depends:
@@ -14,7 +14,7 @@ Standards-Version: 4.5.1
 
 Package: desktoparrange
 Architecture: all
-Description: Change window properties for opening windows
+Description: #  Arrange Linux worskpaces
  according to a set of configurable rules.
 Depends: ${misc:Depends},
  gawk,

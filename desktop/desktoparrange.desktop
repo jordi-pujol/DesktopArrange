@@ -1,5 +1,5 @@
 [Desktop Entry]
-Comment=Set New Window Properties
+Comment=Arrange Linux worskpaces according to a set of configurable rules.
 Exec=/usr/bin/desktoparrange.sh start
 GenericName=DesktopArrange
 Name=DesktopArrange

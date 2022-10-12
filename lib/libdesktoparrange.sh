@@ -3,10 +3,10 @@
 #************************************************************************
 #  DesktopArrange
 #
-#  Change window properties for opening windows
+#  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.28 $
+#  $Revision: 0.30 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -262,12 +262,13 @@ DesktopsCount() {
 
 DesktopSetCurrent() {
 	local windowId="${1}" \
-		rule="${2}" \
-		desktop="${3}"
+		ruleType="${2}" \
+		rule="${3}" \
+		desktop="${4}"
 	[ ${desktop} -eq $(DesktopCurrent) ] || \
 		xdotool set_desktop ${desktop} 2> /dev/null || {
 			LogPrio="err" \
-			_log "window ${windowId} rule ${rule}:" \
+			_log "window ${windowId} ${ruleType} ${rule}:" \
 				"can't set current desktop to ${desktop}"
 			return ${ERR}
 		}
@@ -283,13 +284,14 @@ WindowStateAction() {
 
 WindowDesktop() {
 	local windowId="${1}" \
-		rule="${2:-}" \
+		ruleType="${2:-}" \
+		rule="${3:-}"
 		desktop
 	desktop="$(xdotool get_desktop_for_window ${windowId} 2> /dev/null)" || \
 		desktop=-2
 	[ -n "${desktop}" ] || \
 		LogPrio="err" \
-		_log "window ${windowId}${rule:+" rule ${rule}"}:" \
+		_log "window ${windowId}${rule:+" ${ruleType} ${rule}"}:" \
 			"can't get desktop for this window"
 	printf '%d\n' ${desktop:-"-2"}
 }
@@ -518,16 +520,21 @@ IsWindowBelow() {
 }
 
 RuleLine() {
-	local prop="${1}" \
-		val="${2}" \
-		v deselected
+	local ruleType="${1}" \
+		ruleNumber="${2}" \
+		prop="${3}" \
+		val="${4}" \
+		v deselected ruleName indexToSet indexToSelect
+	ruleName="${ruleType}rule"
+	indexToSet=$((index${ruleType^}Set))
+	indexToSelect=$((index${ruleType^}Select))
 	[ -n "${prop}" ] || \
 		return ${OK}
 	if [ "${prop:0:8}" = "deselect" ]; then
 		if [ -n "${val}" ];then
 			if [ "${val:0:1}" = "!" ];then
 				LogPrio="warn" \
-				_log "rule ${Rules}: \"${prop}\" ignoring wrong value \"${val}\"."
+				_log "${ruleName} ${ruleNumber}: \"${prop}\" ignoring wrong value \"${val}\"."
 				val=""
 			else
 				prop="${prop:2}"
@@ -552,7 +559,7 @@ RuleLine() {
 				;;
 			*)
 				LogPrio="err" \
-				_log "rule ${Rules}: \"${prop}\" without a value."
+				_log "${ruleName} ${ruleNumber}: \"${prop}\" without a value."
 				return ${ERR}
 				;;
 			esac
@@ -560,7 +567,7 @@ RuleLine() {
 	else
 		[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
 			LogPrio="warn" \
-			_log "rule ${Rules}: \"${prop}\" with a value." \
+			_log "${ruleName} ${ruleNumber}: \"${prop}\" with a value." \
 				"Value \"${val}\" is ignored"
 			val=""
 		}
@@ -571,7 +578,7 @@ RuleLine() {
 				v="${NEGATIVE}"
 			fi
 			case "${prop}" in
-			select_others | \
+			select_stop | \
 			set_maximized | \
 			set_maximized_horz | \
 			set_maximized_vert | \
@@ -593,7 +600,7 @@ RuleLine() {
 	fi
 	[ -n "${val}" ] || {
 		LogPrio="err" \
-		_log "rule ${Rules}: Property \"${prop}\" has not a value"
+		_log "${ruleName} ${ruleNumber}: Property \"${prop}\" has not a value"
 		return ${ERR}
 	}
 	deselected=""
@@ -609,16 +616,16 @@ RuleLine() {
 	select_application | \
 	select_class | \
 	select_role)
-		eval rule${Rules}_$((++indexSelect))_${prop}=\'${deselected}${val}\'
+		eval ${ruleName}${ruleNumber}_$((++indexToSelect))_${prop}=\'${deselected}${val}\'
 		;;
 	select_desktop | \
 	select_desktops)
 		_check_natural val ${NONE} "${deselected}"
-		eval rule${Rules}_$((++indexSelect))_${prop}=\'${val}\'
+		eval ${ruleName}${ruleNumber}_$((++indexToSelect))_${prop}=\'${val}\'
 		;;
 	select_desktop_size | \
 	select_desktop_workarea)
-		_check_fixedsize "rule${Rules}_$((++indexSelect))_${prop}" "${val}" "" "${deselected}"
+		_check_fixedsize "${ruleName}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}" "" "${deselected}"
 		;;
 	select_maximized | \
 	select_maximized_horz | \
@@ -630,28 +637,28 @@ RuleLine() {
 	select_sticky)
 		[ -z "${deselected}" ] || {
 			LogPrio="err" \
-			_log "rule ${Rules}: Property \"${prop}\" wrong value \"${val}\""
+			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" wrong value \"${val}\""
 			return ${ERR}
 		}
-		_check_yn "rule${Rules}_$((++indexSelect))_${prop}" "${val}"
+		_check_yn "${ruleName}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}"
 		;;
-	select_others)
+	select_stop)
 		[ -z "${deselected}" ] || {
 			LogPrio="err" \
-			_log "rule ${Rules}: Property \"${prop}\" wrong value \"${deselected}${val}\""
+			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" wrong value \"${deselected}${val}\""
 			return ${ERR}
 		}
-		_check_y "rule${Rules}_0_${prop}" "${val}"
+		_check_y "${ruleName}${ruleNumber}_0_${prop}" "${val}"
 		;;
 	set_delay)
 		_check_natural val ${NONE}
 		[ "${val}" -eq ${NONE} ] || \
-			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
+			eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_active_desktop | \
 	set_desktop)
 		_check_natural val ${NONE}
-		eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
+		eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_position | \
 	set_size | \
@@ -659,43 +666,43 @@ RuleLine() {
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
 			LogPrio="err" \
-			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
+			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
 		else
 			_check_integer_pair val "x" "y"
-			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
+			eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
 			LogPrio="err" \
-			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
+			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
 		else
 			_check_integer_pair val "0" "0"
 			if [ "${val}" = "0 0" ]; then
 				val="0 2"
 				LogPrio="warn" \
-				_log "rule ${Rules}: Property \"${prop}\" invalid value. Assuming \"${val}\""
+				_log "${ruleName} ${ruleNumber}: Property \"${prop}\" invalid value. Assuming \"${val}\""
 			fi
-			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
+			eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
 			LogPrio="err" \
-			_log "rule ${Rules}: Property \"${prop}\" invalid value \"${val}\""
+			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
 		else
 			_check_integer_pair val "0" "0"
-			eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
+			eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_tap_keys | \
 	set_type_text)
-		eval rule${Rules}_$((++indexSet))_${prop}=\'${val}\'
+		eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_maximized | \
 	set_maximized_horz | \
@@ -708,25 +715,30 @@ RuleLine() {
 	set_pinned | \
 	set_above | \
 	set_below)
-		_check_yn "rule${Rules}_$((++indexSet))_${prop}" "${val}"
+		_check_yn "${ruleName}${ruleNumber}_$((++indexToSet))_${prop}" "${val}"
 		;;
 	set_focus | \
 	set_closed | \
 	set_killed)
-		_check_y "rule${Rules}_$((++indexSet))_${prop}" "${val}"
+		_check_y "${ruleName}${ruleNumber}_$((++indexToSet))_${prop}" "${val}"
 		;;
 	*)
 		LogPrio="err" \
-		_log "rule ${Rules}: Property \"${prop}\" is not implemented yet"
+		_log "${ruleName} ${ruleNumber}: Property \"${prop}\" is not implemented yet"
 		return ${ERR}
 		;;
 	esac
+	let "index${ruleType^}Set=indexToSet,1"
+	let "index${ruleType^}Select=indexToSelect,1"
 }
 
 ReadConfig() {
-	local foundParm="" foundRule="" indexSet indexSelect \
+	local foundParm="" foundRule="" foundGlobalRule="" \
+	indexSet indexSelect \
+	indexGlobalSet indexGlobalSelect \
 		prop val
 	Rules=${NONE}
+	GlobalRules=${NONE}
 	rm -f "${VARSFILE}"*
 	: > "${VARSFILE}"
 	while read -r line; do
@@ -735,21 +747,30 @@ ReadConfig() {
 			continue
 		if grep -qsxiEe 'parameters[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
 			printf '%s\n' "Parameters {"
-			[ -z "${foundRule}" ] || \
+			[ -z "${foundRule}" -a -z  "${foundGlobalRule}" ] || \
 				return ${ERR}
 			foundParm="y"
 		elif grep -qsxiEe 'rule[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
 			printf '%s\n' "Rule {"
-			[ -z "${foundParm}" ] || \
+			[ -z "${foundParm}" -a -z  "${foundGlobalRule}" ] || \
 				return ${ERR}
 			foundRule="y"
 			let Rules++,1
 			indexSet=0
 			indexSelect=0
+		elif grep -qsxiEe 'global[[:blank:]]*rule[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
+			printf '%s\n' "Global Rule {"
+			[ -z "${foundParm}" -a -z "${foundRule}" ] || \
+				return ${ERR}
+			foundGlobalRule="y"
+			let GlobalRules++,1
+			indexGlobalSet=0
+			indexGlobalSelect=0
 		elif grep -qsxiEe '\}[[:blank:]]*' <<< "${line,,}"; then
 			printf '%s\n' "}" ""
 			foundParm=""
 			foundRule=""
+			foundGlobalRule=""
 		else
 			printf '\t%s\n' "${line}"
 			if [ -n "${foundParm}" ]; then
@@ -785,7 +806,21 @@ ReadConfig() {
 				val="$(_unquote "$(_trim "$( \
 					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
 					<<< "${line}")")")"
-				RuleLine "${prop}" "${val}" || \
+				RuleLine "" "${Rules}" "${prop}" "${val}" || \
+					return ${ERR}
+			elif [ -n "${foundGlobalRule}" ]; then
+				prop="$(sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/s//\1_/' \
+					-e '/^([^[:blank:]=]+).*/s//\1/p' \
+					<<< "${line,,}")"
+				! sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/!q1' \
+				<<< "${line,,}" || \
+					line="$(sed -r \
+					-e '/^[^[:blank:]]+[[:blank:]]+/s///' \
+					<<< "${line}")"
+				val="$(_unquote "$(_trim "$( \
+					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
+					<<< "${line}")")")"
+				RuleLine "global" "${GlobalRules}" "${prop}" "${val}" || \
 					return ${ERR}
 			else
 				return ${ERR}
@@ -806,7 +841,6 @@ LoadConfig() {
 	EmptyList=""
 	emptylist=""
 	config="${HOME}/.config/${APPNAME}/config.txt"
-	IgnoreWindowTypes="desktop|dock"
 	unset $(awk -F '=' \
 		'$1 ~ "^rule[[:digit:]]*_" {print $1}' \
 		< <(set)) 2> /dev/null || :
@@ -888,6 +922,33 @@ LoadConfig() {
 	LogPrio="info" \
 	_log "debug level is \"${Debug}\""
 
+	if [ ${GlobalRules} -eq ${NONE} ]; then
+		LogPrio="warn" \
+		_log "Have not configured any global rule"
+	else
+		rule=${NONE}
+		while [ $((rule++)) -lt ${GlobalRules} ]; do
+			echo
+			if ! set | \
+			grep -sEe "^globalrule${rule}_[[:digit:]]+_set_.*=" | \
+			sort --numeric --field-separator="_" --key 2,2; then
+				eval globalrule${rule}_0_select_noactions='y'
+				LogPrio="warn" \
+				_log "global rule ${rule}:" \
+					"hasn't defined any property to set"
+			fi
+			if ! set | \
+			grep -sEe "^globalrule${rule}_[[:digit:]]+_select_.*=" | \
+			sort --numeric --field-separator="_" --key 2,2; then
+				LogPrio="err" \
+				_log "global rule ${rule}:" \
+					"hasn't defined any property to select"
+				exit ${ERR}
+			fi
+		done
+		echo
+	fi >> "${LOGFILE}"
+
 	if [ ${Rules} -eq ${NONE} ]; then
 		LogPrio="warn" \
 		_log "Have not configured any rule"
@@ -895,22 +956,22 @@ LoadConfig() {
 		rule=${NONE}
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
-			set | \
-			grep -sEe "^rule${rule}_[[:digit:]]+_select_.*=" | \
-			sort --numeric --field-separator="_" --key 2,2 || {
-				LogPrio="err" \
-				_log "rule ${rule}:" \
-					"hasn't defined any property to select"
-				exit ${ERR}
-			}
-			set | \
+			if ! set | \
 			grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" | \
-			sort --numeric --field-separator="_" --key 2,2 || {
+			sort --numeric --field-separator="_" --key 2,2; then
 				eval rule${rule}_0_select_noactions='y'
 				LogPrio="warn" \
 				_log "rule ${rule}:" \
 					"hasn't defined any property to set"
-			}
+			fi
+			if ! set | \
+			grep -sEe "^rule${rule}_[[:digit:]]+_select_.*=" | \
+			sort --numeric --field-separator="_" --key 2,2; then
+				LogPrio="err" \
+				_log "${ruleName} ${rule}:" \
+					"hasn't defined any property to select"
+				exit ${ERR}
+			fi
 		done
 		echo
 	fi >> "${LOGFILE}"
