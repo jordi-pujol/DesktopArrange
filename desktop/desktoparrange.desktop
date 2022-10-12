@@ -1,8 +1,8 @@
 [Desktop Entry]
 Comment=Set New Window Properties
-Exec=/usr/bin/setnewwinprops.sh start
-GenericName=SetNewWinProps
-Name=SetNewWinProps
+Exec=/usr/bin/desktoparrange.sh start
+GenericName=DesktopArrange
+Name=DesktopArrange
 StartupNotify=true
 NoDisplay=true
 Terminal=false

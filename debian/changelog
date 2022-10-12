@@ -1,4 +1,12 @@
-setnewwinprops (0.27) unstable; urgency=medium
+desktoparrange (0.28) unstable; urgency=medium
+
+  * before this project was named "setnewwinprops"
+    but now covers a more extensive goal,
+    have changed the name to "desktoparrange"
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 12 Oct 2022 10:34:21 +0200
+
+desktoparrange (0.27) unstable; urgency=medium
 
   * Log level parameters valid in the command line
   and in the configuration file in section "Parameters {"
@@ -14,7 +22,7 @@ setnewwinprops (0.27) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 11 Oct 2022 06:32:13 +0200
 
-setnewwinprops (0.26) unstable; urgency=medium
+desktoparrange (0.26) unstable; urgency=medium
 
   * for each Rule the conditions "select" and "deselect" will be executed
     in order of appearance
@@ -26,7 +34,7 @@ setnewwinprops (0.26) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 10 Oct 2022 04:55:54 +0200
 
-setnewwinprops (0.25) unstable; urgency=medium
+desktoparrange (0.25) unstable; urgency=medium
 
   * The keywords "check" and "uncheck" have been renamed to "select" and "deselect"
   * The package toggle-decorations is now a dependency to install this tool.
@@ -42,7 +50,7 @@ setnewwinprops (0.25) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 05 Oct 2022 12:14:20 +0200
 
-setnewwinprops (0.24) unstable; urgency=medium
+desktoparrange (0.24) unstable; urgency=medium
 
   * parse better the config file, parser accepts:
     - set[_ ]property
@@ -62,13 +70,13 @@ setnewwinprops (0.24) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 03 Oct 2022 13:44:07 +0200
 
-setnewwinprops (0.23) unstable; urgency=medium
+desktoparrange (0.23) unstable; urgency=medium
 
-  * Now setnewwinprops uses the C program toggle-decorations.c to set or unset
+  * Now desktoparrange uses the C program toggle-decorations.c to set or unset
     window decorations. This C program was done by muktupavels.
     However, toggle-decorations is not part of this package because it's build for
     all architectures.
-    setnewwinprops may use an alternative method to set or unset
+    desktoparrange may use an alternative method to set or unset
     window decorations tappping keys in the window menu. 
     Will build toggle-decorations in a separate package.
   * code improvement:
@@ -76,27 +84,27 @@ setnewwinprops (0.23) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sun, 02 Oct 2022 21:42:43 +0200
 
-setnewwinprops (0.22) unstable; urgency=medium
+desktoparrange (0.22) unstable; urgency=medium
 
   * new action: set_tile
-    setnewwinprops will store the window IDs when a rule sets a tile.
-    setnewwinprops will move next windows set by the same rule
+    desktoparrange will store the window IDs when a rule sets a tile.
+    desktoparrange will move next windows set by the same rule
     adding the tile to the coordinates of the previously tiled window.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sun, 02 Oct 2022 10:48:26 +0200
 
-setnewwinprops (0.21) unstable; urgency=medium
+desktoparrange (0.21) unstable; urgency=medium
 
   * code improvement:
     - make better logic and check behaviour
   * new action: set_pointer
     the pointer is moved to coordinates relative to the window geometry
-  * bin/setnewwinprops.sh, WindowSetupRule():
+  * bin/desktoparrange.sh, WindowSetupRule():
     all the actions are done according to the same logic
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 01 Oct 2022 18:50:30 +0200
 
-setnewwinprops (0.20) unstable; urgency=medium
+desktoparrange (0.20) unstable; urgency=medium
 
   * config file is parsed instead of included in the bash program,
   * For every rule the actions are numbered in order of appearance and therefore,
@@ -107,7 +115,7 @@ setnewwinprops (0.20) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 01 Oct 2022 06:43:15 +0200
 
-setnewwinprops (0.11) unstable; urgency=medium
+desktoparrange (0.11) unstable; urgency=medium
 
   * new rule option: rule_set_continue
     allows to set sequentially multiple rules for every window.
@@ -116,7 +124,7 @@ setnewwinprops (0.11) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Thu, 29 Sep 2022 13:17:34 +0200
 
-setnewwinprops (0.10) unstable; urgency=medium
+desktoparrange (0.10) unstable; urgency=medium
 
   * new properties to check and set up.
   * function to tap keys,
@@ -124,7 +132,7 @@ setnewwinprops (0.10) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 27 Sep 2022 10:49:08 +0200
 
-setnewwinprops (0.9) unstable; urgency=medium
+desktoparrange (0.9) unstable; urgency=medium
 
   * Window setup sequence:
     - move to desktop
@@ -139,7 +147,7 @@ setnewwinprops (0.9) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 26 Sep 2022 09:49:13 +0200
 
-setnewwinprops (0.8) unstable; urgency=medium
+desktoparrange (0.8) unstable; urgency=medium
 
   * daemon actions:
     - start
@@ -151,7 +159,7 @@ setnewwinprops (0.8) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sun, 25 Sep 2022 11:13:07 +0200
 
-setnewwinprops (0.7) unstable; urgency=medium
+desktoparrange (0.7) unstable; urgency=medium
 
   * daemon actions:
     - start
@@ -164,10 +172,10 @@ setnewwinprops (0.7) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 24 Sep 2022 11:56:56 +0200
 
-setnewwinprops (0.6) unstable; urgency=medium
+desktoparrange (0.6) unstable; urgency=medium
 
-  * bin/setnewwinprops-daemon.sh:
-    Has been renamed to bin/setnewwinprops.sh
+  * bin/desktoparrange-daemon.sh:
+    Has been renamed to bin/desktoparrange.sh
   * introduce new window properties to check:
     - state
     - app name
@@ -175,33 +183,33 @@ setnewwinprops (0.6) unstable; urgency=medium
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 21 Sep 2022 14:02:20 +0200
 
-setnewwinprops (0.5) unstable; urgency=low
+desktoparrange (0.5) unstable; urgency=low
 
   * config.txt:
     Debug values may be:
     - empty string (default)
     - y|verbose
     - xtrace
-  * bin/setnewwinprops-daemon.sh WindowSetup():
+  * bin/desktoparrange-daemon.sh WindowSetup():
     - wait until the window has focus
     - much better error management
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Mon, 19 Sep 2022 14:37:40 +0200
 
-setnewwinprops (0.4) unstable; urgency=low
+desktoparrange (0.4) unstable; urgency=low
 
   * write debug messages in verbose level.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sun, 18 Sep 2022 17:37:40 +0200
 
-setnewwinprops (0.3) unstable; urgency=low
+desktoparrange (0.3) unstable; urgency=low
 
   * implement more window properties.
   * some code improvements.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 17 Sep 2022 20:37:40 +0200
 
-setnewwinprops (0.2) unstable; urgency=low
+desktoparrange (0.2) unstable; urgency=low
 
   * Define objects:
     Rules and Windows
@@ -209,7 +217,7 @@ setnewwinprops (0.2) unstable; urgency=low
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Fri, 16 Sep 2022 10:37:40 +0200
 
-setnewwinprops (0.1) unstable; urgency=low
+desktoparrange (0.1) unstable; urgency=low
 
   * Change window properties for opening windows
     according to a set of configurable rules.

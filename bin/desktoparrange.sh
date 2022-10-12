@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #************************************************************************
-#  SetNewWinProps
+#  DesktopArrange
 #
 #  Change window properties for opening windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.27 $
+#  $Revision: 0.28 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -25,7 +25,7 @@
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
 
-. /usr/lib/setnewwinprops/libsetnewwinprops.sh
+. /usr/lib/desktoparrange/libdesktoparrange.sh
 
 _exit() {
 	local pidsChildren
@@ -45,7 +45,7 @@ _exit() {
 CmdWaitFocus() {
 	local windowId="${1}"
 	echo "xdotool behave ${windowId} focus" \
-		"exec /usr/lib/setnewwinprops/setnewwinprops-waitfocus.sh"
+		"exec /usr/lib/desktoparrange/desktoparrange-endwaiting.sh"
 }
 
 ActionNeedsFocus() {
@@ -1324,7 +1324,7 @@ set -o errexit -o nounset -o pipefail +o noglob -o noclobber
 
 # constants
 readonly NAME="$(basename "${0}")" \
-	APPNAME="setnewwinprops"
+	APPNAME="desktoparrange"
 XROOT="$(GetXroot)" || \
 	exit ${ERR}
 readonly XROOT \
