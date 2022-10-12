@@ -524,17 +524,16 @@ RuleLine() {
 		ruleNumber="${2}" \
 		prop="${3}" \
 		val="${4}" \
-		v deselected ruleName indexToSet indexToSelect
-	ruleName="${ruleType}rule"
-	indexToSet=$((index${ruleType^}Set))
-	indexToSelect=$((index${ruleType^}Select))
+		v deselected indexToSet indexToSelect
+	let "indexToSet=index${ruleType^}Set,1 "
+	let "indexToSelect=index${ruleType^}Select,1"
 	[ -n "${prop}" ] || \
 		return ${OK}
 	if [ "${prop:0:8}" = "deselect" ]; then
 		if [ -n "${val}" ];then
 			if [ "${val:0:1}" = "!" ];then
 				LogPrio="warn" \
-				_log "${ruleName} ${ruleNumber}: \"${prop}\" ignoring wrong value \"${val}\"."
+				_log "${ruleType} ${ruleNumber}: \"${prop}\" ignoring wrong value \"${val}\"."
 				val=""
 			else
 				prop="${prop:2}"
@@ -559,7 +558,7 @@ RuleLine() {
 				;;
 			*)
 				LogPrio="err" \
-				_log "${ruleName} ${ruleNumber}: \"${prop}\" without a value."
+				_log "${ruleType} ${ruleNumber}: \"${prop}\" without a value."
 				return ${ERR}
 				;;
 			esac
@@ -567,7 +566,7 @@ RuleLine() {
 	else
 		[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
 			LogPrio="warn" \
-			_log "${ruleName} ${ruleNumber}: \"${prop}\" with a value." \
+			_log "${ruleType} ${ruleNumber}: \"${prop}\" with a value." \
 				"Value \"${val}\" is ignored"
 			val=""
 		}
@@ -600,7 +599,7 @@ RuleLine() {
 	fi
 	[ -n "${val}" ] || {
 		LogPrio="err" \
-		_log "${ruleName} ${ruleNumber}: Property \"${prop}\" has not a value"
+		_log "${ruleType} ${ruleNumber}: Property \"${prop}\" has not a value"
 		return ${ERR}
 	}
 	deselected=""
@@ -616,16 +615,16 @@ RuleLine() {
 	select_application | \
 	select_class | \
 	select_role)
-		eval ${ruleName}${ruleNumber}_$((++indexToSelect))_${prop}=\'${deselected}${val}\'
+		eval ${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}=\'${deselected}${val}\'
 		;;
 	select_desktop | \
 	select_desktops)
 		_check_natural val ${NONE} "${deselected}"
-		eval ${ruleName}${ruleNumber}_$((++indexToSelect))_${prop}=\'${val}\'
+		eval ${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}=\'${val}\'
 		;;
 	select_desktop_size | \
 	select_desktop_workarea)
-		_check_fixedsize "${ruleName}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}" "" "${deselected}"
+		_check_fixedsize "${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}" "" "${deselected}"
 		;;
 	select_maximized | \
 	select_maximized_horz | \
@@ -637,28 +636,28 @@ RuleLine() {
 	select_sticky)
 		[ -z "${deselected}" ] || {
 			LogPrio="err" \
-			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" wrong value \"${val}\""
+			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" wrong value \"${val}\""
 			return ${ERR}
 		}
-		_check_yn "${ruleName}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}"
+		_check_yn "${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}"
 		;;
 	select_stop)
 		[ -z "${deselected}" ] || {
 			LogPrio="err" \
-			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" wrong value \"${deselected}${val}\""
+			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" wrong value \"${deselected}${val}\""
 			return ${ERR}
 		}
-		_check_y "${ruleName}${ruleNumber}_0_${prop}" "${val}"
+		_check_y "${ruleType}${ruleNumber}_0_${prop}" "${val}"
 		;;
 	set_delay)
 		_check_natural val ${NONE}
 		[ "${val}" -eq ${NONE} ] || \
-			eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+			eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_active_desktop | \
 	set_desktop)
 		_check_natural val ${NONE}
-		eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_position | \
 	set_size | \
@@ -666,43 +665,43 @@ RuleLine() {
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
 			LogPrio="err" \
-			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
+			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
 		else
 			_check_integer_pair val "x" "y"
-			eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+			eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
 			LogPrio="err" \
-			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
+			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
 		else
 			_check_integer_pair val "0" "0"
 			if [ "${val}" = "0 0" ]; then
 				val="0 2"
 				LogPrio="warn" \
-				_log "${ruleName} ${ruleNumber}: Property \"${prop}\" invalid value. Assuming \"${val}\""
+				_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value. Assuming \"${val}\""
 			fi
-			eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+			eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
 			LogPrio="err" \
-			_log "${ruleName} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
+			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
 		else
 			_check_integer_pair val "0" "0"
-			eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+			eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
 		;;
 	set_tap_keys | \
 	set_type_text)
-		eval ${ruleName}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_maximized | \
 	set_maximized_horz | \
@@ -715,16 +714,16 @@ RuleLine() {
 	set_pinned | \
 	set_above | \
 	set_below)
-		_check_yn "${ruleName}${ruleNumber}_$((++indexToSet))_${prop}" "${val}"
+		_check_yn "${ruleType}${ruleNumber}_$((++indexToSet))_${prop}" "${val}"
 		;;
 	set_focus | \
 	set_closed | \
 	set_killed)
-		_check_y "${ruleName}${ruleNumber}_$((++indexToSet))_${prop}" "${val}"
+		_check_y "${ruleType}${ruleNumber}_$((++indexToSet))_${prop}" "${val}"
 		;;
 	*)
 		LogPrio="err" \
-		_log "${ruleName} ${ruleNumber}: Property \"${prop}\" is not implemented yet"
+		_log "${ruleType} ${ruleNumber}: Property \"${prop}\" is not implemented yet"
 		return ${ERR}
 		;;
 	esac
@@ -734,8 +733,8 @@ RuleLine() {
 
 ReadConfig() {
 	local foundParm="" foundRule="" foundGlobalRule="" \
-	indexSet indexSelect \
-	indexGlobalSet indexGlobalSelect \
+	indexRuleSet indexRuleSelect \
+	indexGlobalruleSet indexGlobalruleSelect \
 		prop val
 	Rules=${NONE}
 	GlobalRules=${NONE}
@@ -756,16 +755,16 @@ ReadConfig() {
 				return ${ERR}
 			foundRule="y"
 			let Rules++,1
-			indexSet=0
-			indexSelect=0
+			indexRuleSet=0
+			indexRuleSelect=0
 		elif grep -qsxiEe 'global[[:blank:]]*rule[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
 			printf '%s\n' "Global Rule {"
 			[ -z "${foundParm}" -a -z "${foundRule}" ] || \
 				return ${ERR}
 			foundGlobalRule="y"
 			let GlobalRules++,1
-			indexGlobalSet=0
-			indexGlobalSelect=0
+			indexGlobalruleSet=0
+			indexGlobalruleSelect=0
 		elif grep -qsxiEe '\}[[:blank:]]*' <<< "${line,,}"; then
 			printf '%s\n' "}" ""
 			foundParm=""
@@ -774,7 +773,7 @@ ReadConfig() {
 		else
 			printf '\t%s\n' "${line}"
 			if [ -n "${foundParm}" ]; then
-				case "${line,,}" in
+				case "$(_unquote "$(_trim "${line,,}")")" in
 				silent)
 					Debug="info"
 					;;
@@ -791,6 +790,8 @@ ReadConfig() {
 					EmptyList="y"
 					;;
 				*)
+					LogPrio="err" \
+					_log "invalid parameter"
 					return ${ERR}
 					;;
 				esac
@@ -806,7 +807,7 @@ ReadConfig() {
 				val="$(_unquote "$(_trim "$( \
 					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
 					<<< "${line}")")")"
-				RuleLine "" "${Rules}" "${prop}" "${val}" || \
+				RuleLine "rule" "${Rules}" "${prop}" "${val}" || \
 					return ${ERR}
 			elif [ -n "${foundGlobalRule}" ]; then
 				prop="$(sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/s//\1_/' \
@@ -820,15 +821,22 @@ ReadConfig() {
 				val="$(_unquote "$(_trim "$( \
 					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
 					<<< "${line}")")")"
-				RuleLine "global" "${GlobalRules}" "${prop}" "${val}" || \
+				RuleLine "globalrule" "${GlobalRules}" "${prop}" "${val}" || \
 					return ${ERR}
 			else
+				LogPrio="err" \
+				_log "have read a line without section"
 				return ${ERR}
 			fi
 		fi
 	done < "${config}" >> "${LOGFILE}"
-	[ -z "${foundParm}" -a -z "${foundRule}" ] || \
+	[ -z "${foundParm}" -a -z "${foundRule}" -a -z "${foundGlobalRule}" ] || {
+		LogPrio="err" \
+		_log "section" \
+		"${foundParm:+"Parameters"}${foundRule:+"Rule"}${foundGlobalRule:+"Global Rule"}" \
+		"not closed."
 		return ${ERR}
+	}
 }
 
 LoadConfig() {

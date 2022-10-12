@@ -1257,7 +1257,7 @@ WindowNew() {
 	if [ -n "${setupGlobalRules}" -o -n "${setupRules}" ]; then
 		(WindowSetup ${windowId} "${setupGlobalRules}" "${setupRules}") &
 	else
-		_log "window ${windowId}: There is not any rule to setup"
+		_log "window ${windowId}: There is not any rule match"
 	fi
 	return ${OK}
 }
