@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.30 $
+#  $Revision: 0.31 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -62,6 +62,14 @@ _log() {
 		printf '%s\n' "${msg}" >> "${LOGFILE}"
 	fi
 	LogPrio=""
+}
+
+_lock_active() {
+	local lockfile="${1}.lock" \
+		pid="${2}"
+	[ ! -e "${lockfile}" ] || \
+	[ $(cat "${lockfile}") -ne ${pid} ] || \
+		echo "y"
 }
 
 _lock_release() {
@@ -285,10 +293,9 @@ WindowStateAction() {
 WindowDesktop() {
 	local windowId="${1}" \
 		ruleType="${2:-}" \
-		rule="${3:-}"
+		rule="${3:-}" \
 		desktop
-	desktop="$(xdotool get_desktop_for_window ${windowId} 2> /dev/null)" || \
-		desktop=-2
+	desktop="$(xdotool get_desktop_for_window ${windowId} 2> /dev/null)" || :
 	[ -n "${desktop}" ] || \
 		LogPrio="err" \
 		_log "window ${windowId}${rule:+" ${ruleType} ${rule}"}:" \
@@ -353,7 +360,7 @@ WindowNetAllowedActions() {
 
 IsWindowNetStateActive() {
 	local windowId="${1}" \
-		netState netAllowedActions state
+		netState netAllowedActions state action
 	netState="$(WindowNetState ${windowId})" || \
 		return ${ERR}
 	netAllowedActions="$(WindowNetAllowedActions ${windowId})" || \
@@ -522,9 +529,22 @@ IsWindowBelow() {
 RuleLine() {
 	local ruleType="${1}" \
 		ruleNumber="${2}" \
-		prop="${3}" \
-		val="${4}" \
+		line="${3}" \
+		prop val \
 		v deselected indexToSet indexToSelect
+
+	prop="$(sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/s//\1_/' \
+		-e '/^([^[:blank:]=]+).*/s//\1/p' \
+		<<< "${line,,}")"
+	! sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/!q1' \
+	<<< "${line,,}" || \
+		line="$(sed -r \
+		-e '/^[^[:blank:]]+[[:blank:]]+/s///' \
+		<<< "${line}")"
+	val="$(_unquote "$(_trim "$( \
+		sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
+		<<< "${line}")")")"
+
 	let "indexToSet=index${ruleType^}Set,1 "
 	let "indexToSelect=index${ruleType^}Select,1"
 	[ -n "${prop}" ] || \
@@ -660,17 +680,24 @@ RuleLine() {
 		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_position | \
-	set_size | \
-	set_tiled)
+	set_size)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
 		if [ "$(wc -w <<< "${val}")" != 2 ]; then
 			LogPrio="err" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
-		else
-			_check_integer_pair val "x" "y"
-			eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
+		_check_integer_pair val "x" "y"
+		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+		;;
+	set_tiled)
+		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
+		if [ "$(wc -w <<< "${val}")" != 4 ]; then
+			LogPrio="err" \
+			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
+			return ${ERR}
+		fi
+		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
@@ -678,15 +705,14 @@ RuleLine() {
 			LogPrio="err" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
-		else
-			_check_integer_pair val "0" "0"
-			if [ "${val}" = "0 0" ]; then
-				val="0 2"
-				LogPrio="warn" \
-				_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value. Assuming \"${val}\""
-			fi
-			eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
+		_check_integer_pair val "0" "0"
+		if [ "${val}" = "0 0" ]; then
+			val="0 2"
+			LogPrio="warn" \
+			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value. Assuming \"${val}\""
+		fi
+		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
@@ -694,10 +720,9 @@ RuleLine() {
 			LogPrio="err" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
-		else
-			_check_integer_pair val "0" "0"
-			eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		fi
+		_check_integer_pair val "0" "0"
+		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
 		;;
 	set_tap_keys | \
 	set_type_text)
@@ -734,8 +759,8 @@ RuleLine() {
 ReadConfig() {
 	local foundParm="" foundRule="" foundGlobalRule="" \
 	indexRuleSet indexRuleSelect \
-	indexGlobalruleSet indexGlobalruleSelect \
-		prop val
+	indexGlobalruleSet indexGlobalruleSelect
+
 	Rules=${NONE}
 	GlobalRules=${NONE}
 	rm -f "${VARSFILE}"*
@@ -796,32 +821,10 @@ ReadConfig() {
 					;;
 				esac
 			elif [ -n "${foundRule}" ]; then
-				prop="$(sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/s//\1_/' \
-					-e '/^([^[:blank:]=]+).*/s//\1/p' \
-					<<< "${line,,}")"
-				! sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/!q1' \
-				<<< "${line,,}" || \
-					line="$(sed -r \
-					-e '/^[^[:blank:]]+[[:blank:]]+/s///' \
-					<<< "${line}")"
-				val="$(_unquote "$(_trim "$( \
-					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
-					<<< "${line}")")")"
-				RuleLine "rule" "${Rules}" "${prop}" "${val}" || \
+				RuleLine "rule" "${Rules}" "${line}" || \
 					return ${ERR}
 			elif [ -n "${foundGlobalRule}" ]; then
-				prop="$(sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/s//\1_/' \
-					-e '/^([^[:blank:]=]+).*/s//\1/p' \
-					<<< "${line,,}")"
-				! sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/!q1' \
-				<<< "${line,,}" || \
-					line="$(sed -r \
-					-e '/^[^[:blank:]]+[[:blank:]]+/s///' \
-					<<< "${line}")"
-				val="$(_unquote "$(_trim "$( \
-					sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
-					<<< "${line}")")")"
-				RuleLine "globalrule" "${GlobalRules}" "${prop}" "${val}" || \
+				RuleLine "globalrule" "${GlobalRules}" "${line}" || \
 					return ${ERR}
 			else
 				LogPrio="err" \

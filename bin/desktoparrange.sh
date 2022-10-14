@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.30 $
+#  $Revision: 0.31 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -144,6 +144,17 @@ PointerMove() {
 			"error setting pointer to (${val})=(${x} ${y})"
 }
 
+WindowShow() {
+	local windowId="${1}"
+	wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert && \
+	wmctrl -i -r ${windowId} -b remove,shaded,hidden && \
+	wmctrl -i -r ${windowId} -b remove,above,below && \
+	wmctrl -i -r ${windowId} -b remove,fullscreen || \
+		LogPrio="err" \
+		_log "window ${windowId}:" \
+			"Can't remove,maximized_horz,maximized_vert,shaded,hidden,above,below,fullscreen"
+}
+
 WindowUndecorate() {
 	local windowId="${1}" \
 		ruleType="${2}" \
@@ -263,6 +274,7 @@ WindowTile() {
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
+	WindowShow ${windowId}
 	GetMenuBarHeight ${windowId}
 	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
 	recordKey="tile_${ruleType}${rule}_${desktop}"
@@ -288,6 +300,7 @@ WindowTile() {
 				"WindowTile: previous tiled window ${win} is not in current desktop"
 		done
 		if [ $(wc -w <<< "${record}") -gt 1 ]; then
+			WindowShow ${win}
 			WindowGeometry ${win} || {
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
@@ -298,7 +311,7 @@ WindowTile() {
 			_log "window ${windowId} ${ruleType} ${rule}:" \
 				"WindowTile: ${record:-${ruleType}${rule}} ${windowId}"
 			DesktopSize ${desktop}
-			x="$(cut -f 1 -s -d ' ' <<< "${val}")"
+			x="$(cut -f 3 -s -d ' ' <<< "${val}")"
 			if [ "${x}" = "x" ]; then
 				let "x=windowX,1"
 			else
@@ -317,7 +330,7 @@ WindowTile() {
 					let "x=windowX,1"
 				fi
 			fi
-			y="$(cut -f 2 -s -d ' ' <<< "${val}")"
+			y="$(cut -f 4 -s -d ' ' <<< "${val}")"
 			if [ "${y}" = "y" ]; then
 				let "y=windowY,1"
 			else
@@ -345,15 +358,24 @@ WindowTile() {
 			[ ${undecorated} -eq 0 ] || \
 				let "y-=MenuBarHeight,1"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-				"WindowTile: moving to (${val})=(${x} ${y})"
+				"WindowTile: tiling to" \
+				"($(cut -f 3- -s -d ' ' <<< "${val}"))=(${x} ${y})"
 			xdotool windowmove ${windowId} ${x} ${y} || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowTile: can't move to (${val})=(${x} ${y})"
+					"WindowTile: can't tile to" \
+					"($(cut -f 3- -s -d ' ' <<< "${val}"))=(${x} ${y})"
+			xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
+				LogPrio="err" \
+				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+					"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
 		fi
-	else
+	fi
+	if [ $(wc -w <<< "${record}") -le 1 ]; then
 		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 			"WindowTile: It's the first window to tile"
+		WindowPosition ${windowId} "${ruleType}" ${rule} \
+			"$(cut -f -2 -s -d ' ' <<< "${val}")"
 	fi
 	{ awk -v recordKey="${recordKey}" \
 	'$1 != recordKey {print $0}' < "${VARSFILE}"
@@ -438,16 +460,24 @@ WindowMosaic() {
 		[ ${undecorated} -ne 0 ] && \
 			let "h=wH-(MenuBarHeight/2),1" || \
 			h=${wH}
-		wmctrl -i -r ${win} -b remove,maximized_horz,maximized_vert,minimized || \
-			LogPrio="err" \
-			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-				"WindowMosaic: remove,maximized_horz,maximized_vert,minimized"
+		WindowShow ${win}
 		_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
 			"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 		wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
 				LogPrio="err" \
 				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
 					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+		if WindowGeometry ${win}; then
+			xdotool mousemove --window ${win} $((windowWidth/2)) $((windowHeight/2)) || \
+				LogPrio="err" \
+				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+					"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
+		else
+			LogPrio="err" \
+			_log "window ${windowId} ${ruleType} ${rule}:" \
+				"error setting position, can't get window geometry"
+			return ${OK}
+		fi
 		if [ ${col} -ge ${cols} ]; then
 			col=0
 		fi
@@ -480,6 +510,7 @@ WindowPosition() {
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
+	WindowShow ${windowId}
 	WindowGeometry ${windowId} || {
 		LogPrio="err" \
 		_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -489,9 +520,12 @@ WindowPosition() {
 	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
 	DesktopSize ${desktop}
 
-	_lock_acquire "${VARSFILE}" ${mypid}
+	lockActive="$(_lock_active "${VARSFILE}" ${mypid})"
+	[ -n "${lockActive}" ] || \
+		_lock_acquire "${VARSFILE}" ${mypid}
 	GetMenuBarHeight ${windowId}
-	_lock_release "${VARSFILE}" ${mypid}
+	[ -n "${lockActive}" ] || \
+		_lock_release "${VARSFILE}" ${mypid}
 
 	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
 	case "${x}" in
@@ -532,6 +566,10 @@ WindowPosition() {
 		LogPrio="err" \
 		_log "window ${windowId} ${ruleType} ${rule}:" \
 			"error moving to (${val})=(${x} ${y})"
+	xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
+		LogPrio="err" \
+		_log "window ${windowId} ${ruleType} ${rule}:" \
+			"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
 }
 
 WindowWaitFocus() {
@@ -889,8 +927,8 @@ WindowSetupRule() {
 			;;
 		esac
 	done < <(sort --numeric --key 1,1 \
-		< <(sed -nre "\|^${ruleType}${rule}_([[:digit:]]+)_(set_.*)|s||\1 \2|p" \
-		< <(set)))
+	< <(sed -nre "\|^${ruleType}${rule}_([[:digit:]]+)_(set_.*)|s||\1 \2|p" \
+	< <(set)))
 
 	_log "window ${windowId} ${ruleType} ${rule}:" \
 		"end setting up"
@@ -900,9 +938,8 @@ WindowSetup() {
 	local windowId="${1}" \
 		setupGlobalRules="${2}" \
 		setupRules="${3}" \
-		rule mypid rc=${OK}
-
-	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
+		setupTempRules="${4}" \
+		rule rc=${OK}
 
 	if [ -n "${setupGlobalRules}" ]; then
 		_log "window ${windowId}: applying global rules" \
@@ -927,20 +964,41 @@ WindowSetup() {
 				LogPrio="err" \
 				_log "window ${windowId} rule ${rule}:" \
 					"error setting rule"
+				rc=${ERR}
 				break
 			}
 		done
 		_log "window ${windowId}: end applying rules" \
 			"( $(tr -s '[:blank:],' ',' < <(echo ${setupRules})) )"
 	fi
+	if  [ ${rc} -eq ${OK} -a -n "${setupTempRules}" ]; then
+		_log "window ${windowId}: applying temporary rule ${setupTempRules}"
+		WindowSetupRule ${windowId} "temprule" ${setupTempRules} || {
+			LogPrio="err" \
+			_log "window ${windowId} temprule ${setupTempRules}:" \
+				"error setting rule"
+			rc=${ERR}
+		}
+		_log "window ${windowId}: end applying temporary rule ${setupTempRules}"
+	fi
 }
 
 WindowSelect() {
-	local ruleType="${1}" \
-		rules rule
-	rule=${NONE}
-	rules="$([ "${ruleType}" = "rule" ] && echo ${Rules} || echo ${GlobalRules})"
-	while [ $((rule++)) -lt ${rules} ]; do
+	local windowId="${1}" \
+		ruleType="${2}" \
+		checkRules="${3:-}" \
+		rules rule propName netState \
+		index prop val \
+		deselected selectNoactions rc
+
+	[ -n "${checkRules}" ] || \
+		checkRules="$(echo \
+			$(seq 1 "$( \
+				[ "${ruleType}" = "rule" ] \
+				&& echo ${Rules} \
+				|| echo ${GlobalRules})"))"
+
+	for rule in ${checkRules}; do
 		rc="${AFFIRMATIVE}"
 		selectNoactions=""
 		_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -1195,6 +1253,9 @@ WindowSelect() {
 				globalrule)
 					setupGlobalRules="${setupGlobalRules}${rule}${TAB}"
 					;;
+				temprule)
+					setupTempRules="${setupTempRules}${rule}${TAB}"
+					;;
 				esac
 			fi
 			[ -z "${selectStop}" ] || \
@@ -1209,66 +1270,79 @@ WindowSelect() {
 	done
 }
 
-WindowNew() {
+WindowArrange() {
 	local windowId="${1}" \
-		rule setupRules setupGlobalRules \
-		propName netState \
-		index prop val deselected \
-		rc selectStop selectNoactions
+		checkGlobalRules="${2}" \
+		checkRules="${3}" \
+		checkTempRules="${4:-}" \
+		setupRules setupGlobalRules setupTempRules \
+		selectStop
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
-	[ -z "${Debug}" ] || {
-		DesktopSize $(WindowDesktop ${windowId})
-		printf "%s='%s'\n" \
-			"New window id" ${windowId} \
-			"window_title" "$(WindowTitle ${windowId})" \
-			"window_state" "$(WindowState ${windowId})" \
-			"window_type" "$(WindowType ${windowId})" \
-			"window_app_name" "$(WindowAppName ${windowId})" \
-			"window_application" "$(WindowApplication ${windowId} 2> /dev/null)" \
-			"window_class" "$(WindowClass ${windowId})" \
-			"window_role" "$(WindowRole ${windowId} || :)" \
-			"window_desktop" "$(WindowDesktop ${windowId})" \
-			"window_is_maximized" "$(IsWindowMaximized ${windowId} ".")" \
-			"window_is_maximized_horz" "$(IsWindowMaximized_horz ${windowId} ".")" \
-			"window_is_maximized_vert" "$(IsWindowMaximized_vert ${windowId} ".")" \
-			"window_is_fullscreen" "$(IsWindowFullscreen ${windowId} ".")" \
-			"window_is_minimized" "$(IsWindowMinimized ${windowId} ".")" \
-			"window_is_shaded" "$(IsWindowShaded ${windowId} ".")" \
-			"window_is_undecorated" "$(IsWindowUndecorated ${windowId} ".")" \
-			"window_is_sticky" "$(IsWindowSticky ${windowId} ".")" \
-			"window_desktop_size" "${desktopWidth}x${desktopHeight}" \
-			"window_desktop_workarea" \
-			"${desktopWorkareaX},${desktopWorkareaY} ${desktopWorkareaW}x${desktopWorkareaH}" \
-			"desktopsCount" "$(DesktopsCount)"
-	} >> "${LOGFILE}"
+	DesktopSize $(WindowDesktop ${windowId})
+	printf "%s='%s'\n" \
+		"WindowArrange id" ${windowId} \
+		"window_title" "$(WindowTitle ${windowId})" \
+		"window_state" "$(WindowState ${windowId})" \
+		"window_type" "$(WindowType ${windowId})" \
+		"window_app_name" "$(WindowAppName ${windowId})" \
+		"window_application" "$(WindowApplication ${windowId} 2> /dev/null)" \
+		"window_class" "$(WindowClass ${windowId})" \
+		"window_role" "$(WindowRole ${windowId} || :)" \
+		"window_desktop" "$(WindowDesktop ${windowId})" \
+		"window_is_maximized" "$(IsWindowMaximized ${windowId} ".")" \
+		"window_is_maximized_horz" "$(IsWindowMaximized_horz ${windowId} ".")" \
+		"window_is_maximized_vert" "$(IsWindowMaximized_vert ${windowId} ".")" \
+		"window_is_fullscreen" "$(IsWindowFullscreen ${windowId} ".")" \
+		"window_is_minimized" "$(IsWindowMinimized ${windowId} ".")" \
+		"window_is_shaded" "$(IsWindowShaded ${windowId} ".")" \
+		"window_is_undecorated" "$(IsWindowUndecorated ${windowId} ".")" \
+		"window_is_sticky" "$(IsWindowSticky ${windowId} ".")" \
+		"window_desktop_size" "${desktopWidth}x${desktopHeight}" \
+		"window_desktop_workarea" \
+		"${desktopWorkareaX},${desktopWorkareaY} ${desktopWorkareaW}x${desktopWorkareaH}" \
+		"desktopsCount" "$(DesktopsCount)" \
+	>> "${LOGFILE}"
 
 	# checking properties of this window
 	# we'll set up only the first rule that match,
 	# unless that this rule contains the command "select others"
-	setupRules=""
 	setupGlobalRules=""
+	setupRules=""
+	setupTempRules=""
 	selectStop=""
-	WindowSelect "globalrule"
-	[ -n "${selectStop}" ] || \
-		WindowSelect "rule"
-	if [ -n "${setupGlobalRules}" -o -n "${setupRules}" ]; then
-		(WindowSetup ${windowId} "${setupGlobalRules}" "${setupRules}") &
+	[ -z "${checkGlobalRules}" ] || \
+		WindowSelect ${windowId} "globalrule"
+	[ -z "${checkRules}" ] || \
+		[ -n "${selectStop}" ] || \
+			WindowSelect ${windowId} "rule"
+	[ -z "${checkTempRules}" ] || \
+		[ -n "${selectStop}" ] || \
+			WindowSelect ${windowId} "temprule" "${checkTempRules}"
+	if [ -n "${setupGlobalRules}" -o -n "${setupRules}" -o -n "${setupTempRules}" ]; then
+		WindowSetup ${windowId} \
+		"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" || \
+			LogPrio="err" \
+			_log "window ${windowId}: WindowSetup returns error"
 	else
-		_log "window ${windowId}: There is not any rule match"
+		_log "window ${windowId}: doesn't match any rule"
 	fi
 	return ${OK}
 }
 
 WindowsUpdate() {
-	local windowId window_type pids
+	local windowId window_type pids mypid
 	_log "current window count ${#}"
+
+	(
+	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
 	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
 	< <(printf '%s\n' "${@}")); do
-		WindowNew ${windowId} || :
+		WindowArrange ${windowId} "globalrule" "rule"
 	done
+	) &
 
 	for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
 	< <(printf '%s\n' ${WindowIds})); do
@@ -1301,6 +1375,70 @@ WindowsUpdate() {
 
 	WindowIds="${@}"
 	return ${OK}
+}
+
+DesktopArrange() {
+	local cmd="${1}" \
+		ruleType="temprule" \
+		indexTempruleSet indexTempruleSelect \
+		rule line \
+		desktop mypid windowId
+
+	cmd="$(awk -v appname="${APPNAME}" \
+		'$1 == appname {
+			for (j=1; j < NF; j++)
+				$j=$(j+1)
+			NF--
+			rc=-1
+			print $0
+		}
+		END{exit rc+1}' \
+		<<< "${cmd}")" || {
+			LogPrio="err" \
+			_log "DesktopArrange: invalid command"
+			return ${OK}
+		}
+
+	LogPrio="debug" \
+	_log "DesktopArrange: received command \"${cmd}\""
+
+	rule=""
+	indexTempruleSelect=0
+	indexTempruleSet=0
+	while read -r line; do
+		if [ -z "${rule}" ]; then
+			_lock_acquire "${VARSFILE}" ${$}
+			if rule="$(awk \
+			-v var="TempRule" -F '=' \
+			'$1 == var {print ++$2; rc=-1; exit}
+			END{exit rc+1}' < "${VARSFILE}")"; then
+				sed -i -e "\|^TempRule=.*|s||TempRule=${rule}|" "${VARSFILE}"
+			else
+				rule=1
+				echo "TempRule=${rule}" >> "${VARSFILE}"
+			fi
+			_lock_release "${VARSFILE}" ${$}
+		fi
+		RuleLine "${ruleType}" "${rule}" "${line}"
+	done < <(printf '%s\n' "${cmd}" | \
+	tr -s ':' '\n' | \
+	grep -swEe '^[[:blank:]]*(select|unselect|set|unset)')
+
+	[ -n "${rule}" ] || \
+		LogPrio="warn" \
+		_log "DesktopArrange: line does not contain any command"
+
+	(
+	desktop="$(DesktopCurrent)"
+	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
+	for windowId in $(xprop -root "_NET_CLIENT_LIST_STACKING" | \
+	cut -f 2- -s -d '#' | \
+	tr -s '[:blank:],' ' '); do
+		[ $(WindowDesktop ${windowId}) = ${desktop} ] || \
+			continue
+		WindowArrange ${windowId} "globalrule" "" "${rule}"
+	done
+	) &
 }
 
 Main() {
@@ -1349,6 +1487,13 @@ Main() {
 			reload)
 				LoadConfig "${@}"
 				;;
+			desktoparrange*)
+				DesktopArrange "${txt}"
+				;;
+			*)
+				LogPrio="err" \
+				_log "Main: pipe received invalid message \"${txt}\""
+				;;
 			esac
 			if [ -z "${MenuBarHeight}" ]; then
 				_lock_acquire "${VARSFILE}" ${$}
@@ -1376,7 +1521,8 @@ readonly XROOT \
 	PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe" \
 	VARSFILE="/tmp/${APPNAME}/${USER}/${XROOT}.vars"
 
-case "${1:-}" in
+cmd="${1:-}"
+case "${cmd,,}" in
 start)
 	if pid="$(AlreadyRunning)"; then
 		echo "error: ${APPNAME} is already running for this session" >&2
@@ -1419,13 +1565,22 @@ status)
 		echo "info: log files" \
 			$(ls -Q "${LOGFILE}"{,.xtrace} 2> /dev/null) >&2
 	else
-		echo "info: ${APPNAME} is not running for this session" >&2
+		echo "err: ${APPNAME} is not running for this session" >&2
+		exit ${ERR}
+	fi
+	;;
+desktoparrange)
+	if pid="$(AlreadyRunning)"; then
+		msg="${@}"
+		printf "%s\n" "${msg}" >> "${PIPE}"
+	else
+		echo "err: ${APPNAME} is not running for this session" >&2
 		exit ${ERR}
 	fi
 	;;
 *)
-	echo "wrong action." >&2
-	echo "valid actions are: start|stop|restart|reload|status" >&2
+	echo "err: wrong action." >&2
+	echo "err: valid actions are: start|stop|restart|reload|status|desktoparrange" >&2
 	exit ${ERR}
 	;;
 esac

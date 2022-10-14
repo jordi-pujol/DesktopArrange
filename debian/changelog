@@ -1,3 +1,15 @@
+desktoparrange (0.31) unstable; urgency=medium
+
+  * the daemon responds to interactive commands.
+    - Usage:
+      desktoparrange.sh [command] action [: action] [: action] ...
+    - command desktoparrange
+      Arrange the current desktop,
+      Example: Set windows layout in horizontal mosaic (1 column), and undecorate:
+      $ desktoparrange.sh desktoparrange set mosaicked  0 1 : set undecorated
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 12 Oct 2022 21:49:27 +0200
+
 desktoparrange (0.30) unstable; urgency=medium
 
   * introduce global rules.
