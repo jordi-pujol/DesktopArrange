@@ -1,8 +1,14 @@
+desktoparrange (0.32) unstable; urgency=medium
+
+  * l
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Fri, 14 Oct 2022 12:07:15 +0200
+
 desktoparrange (0.31) unstable; urgency=medium
 
   * the daemon responds to interactive commands.
     - Usage:
-      desktoparrange.sh [command] action [: action] [: action] ...
+      desktoparrange.sh command action [: action] [: action] ...
     - command desktoparrange
       Arrange the current desktop,
       Example: Set windows layout in horizontal mosaic (1 column), and undecorate:

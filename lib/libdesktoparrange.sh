@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.31 $
+#  $Revision: 0.32 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -561,6 +561,7 @@ RuleLine() {
 			fi
 		else
 			case "${prop:2}" in
+			select_stop | \
 			select_maximized | \
 			select_maximized_horz | \
 			select_maximized_vert | \
@@ -584,38 +585,46 @@ RuleLine() {
 			esac
 		fi
 	else
-		[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
-			LogPrio="warn" \
-			_log "${ruleType} ${ruleNumber}: \"${prop}\" with a value." \
-				"Value \"${val}\" is ignored"
-			val=""
-		}
-		if [ -z "${val}" ]; then
-			v="${AFFIRMATIVE}"
-			if [ "${prop:0:2}" = "un" ]; then
-				prop="${prop:2}"
-				v="${NEGATIVE}"
+		[ "${prop:0:2}" = "un" ] && \
+			p="${prop:2}" || \
+			p="${prop}"
+		case "${p}" in
+		select_stop | \
+		set_maximized | \
+		set_maximized_horz | \
+		set_maximized_vert | \
+		set_minimized | \
+		set_fullscreen | \
+		set_sticky | \
+		set_shaded | \
+		set_undecorated | \
+		set_pinned | \
+		set_above | \
+		set_below | \
+		set_focus | \
+		set_closed | \
+		set_killed)
+			[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
+				LogPrio="warn" \
+				_log "${ruleType} ${ruleNumber}: \"${prop}\" with a value." \
+					"Value \"${val}\" is ignored"
+				val=""
+			}
+			if [ -z "${val}" ]; then
+				val="${AFFIRMATIVE}"
+				[ "${prop:0:2}" != "un" ] || {
+					prop="${prop:2}"
+					val="${NEGATIVE}"
+				}
 			fi
-			case "${prop}" in
-			select_stop | \
-			set_maximized | \
-			set_maximized_horz | \
-			set_maximized_vert | \
-			set_minimized | \
-			set_fullscreen | \
-			set_sticky | \
-			set_shaded | \
-			set_undecorated | \
-			set_pinned | \
-			set_above | \
-			set_below | \
-			set_focus | \
-			set_closed | \
-			set_killed)
-				val="${v}"
-				;;
-			esac
-		fi
+			;;
+		*)
+			[ "${prop:0:2}" != "un" ] || {
+				prop="${prop:2}"
+				val="!${val}"
+			}
+			;;
+		esac
 	fi
 	[ -n "${val}" ] || {
 		LogPrio="err" \

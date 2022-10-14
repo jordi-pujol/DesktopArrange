@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.31 $
+#  $Revision: 0.32 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -1329,7 +1329,20 @@ WindowArrange() {
 	else
 		_log "window ${windowId}: doesn't match any rule"
 	fi
-	return ${OK}
+}
+
+WindowsArrange() {
+	local windows="${1}" \
+		checkGlobalRules="${2}" \
+		checkRules="${3}" \
+		checkTempRules="${4:-}" \
+		windowId mypid
+
+	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
+	for windowId in ${windows}; do
+		WindowArrange ${windowId} \
+			"${checkGlobalRules}" "${checkRules}" "${checkTempRules}" || :
+	done
 }
 
 WindowsUpdate() {
@@ -1337,11 +1350,8 @@ WindowsUpdate() {
 	_log "current window count ${#}"
 
 	(
-	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
-	for windowId in $(grep -svwF "$(printf '%s\n' ${WindowIds})" \
-	< <(printf '%s\n' "${@}")); do
-		WindowArrange ${windowId} "globalrule" "rule"
-	done
+	WindowsArrange "$(grep -svwF "$(printf '%s\n' ${WindowIds})" \
+	< <(printf '%s\n' "${@}"))" "globalrule" "rule"
 	) &
 
 	for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
@@ -1382,7 +1392,7 @@ DesktopArrange() {
 		ruleType="temprule" \
 		indexTempruleSet indexTempruleSelect \
 		rule line \
-		desktop mypid windowId
+		mypid windowId
 
 	cmd="$(awk -v appname="${APPNAME}" \
 		'$1 == appname {
@@ -1405,39 +1415,41 @@ DesktopArrange() {
 	rule=""
 	indexTempruleSelect=0
 	indexTempruleSet=0
+	_lock_acquire "${VARSFILE}" ${$}
+	if rule="$(awk \
+	-v var="TempRule" -F '=' \
+	'$1 == var {print ++$2; rc=-1; exit}
+	END{exit rc+1}' < "${VARSFILE}")"; then
+		sed -i -e "\|^TempRule=.*|s||TempRule=${rule}|" "${VARSFILE}"
+	else
+		rule=1
+		echo "TempRule=${rule}" >> "${VARSFILE}"
+	fi
+	_lock_release "${VARSFILE}" ${$}
+	RuleLine "${ruleType}" "${rule}" "select desktop $(DesktopCurrent)" || {
+		LogPrio="err" \
+		_log "DesktopArrange: invalid"
+		return ${OK}
+	}
 	while read -r line; do
-		if [ -z "${rule}" ]; then
-			_lock_acquire "${VARSFILE}" ${$}
-			if rule="$(awk \
-			-v var="TempRule" -F '=' \
-			'$1 == var {print ++$2; rc=-1; exit}
-			END{exit rc+1}' < "${VARSFILE}")"; then
-				sed -i -e "\|^TempRule=.*|s||TempRule=${rule}|" "${VARSFILE}"
-			else
-				rule=1
-				echo "TempRule=${rule}" >> "${VARSFILE}"
-			fi
-			_lock_release "${VARSFILE}" ${$}
-		fi
-		RuleLine "${ruleType}" "${rule}" "${line}"
+		grep -swEe '^(select|deselect|set|unset)' <<< "${line}" && \
+		RuleLine "${ruleType}" "${rule}" "${line}" || {
+			LogPrio="err" \
+			_log "DesktopArrange: invalid command: \"${line}\""
+			return ${OK}
+		}
 	done < <(printf '%s\n' "${cmd}" | \
-	tr -s ':' '\n' | \
-	grep -swEe '^[[:blank:]]*(select|unselect|set|unset)')
+	tr -s ':' '\n')
 
 	[ -n "${rule}" ] || \
 		LogPrio="warn" \
 		_log "DesktopArrange: line does not contain any command"
 
 	(
-	desktop="$(DesktopCurrent)"
-	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
-	for windowId in $(xprop -root "_NET_CLIENT_LIST_STACKING" | \
-	cut -f 2- -s -d '#' | \
-	tr -s '[:blank:],' ' '); do
-		[ $(WindowDesktop ${windowId}) = ${desktop} ] || \
-			continue
-		WindowArrange ${windowId} "globalrule" "" "${rule}"
-	done
+	WindowsArrange "$(xprop -root "_NET_CLIENT_LIST_STACKING" | \
+		cut -f 2- -s -d '#' | \
+		tr -s '[:blank:],' ' ')" \
+		"globalrule" "" "${rule}"
 	) &
 }
 
