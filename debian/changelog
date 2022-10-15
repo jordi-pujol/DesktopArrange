@@ -1,6 +1,12 @@
 desktoparrange (0.32) unstable; urgency=medium
 
-  * l
+  * new program option: windowinfo windowId [ windowId ] ...
+    - lists the relevant information of a window
+    We will use it to write rules that select an set window properties.
+  * Window Mosaic:
+    when mosaic has only one row or one column then desktoparrange will 
+    maximize windows horizontally or vertically
+  * Continue developing the interactive command "desktoparrange"
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Fri, 14 Oct 2022 12:07:15 +0200
 
