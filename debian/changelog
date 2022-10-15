@@ -1,3 +1,11 @@
+desktoparrange (0.33) unstable; urgency=medium
+
+  * command line:
+    - write parameters to the communication pipe in a single line;
+    the daemon reads this line of text and rebuilds the command line.
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 15 Oct 2022 07:46:45 +0200
+
 desktoparrange (0.32) unstable; urgency=medium
 
   * new program option: windowinfo windowId [ windowId ] ...

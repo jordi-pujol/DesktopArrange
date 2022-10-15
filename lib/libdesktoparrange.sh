@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.32 $
+#  $Revision: 0.33 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -24,6 +24,23 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
+
+PARMS="$(p=""
+	i=0
+	for parm in "${@}"; do
+		[ -z "${p}" ] && {
+			printf '%s' "${parm}"
+			p=" "
+		} || \
+			printf '%s[%s]="%s"' "${p}" "$((++i))" "${parm}"
+	done)"
+
+CmdParms() {
+	local cmd="${1}"
+	sed -re '\|^\[[[:digit:]]+\]="([^"]*)"$|s||\1|' \
+		< <(sed -re '\|" (\[[[:digit:]]+\]=")|s||"\n\1|g' \
+		<<< "${cmd}")
+}
 
 _trim() {
 	printf '%s\n' "${@}" | \

@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.32 $
+#  $Revision: 0.33 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -1433,27 +1433,34 @@ WindowsUpdate() {
 	return ${OK}
 }
 
+TempRuleLine() {
+	if [ -z "${rule}" ]; then
+		_lock_acquire "${VARSFILE}" ${$}
+		if rule="$(awk \
+		-v var="TempRule" -F '=' \
+		'$1 == var {print ++$2; rc=-1; exit}
+		END{exit rc+1}' < "${VARSFILE}")"; then
+			sed -i -e "\|^TempRule=.*|s||TempRule=${rule}|" "${VARSFILE}"
+		else
+			rule=1
+			echo "TempRule=${rule}" >> "${VARSFILE}"
+		fi
+		_lock_release "${VARSFILE}" ${$}
+	fi
+	grep -swEe '^(select|deselect|set|unset)' <<< "${line}" && \
+	RuleLine "${ruleType}" "${rule}" "${line}" || {
+		LogPrio="err" \
+		_log "DesktopArrange: invalid command: \"${line}\""
+		return ${ERR}
+	}
+}
+
 DesktopArrange() {
 	local cmd="${1}" \
 		ruleType="temprule" \
 		indexTempruleSet indexTempruleSelect \
-		rule line \
+		rule line parm \
 		mypid winIds
-
-	cmd="$(awk -v appname="${APPNAME}" \
-		'$1 == appname {
-			for (j=1; j < NF; j++)
-				$j=$(j+1)
-			NF--
-			rc=-1
-			print $0
-		}
-		END{exit rc+1}' \
-		<<< "${cmd}")" || {
-			LogPrio="err" \
-			_log "DesktopArrange: invalid command"
-			return ${OK}
-		}
 
 	LogPrio="debug" \
 	_log "DesktopArrange: received command \"${cmd}\""
@@ -1461,26 +1468,24 @@ DesktopArrange() {
 	rule=""
 	indexTempruleSelect=0
 	indexTempruleSet=0
-	_lock_acquire "${VARSFILE}" ${$}
-	if rule="$(awk \
-	-v var="TempRule" -F '=' \
-	'$1 == var {print ++$2; rc=-1; exit}
-	END{exit rc+1}' < "${VARSFILE}")"; then
-		sed -i -e "\|^TempRule=.*|s||TempRule=${rule}|" "${VARSFILE}"
-	else
-		rule=1
-		echo "TempRule=${rule}" >> "${VARSFILE}"
-	fi
-	_lock_release "${VARSFILE}" ${$}
-	while read -r line; do
-		grep -swEe '^(select|deselect|set|unset)' <<< "${line}" && \
-		RuleLine "${ruleType}" "${rule}" "${line}" || {
-			LogPrio="err" \
-			_log "DesktopArrange: invalid command: \"${line}\""
+
+	line=""
+	while read -r parm; do
+		[ -n "${parm}" ] || \
+			continue
+		if [ "${parm}" = ":" -a -n "${line}" ]; then
+			TempRuleLine "${line}" || \
+				return ${OK}
+			line=""
+		else
+			line="${line:+"${line} "}${parm}"
+		fi
+	done < <(CmdParms "${cmd}")
+
+	if [ -n "${line}" ]; then
+		TempRuleLine "${line}" || \
 			return ${OK}
-		}
-	done < <(printf '%s\n' "${cmd}" | \
-	tr -s ':' '\n')
+	fi
 
 	[ -n "${rule}" ] || \
 		LogPrio="warn" \
@@ -1548,8 +1553,8 @@ Main() {
 			reload)
 				LoadConfig "${@}"
 				;;
-			desktoparrange*)
-				DesktopArrange "${txt}"
+			desktoparrange\ *)
+				DesktopArrange "$(cut -f 2- -s -d ' ' <<< "${txt}")"
 				;;
 			*)
 				LogPrio="err" \
@@ -1573,7 +1578,8 @@ set -o errexit -o nounset -o pipefail +o noglob -o noclobber
 
 # constants
 readonly NAME="$(basename "${0}")" \
-	APPNAME="desktoparrange"
+	APPNAME="desktoparrange" \
+	PARMS
 XROOT="$(GetXroot)" || \
 	exit ${ERR}
 readonly XROOT \
@@ -1632,9 +1638,10 @@ status)
 	;;
 desktoparrange)
 	if pid="$(AlreadyRunning)"; then
+		#echo "info: Interactive command: ${PARMS}" >&2
 		msg="${@}"
-		printf "%s\n" "${msg}" >> "${PIPE}"
 		echo "info: Interactive command: ${@}" >&2
+		printf "%s\n" "${PARMS}" >> "${PIPE}"
 	else
 		echo "err: ${APPNAME} is not running for this session" >&2
 		exit ${ERR}
@@ -1660,7 +1667,7 @@ windowinfo)
 	;;
 *)
 	echo "err: wrong action." >&2
-	echo "err: valid actions are: start|stop|restart|reload|status|desktoparrange|windowinfo" >&2
+	echo "err: valid actions are: start|stop|restart|reload|status|windowinfo|desktoparrange" >&2
 	exit ${ERR}
 	;;
 esac
