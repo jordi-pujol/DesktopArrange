@@ -144,6 +144,30 @@ PointerMove() {
 			"error setting pointer to (${val})=(${x} ${y})"
 }
 
+PrintWindowInfo() {
+	printf "%s='%s'\n" \
+		"window_title" "$(WindowTitle ${windowId})" \
+		"window_state" "$(WindowState ${windowId})" \
+		"window_type" "$(WindowType ${windowId})" \
+		"window_app_name" "$(WindowAppName ${windowId})" \
+		"window_application" "$(WindowApplication ${windowId} 2> /dev/null)" \
+		"window_class" "$(WindowClass ${windowId})" \
+		"window_role" "$(WindowRole ${windowId} || :)" \
+		"window_desktop" "$(WindowDesktop ${windowId})" \
+		"window_is_maximized" "$(IsWindowMaximized ${windowId} ".")" \
+		"window_is_maximized_horz" "$(IsWindowMaximized_horz ${windowId} ".")" \
+		"window_is_maximized_vert" "$(IsWindowMaximized_vert ${windowId} ".")" \
+		"window_is_fullscreen" "$(IsWindowFullscreen ${windowId} ".")" \
+		"window_is_minimized" "$(IsWindowMinimized ${windowId} ".")" \
+		"window_is_shaded" "$(IsWindowShaded ${windowId} ".")" \
+		"window_is_undecorated" "$(IsWindowUndecorated ${windowId} ".")" \
+		"window_is_sticky" "$(IsWindowSticky ${windowId} ".")" \
+		"window_desktop_size" "${desktopWidth}x${desktopHeight}" \
+		"window_desktop_workarea" \
+		"${desktopWorkareaX},${desktopWorkareaY} ${desktopWorkareaW}x${desktopWorkareaH}" \
+		"desktopsCount" "$(DesktopsCount)"
+}
+
 WindowShow() {
 	local windowId="${1}"
 	wmctrl -i -r ${windowId} -b remove,maximized_horz,maximized_vert && \
@@ -426,62 +450,102 @@ WindowMosaic() {
 	else
 		winCount=1
 	fi
-	maxCols="$(cut -f 1 -s -d ' ' <<< "${val}")"
-	maxRows="$(cut -f 2 -s -d ' ' <<< "${val}")"
-	rows=0
-	cols=0
-	if [ ${maxCols} -ne 0 ]; then
-		let "rows = winCount%maxCols == 0 ? winCount/maxCols : (winCount/maxCols)+1 ,1"
-		let "cols = winCount%rows == 0 ? winCount/rows : (winCount/rows)+1 ,1"
-	elif [ ${maxRows} -ne 0 ]; then
-		let "cols = winCount%maxRows == 0 ? winCount/maxRows : (winCount/maxRows)+1 ,1"
-		let "rows = winCount%cols == 0 ? winCount/cols : (winCount/cols)+1 ,1"
-	fi
-	_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-		"WindowMosaic: ${cols} columns, ${rows} rows"
-	DesktopSize
-	col=0
-	row=0
-	let "wW=(desktopWorkareaW/cols)-5,1"
-	let "wH=(desktopWorkareaH/rows)-5,1"
-	for win in $(cut -f 2- -s -d "${SEP}" <<< "${record}") ${windowId}; do
-		if [ ${col} -eq 0 ]; then
-			let "row++,1"
-		fi
-		let "col++,1"
-		let "wX=desktopWorkareaX+(wW+5)*(col-1),1"
-		let "wY=desktopWorkareaY+(wH+3)*(row-1),1"
-		undecorated=0
-		IsWindowUndecorated ${win} || \
-			undecorated="${?}"
-		[ ${undecorated} -ne 2 ] || \
-			continue
-		w="${wW}"
-		[ ${undecorated} -ne 0 ] && \
-			let "h=wH-(MenuBarHeight/2),1" || \
-			h=${wH}
-		WindowShow ${win}
-		_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-			"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
-		wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
-				LogPrio="err" \
-				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
-		if WindowGeometry ${win}; then
-			xdotool mousemove --window ${win} $((windowWidth/2)) $((windowHeight/2)) || \
-				LogPrio="err" \
-				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-					"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
-		else
+	if [ ${winCount} -eq 1 ]; then
+		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+			"WindowMosaic: maximizing"
+		WindowShow ${windowId}
+		wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || \
 			LogPrio="err" \
 			_log "window ${windowId} ${ruleType} ${rule}:" \
-				"error setting position, can't get window geometry"
-			return ${OK}
+				"error maximizing"
+	else
+		maxCols="$(cut -f 1 -s -d ' ' <<< "${val}")"
+		maxRows="$(cut -f 2 -s -d ' ' <<< "${val}")"
+		rows=0
+		cols=0
+		if [ ${maxCols} -ne 0 ]; then
+			let "rows = winCount%maxCols == 0 ? winCount/maxCols : (winCount/maxCols)+1 ,1"
+			let "cols = winCount%rows == 0 ? winCount/rows : (winCount/rows)+1 ,1"
+		elif [ ${maxRows} -ne 0 ]; then
+			let "cols = winCount%maxRows == 0 ? winCount/maxRows : (winCount/maxRows)+1 ,1"
+			let "rows = winCount%cols == 0 ? winCount/cols : (winCount/cols)+1 ,1"
 		fi
-		if [ ${col} -ge ${cols} ]; then
-			col=0
-		fi
-	done
+		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+			"WindowMosaic: ${cols} columns, ${rows} rows"
+		DesktopSize
+		col=0
+		row=0
+		let "wW=(desktopWorkareaW/cols)-5,1"
+		let "wH=(desktopWorkareaH/rows)-5,1"
+		for win in $(cut -f 2- -s -d "${SEP}" <<< "${record}") ${windowId}; do
+			if [ ${col} -eq 0 ]; then
+				let "row++,1"
+			fi
+			let "col++,1"
+			let "wX=desktopWorkareaX+(wW+5)*(col-1),1"
+			let "wY=desktopWorkareaY+(wH+3)*(row-1),1"
+			undecorated=0
+			IsWindowUndecorated ${win} || \
+				undecorated="${?}"
+			[ ${undecorated} -ne 2 ] || \
+				continue
+			w="${wW}"
+			[ ${undecorated} -ne 0 ] && \
+				let "h=wH-(MenuBarHeight/2),1" || \
+				h=${wH}
+			WindowShow ${win}
+			if [ ${rows} -eq 1 ]; then
+				wY=-1 h=-1
+				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
+					LogPrio="err" \
+					_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+						"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+					"WindowMosaic: maximizing vert"
+				wmctrl -i -r ${win} -b add,maximized_vert || \
+					LogPrio="err" \
+					_log "window ${win} ${ruleType} ${rule}:" \
+						"error maximizing vert"
+			elif [ ${cols} -eq 1 ]; then
+				wX=-1; w=-1
+				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
+					LogPrio="err" \
+					_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+						"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+					"WindowMosaic: maximizing horz"
+				wmctrl -i -r ${win} -b add,maximized_horz || \
+					LogPrio="err" \
+					_log "window ${win} ${ruleType} ${rule}:" \
+						"error maximizing horz"
+			else
+				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
+						LogPrio="err" \
+						_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+							"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+			fi
+			if WindowGeometry ${win}; then
+				xdotool mousemove --window ${win} $((windowWidth/2)) $((windowHeight/2)) || \
+					LogPrio="err" \
+					_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+						"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
+			else
+				LogPrio="err" \
+				_log "window ${windowId} ${ruleType} ${rule}:" \
+					"error setting position, can't get window geometry"
+				return ${OK}
+			fi
+			if [ ${col} -ge ${cols} ]; then
+				col=0
+			fi
+		done
+	fi
 	{ awk -v recordKey="${recordKey}" \
 		'$1 != recordKey {print $0}' < "${VARSFILE}"
 	printf '%s\n' "${record:-"${recordKey}${SEP}"}${windowId}${SEP}"
@@ -1282,29 +1346,12 @@ WindowArrange() {
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
 	DesktopSize $(WindowDesktop ${windowId})
+
 	printf "%s='%s'\n" \
-		"WindowArrange id" ${windowId} \
-		"window_title" "$(WindowTitle ${windowId})" \
-		"window_state" "$(WindowState ${windowId})" \
-		"window_type" "$(WindowType ${windowId})" \
-		"window_app_name" "$(WindowAppName ${windowId})" \
-		"window_application" "$(WindowApplication ${windowId} 2> /dev/null)" \
-		"window_class" "$(WindowClass ${windowId})" \
-		"window_role" "$(WindowRole ${windowId} || :)" \
-		"window_desktop" "$(WindowDesktop ${windowId})" \
-		"window_is_maximized" "$(IsWindowMaximized ${windowId} ".")" \
-		"window_is_maximized_horz" "$(IsWindowMaximized_horz ${windowId} ".")" \
-		"window_is_maximized_vert" "$(IsWindowMaximized_vert ${windowId} ".")" \
-		"window_is_fullscreen" "$(IsWindowFullscreen ${windowId} ".")" \
-		"window_is_minimized" "$(IsWindowMinimized ${windowId} ".")" \
-		"window_is_shaded" "$(IsWindowShaded ${windowId} ".")" \
-		"window_is_undecorated" "$(IsWindowUndecorated ${windowId} ".")" \
-		"window_is_sticky" "$(IsWindowSticky ${windowId} ".")" \
-		"window_desktop_size" "${desktopWidth}x${desktopHeight}" \
-		"window_desktop_workarea" \
-		"${desktopWorkareaX},${desktopWorkareaY} ${desktopWorkareaW}x${desktopWorkareaH}" \
-		"desktopsCount" "$(DesktopsCount)" \
-	>> "${LOGFILE}"
+		"WindowArrange id" ${windowId} >> "${LOGFILE}"
+
+	[ -z "${WindowInfo}" ] || \
+		PrintWindowInfo ${windowId} >> "${LOGFILE}"
 
 	# checking properties of this window
 	# we'll set up only the first rule that match,
@@ -1327,7 +1374,7 @@ WindowArrange() {
 			LogPrio="err" \
 			_log "window ${windowId}: WindowSetup returns error"
 	else
-		_log "window ${windowId}: doesn't match any rule"
+		_log "window ${windowId}: there is nothing to do"
 	fi
 }
 
@@ -1349,10 +1396,9 @@ WindowsUpdate() {
 	local windowId window_type pids mypid
 	_log "current window count ${#}"
 
-	(
 	WindowsArrange "$(grep -svwF "$(printf '%s\n' ${WindowIds})" \
-	< <(printf '%s\n' "${@}"))" "globalrule" "rule"
-	) &
+		< <(printf '%s\n' "${@}"))" \
+		"globalrule" "rule" &
 
 	for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
 	< <(printf '%s\n' ${WindowIds})); do
@@ -1392,7 +1438,7 @@ DesktopArrange() {
 		ruleType="temprule" \
 		indexTempruleSet indexTempruleSelect \
 		rule line \
-		mypid windowId
+		mypid winIds
 
 	cmd="$(awk -v appname="${APPNAME}" \
 		'$1 == appname {
@@ -1426,11 +1472,6 @@ DesktopArrange() {
 		echo "TempRule=${rule}" >> "${VARSFILE}"
 	fi
 	_lock_release "${VARSFILE}" ${$}
-	RuleLine "${ruleType}" "${rule}" "select desktop $(DesktopCurrent)" || {
-		LogPrio="err" \
-		_log "DesktopArrange: invalid"
-		return ${OK}
-	}
 	while read -r line; do
 		grep -swEe '^(select|deselect|set|unset)' <<< "${line}" && \
 		RuleLine "${ruleType}" "${rule}" "${line}" || {
@@ -1445,17 +1486,25 @@ DesktopArrange() {
 		LogPrio="warn" \
 		_log "DesktopArrange: line does not contain any command"
 
-	(
-	WindowsArrange "$(xprop -root "_NET_CLIENT_LIST_STACKING" | \
+	winIds="$(wmctrl -l | \
+		awk -v desktop="$(DesktopCurrent)" \
+		'BEGIN{ORS="\t"}
+		$2 == desktop {print $1; rc=-1}
+		END{exit rc+1}')" || \
+			return ${OK}
+
+	winIds="$(xprop -root "_NET_CLIENT_LIST_STACKING" | \
 		cut -f 2- -s -d '#' | \
-		tr -s '[:blank:],' ' ')" \
-		"globalrule" "" "${rule}"
-	) &
+		tr -s '[:space:],' '\n' | \
+		grep -swF "$(printf '0x%0x\n' ${winIds})")" || \
+			return ${OK}
+
+	WindowsArrange "${winIds}" "globalrule" "" "${rule}" &
 }
 
 Main() {
 	# internal variables, daemon scope
-	local Rules GlobalRules Debug="" EmptyList LogPrio txt \
+	local Rules GlobalRules Debug="" EmptyList WindowInfo LogPrio txt \
 		WindowIds="" MenuBarHeight=""
 
 	trap '_exit' EXIT
@@ -1585,14 +1634,33 @@ desktoparrange)
 	if pid="$(AlreadyRunning)"; then
 		msg="${@}"
 		printf "%s\n" "${msg}" >> "${PIPE}"
+		echo "info: Interactive command: ${@}" >&2
 	else
 		echo "err: ${APPNAME} is not running for this session" >&2
 		exit ${ERR}
 	fi
 	;;
+windowinfo)
+	shift
+	if [ -n "${1:-}" ]; then
+		for winId in "${@}"; do
+			if windowId="$(printf '0x%0x' "${winId}")" && \
+			WindowExists "${windowId}"; then
+				DesktopSize $(WindowDesktop ${windowId})
+				printf "%s='%s'\n" "Window id" ${windowId}
+				PrintWindowInfo "${windowId}"
+			else
+				echo "err: window \"${winId}\" doesn't exist" >&2
+			fi
+		done
+	else
+		echo "err: must specify a window ID" >&2
+		exit ${ERR}
+	fi
+	;;
 *)
 	echo "err: wrong action." >&2
-	echo "err: valid actions are: start|stop|restart|reload|status|desktoparrange" >&2
+	echo "err: valid actions are: start|stop|restart|reload|status|desktoparrange|windowinfo" >&2
 	exit ${ERR}
 	;;
 esac

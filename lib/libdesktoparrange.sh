@@ -314,7 +314,9 @@ WindowGeometry() {
 }
 
 WindowExists() {
-	local windowId="$(printf '0x%0x' "${1}")"
+	local windowId
+	windowId="$(printf '0x%0x' "${1}")" || \
+		return ${ERR}
 	xprop -root "_NET_CLIENT_LIST" | \
 	cut -f 2- -s -d '#' | \
 	tr -s '[:blank:],' ' ' | \
@@ -530,8 +532,8 @@ RuleLine() {
 	local ruleType="${1}" \
 		ruleNumber="${2}" \
 		line="${3}" \
-		prop val \
-		v deselected indexToSet indexToSelect
+		prop val p \
+		deselected indexToSet indexToSelect
 
 	prop="$(sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/s//\1_/' \
 		-e '/^([^[:blank:]=]+).*/s//\1/p' \
@@ -549,18 +551,14 @@ RuleLine() {
 	let "indexToSelect=index${ruleType^}Select,1"
 	[ -n "${prop}" ] || \
 		return ${OK}
-	if [ "${prop:0:8}" = "deselect" ]; then
-		if [ -n "${val}" ];then
-			if [ "${val:0:1}" = "!" ];then
-				LogPrio="warn" \
-				_log "${ruleType} ${ruleNumber}: \"${prop}\" ignoring wrong value \"${val}\"."
-				val=""
-			else
-				prop="${prop:2}"
-				val="!${val}"
-			fi
-		else
-			case "${prop:2}" in
+	case "${prop}" in
+	select_* | \
+	deselect_*)
+		if [ -z "${val}" ]; then
+			[ "${prop:0:2}" = "de" ] && \
+				p="${prop:2}" || \
+				p="${prop}"
+			case "${p}" in
 			select_stop | \
 			select_maximized | \
 			select_maximized_horz | \
@@ -574,8 +572,12 @@ RuleLine() {
 			select_above | \
 			select_below | \
 			select_active)
-				prop="${prop:2}"
-				val="${NEGATIVE}"
+				if [ "${prop:0:2}" = "de" ]; then
+					prop="${prop:2}"
+					val="${NEGATIVE}"
+				else
+					val="${AFFIRMATIVE}"
+				fi
 				;;
 			*)
 				LogPrio="err" \
@@ -583,49 +585,115 @@ RuleLine() {
 				return ${ERR}
 				;;
 			esac
+		else
+			if [ "${prop:0:2}" = "de" ]; then
+				if [ "${val:0:1}" = "!" ]; then
+					LogPrio="warn" \
+					_log "${ruleType} ${ruleNumber}: \"${prop}\"" \
+						"ignoring wrong value \"${val}\"."
+					case "${prop:2}" in
+					select_stop | \
+					select_maximized | \
+					select_maximized_horz | \
+					select_maximized_vert | \
+					select_minimized | \
+					select_fullscreen | \
+					select_sticky | \
+					select_shaded | \
+					select_undecorated | \
+					select_pinned | \
+					select_above | \
+					select_below | \
+					select_active)
+						val="${NEGATIVE}"
+						;;
+					*)
+						val=""
+						;;
+					esac
+				else
+					val="!${val}"
+				fi
+				prop="${prop:2}"
+			fi
 		fi
-	else
-		[ "${prop:0:2}" = "un" ] && \
-			p="${prop:2}" || \
-			p="${prop}"
-		case "${p}" in
-		select_stop | \
-		set_maximized | \
-		set_maximized_horz | \
-		set_maximized_vert | \
-		set_minimized | \
-		set_fullscreen | \
-		set_sticky | \
-		set_shaded | \
-		set_undecorated | \
-		set_pinned | \
-		set_above | \
-		set_below | \
-		set_focus | \
-		set_closed | \
-		set_killed)
-			[ "${prop:0:2}" != "un" -o -z "${val}" ] || {
-				LogPrio="warn" \
-				_log "${ruleType} ${ruleNumber}: \"${prop}\" with a value." \
-					"Value \"${val}\" is ignored"
-				val=""
-			}
-			if [ -z "${val}" ]; then
-				val="${AFFIRMATIVE}"
-				[ "${prop:0:2}" != "un" ] || {
+		;;
+	set_* | \
+	unset_*)
+		if [ -z "${val}" ]; then
+			[ "${prop:0:2}" = "un" ] && \
+				p="${prop:2}" || \
+				p="${prop}"
+			case "${p}" in
+			set_stop | \
+			set_maximized | \
+			set_maximized_horz | \
+			set_maximized_vert | \
+			set_minimized | \
+			set_fullscreen | \
+			set_sticky | \
+			set_shaded | \
+			set_undecorated | \
+			set_pinned | \
+			set_above | \
+			set_below | \
+			set_focus | \
+			set_closed | \
+			set_killed)
+				if [ "${prop:0:2}" = "un" ]; then
 					prop="${prop:2}"
 					val="${NEGATIVE}"
-				}
-			fi
-			;;
-		*)
-			[ "${prop:0:2}" != "un" ] || {
+				else
+					val="${AFFIRMATIVE}"
+				fi
+				;;
+			*)
+				LogPrio="err" \
+				_log "${ruleType} ${ruleNumber}: \"${prop}\" without a value."
+				return ${ERR}
+				;;
+			esac
+		else
+			if [ "${prop:0:2}" = "un" ]; then
+				if [ "${val:0:1}" = "!" ]; then
+					LogPrio="warn" \
+					_log "${ruleType} ${ruleNumber}: \"${prop}\"" \
+						"ignoring wrong value \"${val}\"."
+					case "${prop:2}" in
+					set_stop | \
+					set_maximized | \
+					set_maximized_horz | \
+					set_maximized_vert | \
+					set_minimized | \
+					set_fullscreen | \
+					set_sticky | \
+					set_shaded | \
+					set_undecorated | \
+					set_pinned | \
+					set_above | \
+					set_below | \
+					set_focus | \
+					set_closed | \
+					set_killed)
+						val="${NEGATIVE}"
+						;;
+					*)
+						val=""
+						;;
+					esac
+				else
+					val="!${val}"
+				fi
 				prop="${prop:2}"
-				val="!${val}"
-			}
-			;;
-		esac
-	fi
+			fi
+		fi
+		;;
+	*)
+		LogPrio="debug" \
+		_log "${ruleType} ${ruleNumber}:" \
+			"wrong property name \"${prop}\" \"${val}\"."
+		;;
+	esac
 	[ -n "${val}" ] || {
 		LogPrio="err" \
 		_log "${ruleType} ${ruleNumber}: Property \"${prop}\" has not a value"
@@ -653,7 +721,8 @@ RuleLine() {
 		;;
 	select_desktop_size | \
 	select_desktop_workarea)
-		_check_fixedsize "${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}" "" "${deselected}"
+		_check_fixedsize "${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}" \
+			"${val}" "" "${deselected}"
 		;;
 	select_maximized | \
 	select_maximized_horz | \
@@ -852,7 +921,7 @@ ReadConfig() {
 }
 
 LoadConfig() {
-	local rule dbg config emptylist \
+	local rule dbg config emptylist windowinfo \
 		msg="Loading configuration"
 
 	# config variables, default values
@@ -860,6 +929,8 @@ LoadConfig() {
 	dbg=""
 	EmptyList=""
 	emptylist=""
+	WindowInfo=""
+	windowinfo=""
 	config="${HOME}/.config/${APPNAME}/config.txt"
 	unset $(awk -F '=' \
 		'$1 ~ "^rule[[:digit:]]*_" {print $1}' \
@@ -871,7 +942,7 @@ LoadConfig() {
 	for option in "${@}"; do
 		[ -z "${option}" ] || \
 			case "${option,,}" in
-			silent)
+			silent|info)
 				dbg="info"
 				;;
 			verbose)
@@ -879,9 +950,14 @@ LoadConfig() {
 				;;
 			debug)
 				dbg="debug"
+				windowinfo="y"
 				;;
 			xtrace)
 				dbg="xtrace"
+				windowinfo="y"
+				;;
+			windowinfo)
+				windowinfo="y"
 				;;
 			config=*)
 				config="$(cut -f 2- -s -d '=' <<< "${option}")"
@@ -913,6 +989,7 @@ LoadConfig() {
 
 	Debug="${dbg:-${Debug:-}}"
 	EmptyList="${emptylist:-${EmptyList:-}}"
+	WindowInfo="${windowinfo:-${WindowInfo:-}}"
 
 	[ -n "${EmptyList}" ] && \
 		WindowIds="" || \
