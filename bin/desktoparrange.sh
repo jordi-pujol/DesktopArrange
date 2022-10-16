@@ -1459,7 +1459,7 @@ DesktopArrange() {
 	local cmd="${1}" \
 		ruleType="temprule" \
 		indexTempruleSet indexTempruleSelect \
-		rule line parm \
+		rule line parm ParmsArray i \
 		mypid winIds
 
 	LogPrio="debug" \
@@ -1469,8 +1469,11 @@ DesktopArrange() {
 	indexTempruleSelect=0
 	indexTempruleSet=0
 
+	declare -A ParmsArray
+	eval ParmsArray=(${cmd})
 	line=""
-	while read -r parm; do
+	for i in $(seq 2 ${#ParmsArray[@]}); do
+		parm="${ParmsArray[${i}]}"
 		[ -n "${parm}" ] || \
 			continue
 		if [ "${parm}" = ":" -a -n "${line}" ]; then
@@ -1480,8 +1483,7 @@ DesktopArrange() {
 		else
 			line="${line:+"${line} "}${parm}"
 		fi
-	done < <(CmdParms "${cmd}")
-
+	done
 	if [ -n "${line}" ]; then
 		TempRuleLine "${line}" || \
 			return ${OK}
@@ -1553,8 +1555,8 @@ Main() {
 			reload)
 				LoadConfig "${@}"
 				;;
-			desktoparrange\ *)
-				DesktopArrange "$(cut -f 2- -s -d ' ' <<< "${txt}")"
+			\[1\]=\"desktoparrange\"\ \[*)
+				DesktopArrange "${txt}"
 				;;
 			*)
 				LogPrio="err" \
@@ -1638,8 +1640,6 @@ status)
 	;;
 desktoparrange)
 	if pid="$(AlreadyRunning)"; then
-		#echo "info: Interactive command: ${PARMS}" >&2
-		msg="${@}"
 		echo "info: Interactive command: ${@}" >&2
 		printf "%s\n" "${PARMS}" >> "${PIPE}"
 	else

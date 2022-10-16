@@ -28,19 +28,9 @@
 PARMS="$(p=""
 	i=0
 	for parm in "${@}"; do
-		[ -z "${p}" ] && {
-			printf '%s' "${parm}"
-			p=" "
-		} || \
-			printf '%s[%s]="%s"' "${p}" "$((++i))" "${parm}"
+		printf '%s[%d]="%s"' "${p}" "$((++i))" "${parm}"
+		p=" "
 	done)"
-
-CmdParms() {
-	local cmd="${1}"
-	sed -re '\|^\[[[:digit:]]+\]="([^"]*)"$|s||\1|' \
-		< <(sed -re '\|" (\[[[:digit:]]+\]=")|s||"\n\1|g' \
-		<<< "${cmd}")
-}
 
 _trim() {
 	printf '%s\n' "${@}" | \
