@@ -1555,7 +1555,7 @@ Main() {
 			reload)
 				LoadConfig "${@}"
 				;;
-			\[1\]=\"desktoparrange\"\ \[*)
+			\[1\]=\'desktoparrange\'\ \[*)
 				DesktopArrange "${txt}"
 				;;
 			*)

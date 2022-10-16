@@ -28,7 +28,7 @@
 PARMS="$(p=""
 	i=0
 	for parm in "${@}"; do
-		printf '%s[%d]="%s"' "${p}" "$((++i))" "${parm}"
+		printf "%s[%d]='%s'" "${p}" "$((++i))" "${parm}"
 		p=" "
 	done)"
 
