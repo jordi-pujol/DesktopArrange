@@ -1,79 +1,79 @@
 Parameters {
-	Debug=""
+	silent
 }
 
 # ignore all libreoffice windows, when applied don't continue checking other rules
 Rule {
-	select_app_name='libreoffice'
+	select app_name='libreoffice'
 }
 
 # all qemu windows must be undecorated and moved to desktop 3
 Rule {
-	select_class="qemu"
+	select class="qemu"
 	# Undecorate.
-	set_decorated='n'
+	set undecorated
 	# Minimize
-	set_minimized='y'
+	set minimized='y'
 	# Move immediately this window to the desktop num 3
-	set_desktop=3
+	set desktop=3
 	# Continue checking other rules also
-	select_others='y'
+	select others='y'
 }
 
 Rule {
 	# Compare the title of the new window with this string.
-	select_title="QEMU (BlissOS9-overlay)"
+	select title="QEMU (BlissOS9-overlay)"
 
 	# Wait 30 seconds to apply the following properties
-	set_delay=30
-	# set_focus value is allways affirmative
-	set_focus=y
+	set delay=30
+	# set focus value is allways affirmative
+	set focus=y
 	# Next, when the window is focused, set up the following properties:
 	# Set the X Y coordinates
-	set_position='25%,0'
+	set position='25%,0'
 	# Set the width/height
-	set_size='73%,96%'
+	set size='73%,96%'
 }
 
 rule {
 	# Get the title of the new window.
-	select_title="QEMU (BlissOS9-persistent)"
+	select title="QEMU (BlissOS9-persistent)"
 	# Check size for current desktop
-	select_desktop_size="1920x1080"
+	select desktop_size="1920x1080"
 
-	set_delay=30
+	set delay=30
 	# Set the X/Y coordinates of a window.
-	set_position='50,0'
+	set position='50,0'
 	# Set the width/height of a window.
-	set_size='1400,1050'
+	set size='1400,1050'
 	# Undecorate.
-	set_decorated='n'
+	set undecorated
 	# Wait 30 seconds to apply the following properties
-	set_delay=30
+	set delay=30
 	# Move this window to the desktop num 3
-	set_desktop=3
+	set desktop=3
 	# decorate.
-	set_decorated='y'
+	unset undecorated
 	# After waiting (delay) seconds Change to desktop num 3
-	set_active_desktop=3
+	set active_desktop=3
 	# Wait 30 seconds to apply the following properties
-	set_delay=10
+	set delay=10
 	# After waiting (delay) seconds Change to desktop num 3
-	set_active_desktop=1
+	set active_desktop=1
 	# Move this window to the desktop num 3
-	set_desktop=1
+	set desktop=1
 	# Undecorate.
-	set_decorated='n'
+	set undecorated
 	# Wait 30 seconds to apply the following properties
-	set_delay=10
+	set delay=10
 	# Move this window to the desktop num 3
-	set_desktop=3
+	set desktop=3
 	# decorate.
-	set_decorated='y'
+	unset undecorated
 }
 
 Rule {
-	select_app_name='galculator'
-	set_position='5%,10%'
-	set_tile='3%,2%'
+	select app_name='galculator'
+	set position='5%,10%'
+	set tile='3%,2%'
 }

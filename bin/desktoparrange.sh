@@ -1434,6 +1434,9 @@ WindowsUpdate() {
 }
 
 TempRuleLine() {
+	[ -n "${line}" ] || \
+		return ${OK}
+
 	if [ -z "${rule}" ]; then
 		_lock_acquire "${VARSFILE}" ${$}
 		if rule="$(awk \
@@ -1453,6 +1456,7 @@ TempRuleLine() {
 		_log "DesktopArrange: invalid command: \"${line}\""
 		return ${ERR}
 	}
+	line=""
 }
 
 DesktopArrange() {
@@ -1473,21 +1477,15 @@ DesktopArrange() {
 	eval ParmsArray=(${cmd})
 	line=""
 	for i in $(seq 2 ${#ParmsArray[@]}); do
-		parm="${ParmsArray[${i}]}"
-		[ -n "${parm}" ] || \
-			continue
-		if [ "${parm}" = ":" -a -n "${line}" ]; then
-			TempRuleLine "${line}" || \
+		if [ "${ParmsArray[${i}]}" = ":" ]; then
+			TempRuleLine || \
 				return ${OK}
-			line=""
-		else
-			line="${line:+"${line} "}${parm}"
+		elif [ -n "${ParmsArray[${i}]}" ]; then
+			line="${line:+"${line} "}${ParmsArray[${i}]}"
 		fi
 	done
-	if [ -n "${line}" ]; then
-		TempRuleLine "${line}" || \
-			return ${OK}
-	fi
+	TempRuleLine || \
+		return ${OK}
 
 	[ -n "${rule}" ] || \
 		LogPrio="warn" \
