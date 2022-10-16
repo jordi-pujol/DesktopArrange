@@ -1463,8 +1463,8 @@ DesktopArrange() {
 	local cmd="${1}" \
 		ruleType="temprule" \
 		indexTempruleSet indexTempruleSelect \
-		rule line parm ParmsArray i \
-		mypid winIds
+		rule line ParmsArray i \
+		winIds
 
 	LogPrio="debug" \
 	_log "DesktopArrange: received command \"${cmd}\""
