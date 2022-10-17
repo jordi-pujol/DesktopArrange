@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.33 $
+#  $Revision: 0.34 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -24,13 +24,6 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #************************************************************************
-
-PARMS="$(p=""
-	i=0
-	for parm in "${@}"; do
-		printf "%s[%d]='%s'" "${p}" "$((++i))" "${parm}"
-		p=" "
-	done)"
 
 _trim() {
 	printf '%s\n' "${@}" | \
@@ -899,6 +892,9 @@ ReadConfig() {
 				emptylist)
 					EmptyList="y"
 					;;
+				windowinfo)
+					windowinfo="y"
+					;;
 				*)
 					LogPrio="err" \
 					_log "invalid parameter"
@@ -957,11 +953,9 @@ LoadConfig() {
 				;;
 			debug)
 				dbg="debug"
-				windowinfo="y"
 				;;
 			xtrace)
 				dbg="xtrace"
-				windowinfo="y"
 				;;
 			windowinfo)
 				windowinfo="y"
@@ -997,6 +991,12 @@ LoadConfig() {
 	Debug="${dbg:-${Debug:-}}"
 	EmptyList="${emptylist:-${EmptyList:-}}"
 	WindowInfo="${windowinfo:-${WindowInfo:-}}"
+	case "${Debug}" in
+	debug | \
+	xtrace)
+		WindowInfo="y"
+		;;
+	esac
 
 	[ -n "${EmptyList}" ] && \
 		WindowIds="" || \

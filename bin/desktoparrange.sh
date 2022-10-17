@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.33 $
+#  $Revision: 0.34 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -145,7 +145,12 @@ PointerMove() {
 }
 
 PrintWindowInfo() {
+	local windowId="${1}"
+
+	DesktopSize $(WindowDesktop ${windowId})
+
 	printf "%s='%s'\n" \
+		"Window id" ${windowId} \
 		"window_title" "$(WindowTitle ${windowId})" \
 		"window_state" "$(WindowState ${windowId})" \
 		"window_type" "$(WindowType ${windowId})" \
@@ -1345,11 +1350,6 @@ WindowArrange() {
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
-	DesktopSize $(WindowDesktop ${windowId})
-
-	printf "%s='%s'\n" \
-		"WindowArrange id" ${windowId} >> "${LOGFILE}"
-
 	[ -z "${WindowInfo}" ] || \
 		PrintWindowInfo ${windowId} >> "${LOGFILE}"
 
@@ -1476,7 +1476,7 @@ DesktopArrange() {
 	declare -A ParmsArray
 	eval ParmsArray=(${cmd})
 	line=""
-	for i in $(seq 2 ${#ParmsArray[@]}); do
+	for i in $(seq 1 $((${#ParmsArray[@]}-1)) ); do
 		if [ "${ParmsArray[${i}]}" = ":" ]; then
 			TempRuleLine || \
 				return ${OK}
@@ -1553,7 +1553,7 @@ Main() {
 			reload)
 				LoadConfig "${@}"
 				;;
-			\[1\]=\'desktoparrange\'\ \[*)
+			\[0\]=\"desktoparrange\"\ \[*)
 				DesktopArrange "${txt}"
 				;;
 			*)
@@ -1576,10 +1576,13 @@ Main() {
 
 set -o errexit -o nounset -o pipefail +o noglob -o noclobber
 
+declare -a ARGV=( "${@}" )
+ARGC=${#}
+
 # constants
 readonly NAME="$(basename "${0}")" \
 	APPNAME="desktoparrange" \
-	PARMS
+	ARGV ARGC
 XROOT="$(GetXroot)" || \
 	exit ${ERR}
 readonly XROOT \
@@ -1639,7 +1642,9 @@ status)
 desktoparrange)
 	if pid="$(AlreadyRunning)"; then
 		echo "info: Interactive command: ${@}" >&2
-		printf "%s\n" "${PARMS}" >> "${PIPE}"
+		declare -p ARGV | \
+			sed -re '\|^declare -ar ARGV=\((.*)\)$|s||\1|' \
+			>> "${PIPE}"
 	else
 		echo "err: ${APPNAME} is not running for this session" >&2
 		exit ${ERR}
@@ -1651,8 +1656,6 @@ windowinfo)
 		for winId in "${@}"; do
 			if windowId="$(printf '0x%0x' "${winId}")" && \
 			WindowExists "${windowId}"; then
-				DesktopSize $(WindowDesktop ${windowId})
-				printf "%s='%s'\n" "Window id" ${windowId}
 				PrintWindowInfo "${windowId}"
 			else
 				echo "err: window \"${winId}\" doesn't exist" >&2
