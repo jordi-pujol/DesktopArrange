@@ -547,8 +547,8 @@ RuleLine() {
 		sed -nre '/^[^[:blank:]=]+[[:blank:]=]+(.*)/s//\1/p' \
 		<<< "${line}")")")"
 
-	let "indexToSet=index${ruleType^}Set,1 "
-	let "indexToSelect=index${ruleType^}Select,1"
+	let "indexToSet=index${ruleType}Set,1 "
+	let "indexToSelect=index${ruleType}Select,1"
 	[ -n "${prop}" ] || \
 		return ${OK}
 	case "${prop}" in
@@ -830,8 +830,8 @@ RuleLine() {
 		return ${ERR}
 		;;
 	esac
-	let "index${ruleType^}Set=indexToSet,1"
-	let "index${ruleType^}Select=indexToSelect,1"
+	let "index${ruleType}Set=indexToSet,1"
+	let "index${ruleType}Select=indexToSelect,1"
 }
 
 ReadConfig() {
@@ -902,10 +902,10 @@ ReadConfig() {
 					;;
 				esac
 			elif [ -n "${foundRule}" ]; then
-				RuleLine "rule" "${Rules}" "${line}" || \
+				RuleLine "Rule" "${Rules}" "${line}" || \
 					return ${ERR}
 			elif [ -n "${foundGlobalRule}" ]; then
-				RuleLine "globalrule" "${GlobalRules}" "${line}" || \
+				RuleLine "Globalrule" "${GlobalRules}" "${line}" || \
 					return ${ERR}
 			else
 				LogPrio="err" \
@@ -936,7 +936,7 @@ LoadConfig() {
 	windowinfo=""
 	config="${HOME}/.config/${APPNAME}/config.txt"
 	unset $(awk -F '=' \
-		'$1 ~ "^rule[[:digit:]]*_" {print $1}' \
+		'$1 ~ "^(Globalrule|Rule|Temprule)[[:digit:]]*_" {print $1}' \
 		< <(set)) 2> /dev/null || :
 
 	LogPrio="info" \
@@ -1034,15 +1034,15 @@ LoadConfig() {
 		while [ $((rule++)) -lt ${GlobalRules} ]; do
 			echo
 			if ! set | \
-			grep -sEe "^globalrule${rule}_[[:digit:]]+_set_.*=" | \
+			grep -sEe "^Globalrule${rule}_[[:digit:]]+_set_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2; then
-				eval globalrule${rule}_0_select_noactions='y'
+				eval Globalrule${rule}_0_select_noactions='y'
 				LogPrio="warn" \
 				_log "global rule ${rule}:" \
 					"hasn't defined any property to set"
 			fi
 			if ! set | \
-			grep -sEe "^globalrule${rule}_[[:digit:]]+_select_.*=" | \
+			grep -sEe "^Globalrule${rule}_[[:digit:]]+_select_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2; then
 				LogPrio="err" \
 				_log "global rule ${rule}:" \
@@ -1061,15 +1061,15 @@ LoadConfig() {
 		while [ $((rule++)) -lt ${Rules} ]; do
 			echo
 			if ! set | \
-			grep -sEe "^rule${rule}_[[:digit:]]+_set_.*=" | \
+			grep -sEe "^Rule${rule}_[[:digit:]]+_set_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2; then
-				eval rule${rule}_0_select_noactions='y'
+				eval Rule${rule}_0_select_noactions='y'
 				LogPrio="warn" \
 				_log "rule ${rule}:" \
 					"hasn't defined any property to set"
 			fi
 			if ! set | \
-			grep -sEe "^rule${rule}_[[:digit:]]+_select_.*=" | \
+			grep -sEe "^Rule${rule}_[[:digit:]]+_select_.*=" | \
 			sort --numeric --field-separator="_" --key 2,2; then
 				LogPrio="err" \
 				_log "${ruleName} ${rule}:" \

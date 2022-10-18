@@ -1014,9 +1014,9 @@ WindowSetup() {
 		_log "window ${windowId}: applying global rules" \
 			"( $(tr -s '[:blank:],' ',' < <(echo ${setupGlobalRules})) )"
 		for rule in ${setupGlobalRules}; do
-			WindowSetupRule ${windowId} "globalrule" ${rule} || {
+			WindowSetupRule ${windowId} "Globalrule" ${rule} || {
 				LogPrio="err" \
-				_log "window ${windowId} globalrule ${rule}:" \
+				_log "window ${windowId} Globalrule ${rule}:" \
 					"error setting global rule"
 				rc=${ERR}
 				break
@@ -1029,9 +1029,9 @@ WindowSetup() {
 		_log "window ${windowId}: applying rules" \
 			"( $(tr -s '[:blank:],' ',' < <(echo ${setupRules})) )"
 		for rule in ${setupRules}; do
-			WindowSetupRule ${windowId} "rule" ${rule} || {
+			WindowSetupRule ${windowId} "Rule" ${rule} || {
 				LogPrio="err" \
-				_log "window ${windowId} rule ${rule}:" \
+				_log "window ${windowId} Rule ${rule}:" \
 					"error setting rule"
 				rc=${ERR}
 				break
@@ -1042,9 +1042,9 @@ WindowSetup() {
 	fi
 	if  [ ${rc} -eq ${OK} -a -n "${setupTempRules}" ]; then
 		_log "window ${windowId}: applying temporary rule ${setupTempRules}"
-		WindowSetupRule ${windowId} "temprule" ${setupTempRules} || {
+		WindowSetupRule ${windowId} "Temprule" ${setupTempRules} || {
 			LogPrio="err" \
-			_log "window ${windowId} temprule ${setupTempRules}:" \
+			_log "window ${windowId} Temprule ${setupTempRules}:" \
 				"error setting rule"
 			rc=${ERR}
 		}
@@ -1063,7 +1063,7 @@ WindowSelect() {
 	[ -n "${checkRules}" ] || \
 		checkRules="$(echo \
 			$(seq 1 "$( \
-				[ "${ruleType}" = "rule" ] \
+				[ "${ruleType}" = "Rule" ] \
 				&& echo ${Rules} \
 				|| echo ${GlobalRules})"))"
 
@@ -1316,14 +1316,19 @@ WindowSelect() {
 					"${ruleType} without actions to setup"
 			else
 				case "${ruleType}" in
-				rule)
+				Rule)
 					setupRules="${setupRules}${rule}${TAB}"
 					;;
-				globalrule)
+				Globalrule)
 					setupGlobalRules="${setupGlobalRules}${rule}${TAB}"
 					;;
-				temprule)
+				Temprule)
 					setupTempRules="${setupTempRules}${rule}${TAB}"
+					;;
+				*)
+					LogPrio="err" \
+					_log "WindowSelect: window ${windowId} ${ruleType} ${rule}:" \
+					"invalid ruleType"
 					;;
 				esac
 			fi
@@ -1361,44 +1366,44 @@ WindowArrange() {
 	setupTempRules=""
 	selectStop=""
 	[ -z "${checkGlobalRules}" ] || \
-		WindowSelect ${windowId} "globalrule"
+		WindowSelect ${windowId} "Globalrule"
 	[ -z "${checkRules}" ] || \
 		[ -n "${selectStop}" ] || \
-			WindowSelect ${windowId} "rule"
+			WindowSelect ${windowId} "Rule"
 	[ -z "${checkTempRules}" ] || \
 		[ -n "${selectStop}" ] || \
-			WindowSelect ${windowId} "temprule" "${checkTempRules}"
+			WindowSelect ${windowId} "Temprule" "${checkTempRules}"
 	if [ -n "${setupGlobalRules}" -o -n "${setupRules}" -o -n "${setupTempRules}" ]; then
 		WindowSetup ${windowId} \
 		"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" || \
 			LogPrio="err" \
-			_log "window ${windowId}: WindowSetup returns error"
+			_log "WindowArrange: window ${windowId}: WindowSetup returns error"
 	else
 		_log "window ${windowId}: there is nothing to do"
 	fi
 }
 
 WindowsArrange() {
-	local windows="${1}" \
+	local windowIds="${1}" \
 		checkGlobalRules="${2}" \
 		checkRules="${3}" \
 		checkTempRules="${4:-}" \
 		windowId mypid
 
 	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
-	for windowId in ${windows}; do
+	for windowId in ${windowIds}; do
 		WindowArrange ${windowId} \
 			"${checkGlobalRules}" "${checkRules}" "${checkTempRules}" || :
 	done
 }
 
 WindowsUpdate() {
-	local windowId window_type pids mypid
+	local windowId pids
 	_log "current window count ${#}"
 
-	WindowsArrange "$(grep -svwF "$(printf '%s\n' ${WindowIds})" \
-		< <(printf '%s\n' "${@}"))" \
-		"globalrule" "rule" &
+	! windowId="$(grep -svwF "$(printf '%s\n' ${WindowIds})" \
+	< <(printf '%s\n' "${@}"))" || \
+		WindowsArrange "${windowId}" "Globalrule" "Rule" &
 
 	for windowId in $(grep -svwF "$(printf '%s\n' "${@}")" \
 	< <(printf '%s\n' ${WindowIds})); do
@@ -1440,13 +1445,13 @@ TempRuleLine() {
 	if [ -z "${rule}" ]; then
 		_lock_acquire "${VARSFILE}" ${$}
 		if rule="$(awk \
-		-v var="TempRule" -F '=' \
+		-v var="${ruleType}" -F '=' \
 		'$1 == var {print ++$2; rc=-1; exit}
 		END{exit rc+1}' < "${VARSFILE}")"; then
-			sed -i -e "\|^TempRule=.*|s||TempRule=${rule}|" "${VARSFILE}"
+			sed -i -e "\|^${ruleType}=.*|s||${ruleType}=${rule}|" "${VARSFILE}"
 		else
 			rule=1
-			echo "TempRule=${rule}" >> "${VARSFILE}"
+			echo "${ruleType}=${rule}" >> "${VARSFILE}"
 		fi
 		_lock_release "${VARSFILE}" ${$}
 	fi
@@ -1461,7 +1466,7 @@ TempRuleLine() {
 
 DesktopArrange() {
 	local cmd="${1}" \
-		ruleType="temprule" \
+		ruleType="Temprule" \
 		indexTempruleSet indexTempruleSelect \
 		rule line ParmsArray i \
 		winIds
@@ -1504,7 +1509,7 @@ DesktopArrange() {
 		grep -swF "$(printf '0x%0x\n' ${winIds})")" || \
 			return ${OK}
 
-	WindowsArrange "${winIds}" "globalrule" "" "${rule}" &
+	WindowsArrange "${winIds}" "Globalrule" "" "${rule}" &
 }
 
 Main() {
@@ -1576,13 +1581,12 @@ Main() {
 
 set -o errexit -o nounset -o pipefail +o noglob -o noclobber
 
-declare -a ARGV=( "${@}" )
-ARGC=${#}
+declare -ar ARGV=("${@}")
+readonly ARGC=${#}
 
 # constants
 readonly NAME="$(basename "${0}")" \
 	APPNAME="desktoparrange" \
-	ARGV ARGC
 XROOT="$(GetXroot)" || \
 	exit ${ERR}
 readonly XROOT \
@@ -1653,10 +1657,20 @@ desktoparrange)
 windowinfo)
 	shift
 	if [ -n "${1:-}" ]; then
-		for winId in "${@}"; do
+		[ "${1}" != "all" ] && \
+			winIds="${@}" || \
+			winIds="$(wmctrl -l | \
+				awk 'BEGIN{ORS="\t"}
+				$2 != -1 {print $1; rc=-1}
+				END{exit rc+1}')" || {
+					echo "err: no open windows" >&2
+					exit ${ERR}
+				}
+		for winId in ${winIds}; do
 			if windowId="$(printf '0x%0x' "${winId}")" && \
 			WindowExists "${windowId}"; then
 				PrintWindowInfo "${windowId}"
+				echo
 			else
 				echo "err: window \"${winId}\" doesn't exist" >&2
 			fi
@@ -1668,7 +1682,8 @@ windowinfo)
 	;;
 *)
 	echo "err: wrong action." >&2
-	echo "err: valid actions are: start|stop|restart|reload|status|windowinfo|desktoparrange" >&2
+	echo "info: valid actions are:" >&2
+	echo "start|stop|restart|reload|status|windowinfo|desktoparrange" >&2
 	exit ${ERR}
 	;;
 esac
