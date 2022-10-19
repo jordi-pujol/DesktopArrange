@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.34 $
+#  $Revision: 0.35 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -532,7 +532,7 @@ RuleLine() {
 	local ruleType="${1}" \
 		ruleNumber="${2}" \
 		line="${3}" \
-		prop val p \
+		prop val val1 val2 p \
 		deselected indexToSet indexToSelect
 
 	prop="$(sed -nr -e '/^(select|deselect|set|unset)[[:blank:]]+/s//\1_/' \
@@ -760,7 +760,7 @@ RuleLine() {
 	set_position | \
 	set_size)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
-		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+		if [ $(wc -w <<< "${val}") -ne 2 ]; then
 			LogPrio="err" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
@@ -770,7 +770,7 @@ RuleLine() {
 		;;
 	set_tiled)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
-		if [ "$(wc -w <<< "${val}")" != 4 ]; then
+		if [ $(wc -w <<< "${val}") -ne 4 ]; then
 			LogPrio="err" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
@@ -779,14 +779,20 @@ RuleLine() {
 		;;
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
-		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+		if [ $(wc -w <<< "${val}") -lt 2 -o $(wc -w <<< "${val}") -gt 4 ]; then
 			LogPrio="err" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}
 		fi
-		_check_integer_pair val "0" "0"
-		if [ "${val}" = "0 0" ]; then
-			val="0 2"
+		val1="$(cut -f -2 -s -d ' ' <<< "${val}")"
+		_check_integer_pair val1 "0" "0"
+		val2="$(cut -f 3- -s -d ' ' <<< "${val}")"
+		[ $(wc -w <<< "${val2}") -eq 2 ] && \
+			_check_integer_pair val2 "0" "0" || \
+			val2="0 0"
+		val="${val1} ${val2}"
+		if [ "${val1}" = "0 0" ]; then
+			val="2 0 0 0"
 			LogPrio="warn" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value. Assuming \"${val}\""
 		fi
@@ -794,7 +800,7 @@ RuleLine() {
 		;;
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
-		if [ "$(wc -w <<< "${val}")" != 2 ]; then
+		if [ $(wc -w <<< "${val}") -ne 2 ]; then
 			LogPrio="err" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
 			return ${ERR}

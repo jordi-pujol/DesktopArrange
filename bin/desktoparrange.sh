@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.34 $
+#  $Revision: 0.35 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -430,7 +430,7 @@ WindowMosaic() {
 		val="${4}" \
 		win winCount recordKey \
 		wW wH w h wX wY m record desktop undecorated \
-		maxRows maxCols rows cols row col
+		numRows numCols maxRows maxCols rows cols row col
 	local windowWidth windowHeight windowX windowY windowScreen
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
@@ -464,16 +464,22 @@ WindowMosaic() {
 			_log "window ${windowId} ${ruleType} ${rule}:" \
 				"error maximizing"
 	else
-		maxCols="$(cut -f 1 -s -d ' ' <<< "${val}")"
-		maxRows="$(cut -f 2 -s -d ' ' <<< "${val}")"
+		numRows="$(cut -f 1 -s -d ' ' <<< "${val}")"
+		numCols="$(cut -f 2 -s -d ' ' <<< "${val}")"
+		maxRows="$(cut -f 3 -s -d ' ' <<< "${val}")"
+		maxCols="$(cut -f 4 -s -d ' ' <<< "${val}")"
 		rows=0
 		cols=0
-		if [ ${maxCols} -ne 0 ]; then
-			let "rows = winCount%maxCols == 0 ? winCount/maxCols : (winCount/maxCols)+1 ,1"
-			let "cols = winCount%rows == 0 ? winCount/rows : (winCount/rows)+1 ,1"
-		elif [ ${maxRows} -ne 0 ]; then
-			let "cols = winCount%maxRows == 0 ? winCount/maxRows : (winCount/maxRows)+1 ,1"
-			let "rows = winCount%cols == 0 ? winCount/cols : (winCount/cols)+1 ,1"
+		if [ ${numCols} -ne 0 ]; then
+			let "rows=winCount%numCols == 0 ? winCount/numCols : (winCount/numCols)+1,1"
+			[ ${maxRows} -eq 0 -o ${rows} -le ${maxRows} ] || \
+				rows=${maxRows}
+			let "cols=winCount%rows == 0 ? winCount/rows : (winCount/rows)+1,1"
+		elif [ ${numRows} -ne 0 ]; then
+			let "cols=winCount%numRows == 0 ? winCount/numRows : (winCount/numRows)+1,1"
+			[ ${maxCols} -eq 0 -o ${cols} -le ${maxCols} ] || \
+				cols=${maxCols}
+			let "rows=winCount%cols == 0 ? winCount/cols : (winCount/cols)+1,1"
 		fi
 		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 			"WindowMosaic: ${cols} columns, ${rows} rows"
@@ -1657,8 +1663,8 @@ desktoparrange)
 windowinfo)
 	shift
 	if [ -n "${1:-}" ]; then
-		[ "${1}" != "all" ] && \
-			winIds="${@}" || \
+		case "${1,,}" in
+		all)
 			winIds="$(wmctrl -l | \
 				awk 'BEGIN{ORS="\t"}
 				$2 != -1 {print $1; rc=-1}
@@ -1666,8 +1672,23 @@ windowinfo)
 					echo "err: no open windows" >&2
 					exit ${ERR}
 				}
+			;;
+		select)
+			select winId in $(wmctrl -l | \
+			awk '$2 != -1 {print $0}' | \
+			tr -s '[:blank:]' '_'); do
+				[ -n "${winId}" ] || \
+					exit ${OK}
+				winIds="$(cut -f 1 -s -d '_' <<< "${winId}")"
+				break
+			done
+			;;
+		*)
+			winIds="${@}"
+			;;
+		esac
 		for winId in ${winIds}; do
-			if windowId="$(printf '0x%0x' "${winId}")" && \
+			if windowId="$(printf '0x%0x' "${winId}" 2> /dev/null)" && \
 			WindowExists "${windowId}"; then
 				PrintWindowInfo "${windowId}"
 				echo

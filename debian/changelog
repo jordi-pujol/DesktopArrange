@@ -1,8 +1,19 @@
+desktoparrange (0.35) unstable; urgency=medium
+
+  * action "set mosaicked", four parameters.
+    maxrows maxcols are optional, if not present will assume 0
+      set mosaicked rows cols [maxrows maxcols]
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 18 Oct 2022 10:35:35 +0200
+
 desktoparrange (0.34) unstable; urgency=medium
 
-  * implement daemon action windowinfo all
+  * implement daemon action "windowinfo all"
     to list relevant info on all open windows
-    $ desktoparrange.sh  windowinfo all
+    $ desktoparrange.sh windowinfo all
+  * implement daemon action "windowinfo select"
+    to list relevant info on selected windows
+    $ desktoparrange.sh windowinfo select
   * code improvement:
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sun, 16 Oct 2022 16:48:39 +0200
