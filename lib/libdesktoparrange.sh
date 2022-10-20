@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.35 $
+#  $Revision: 0.36 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -62,14 +62,6 @@ _log() {
 		printf '%s\n' "${msg}" >> "${LOGFILE}"
 	fi
 	LogPrio=""
-}
-
-_lock_active() {
-	local lockfile="${1}.lock" \
-		pid="${2}"
-	[ ! -e "${lockfile}" ] || \
-	[ $(cat "${lockfile}") -ne ${pid} ] || \
-		echo "y"
 }
 
 _lock_release() {
@@ -649,8 +641,8 @@ RuleLine() {
 				;;
 			*)
 				LogPrio="err" \
-				_log "${ruleType} ${ruleNumber}: \"${prop}\" without a value."
-				return ${ERR}
+				_log "${ruleType} ${ruleNumber}: \"${prop}\" not found, no value."
+				return ${OK}
 				;;
 			esac
 		else

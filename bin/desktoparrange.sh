@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.35 $
+#  $Revision: 0.36 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -89,8 +89,10 @@ GetMenuBarHeight() {
 		undecorated=0 wY
 	[ -z "${MenuBarHeight}" ] || \
 		return ${OK}
+	_lock_acquire "${VARSFILE}" ${mypid}
 	MenuBarHeight="$(awk -v var="MenuBarHeight" -F '=' \
 		'$1 == var {print $2; exit}' < "${VARSFILE}")"
+	_lock_release "${VARSFILE}" ${mypid}
 	[ -z "${MenuBarHeight}" ] || \
 		return ${OK}
 	IsWindowUndecorated ${windowId} || \
@@ -108,12 +110,14 @@ GetMenuBarHeight() {
 		toggle-decorations -d ${windowId}
 	xdotool windowmove ${windowId} x ${wY}
 	let "MenuBarHeight=windowY-desktopWorkareaY,1"
+	_lock_acquire "${VARSFILE}" ${mypid}
 	awk -v var="MenuBarHeight" -F '=' \
 	'$1 == var {rc=-1; exit}
 	END{exit rc+1}' < "${VARSFILE}" || {
 		echo "MenuBarHeight=${MenuBarHeight}" >> "${VARSFILE}"
 		echo "MenuBarHeight=${MenuBarHeight}" >> "${PIPE}"
 	}
+	_lock_release "${VARSFILE}" ${mypid}
 }
 
 PointerMove() {
@@ -309,9 +313,11 @@ WindowTile() {
 	GetMenuBarHeight ${windowId}
 	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
 	recordKey="tile_${ruleType}_${rule}_${desktop}"
-	if record="$(awk -v recordKey="${recordKey}" \
-	'$1 == recordKey {print $0; rc=-1; exit}
-	END{exit rc+1}' < "${VARSFILE}")"; then
+	_lock_acquire "${VARSFILE}" ${mypid}
+	record="$(awk -v recordKey="${recordKey}" \
+	'$1 == recordKey {print $0; exit}' < "${VARSFILE}")"
+	_lock_release "${VARSFILE}" ${mypid}
+	if [ -n "${record}" ]; then
 		while [ $(wc -w <<< "${record}") -gt 1 ] && \
 		win="$(awk 'NF > 1 {print $NF; rc=-1}
 		END{exit rc+1}' <<< "${record}")" && \
@@ -408,11 +414,13 @@ WindowTile() {
 		WindowPosition ${windowId} "${ruleType}" ${rule} \
 			"$(cut -f -2 -s -d ' ' <<< "${val}")"
 	fi
+	_lock_acquire "${VARSFILE}" ${mypid}
 	{ awk -v recordKey="${recordKey}" \
 	'$1 != recordKey {print $0}' < "${VARSFILE}"
 	printf '%s\n' "${record:-"${recordKey}${SEP}"}${windowId}${SEP}"
 	} > "${VARSFILE}.part"
 	mv -f "${VARSFILE}.part" "${VARSFILE}"
+	_lock_release "${VARSFILE}" ${mypid}
 }
 
 WindowTiling() {
@@ -420,9 +428,7 @@ WindowTiling() {
 		ruleType="${2}" \
 		rule="${3}" \
 		val="${4}"
-	_lock_acquire "${VARSFILE}" ${mypid}
 	WindowTile ${windowId} "${ruleType}" ${rule} "${val}"
-	_lock_release "${VARSFILE}" ${mypid}
 }
 
 GroupEnmossay() {
@@ -608,12 +614,7 @@ WindowPosition() {
 	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
 	DesktopSize ${desktop}
 
-	lockActive="$(_lock_active "${VARSFILE}" ${mypid})"
-	[ -n "${lockActive}" ] || \
-		_lock_acquire "${VARSFILE}" ${mypid}
 	GetMenuBarHeight ${windowId}
-	[ -n "${lockActive}" ] || \
-		_lock_release "${VARSFILE}" ${mypid}
 
 	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
 	case "${x}" in
@@ -858,9 +859,9 @@ WindowSetupRule() {
 			_lock_acquire "${VARSFILE}" ${mypid}
 			record="$(awk -v recordKey="${recordKey}" \
 			'$1 == recordKey {print $0; exit}' < "${VARSFILE}")"
-			{ awk -v recordKey="${recordKey}" \
-			'$1 != recordKey {print $0}' < "${VARSFILE}"
-			printf '%s\n' "${record:-"${recordKey}${SEP}"}${windowId}${SEP}"
+			{	awk -v recordKey="${recordKey}" \
+				'$1 != recordKey {print $0}' < "${VARSFILE}"
+				printf '%s\n' "${record:-"${recordKey}${SEP}"}${windowId}${SEP}"
 			} > "${VARSFILE}.part"
 			mv -f "${VARSFILE}.part" "${VARSFILE}"
 			_lock_release "${VARSFILE}" ${mypid}
@@ -1434,10 +1435,14 @@ WindowsArrange() {
 		WindowArrange ${windowId} \
 			"${checkGlobalRules}" "${checkRules}" "${checkTempRules}" || :
 	done
-	if [ -n "${PendingMosaic}" ]; then
+	[ -z "${PendingMosaic}" ] || \
 		while read -r recordKey val; do
 			GroupEnmossay "${recordKey}" "${val}"
 		done < <(tr -s "${SEP}" '\n' <<< "${PendingMosaic}")
+	if [ -n "${checkTempRules}" ]; then
+		_lock_acquire "${VARSFILE}" ${mypid}
+		sed -i -e "\|_Temprule_${checkTempRules}_|d" "${VARSFILE}"
+		_lock_release "${VARSFILE}" ${mypid}
 	fi
 }
 
