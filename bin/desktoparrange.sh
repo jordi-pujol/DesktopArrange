@@ -110,8 +110,10 @@ GetMenuBarHeight() {
 	let "MenuBarHeight=windowY-desktopWorkareaY,1"
 	awk -v var="MenuBarHeight" -F '=' \
 	'$1 == var {rc=-1; exit}
-	END{exit rc+1}' < "${VARSFILE}" || \
+	END{exit rc+1}' < "${VARSFILE}" || {
 		echo "MenuBarHeight=${MenuBarHeight}" >> "${VARSFILE}"
+		echo "MenuBarHeight=${MenuBarHeight}" >> "${PIPE}"
+	}
 }
 
 PointerMove() {
@@ -306,7 +308,7 @@ WindowTile() {
 	WindowShow ${windowId}
 	GetMenuBarHeight ${windowId}
 	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
-	recordKey="tile_${ruleType}${rule}_${desktop}"
+	recordKey="tile_${ruleType}_${rule}_${desktop}"
 	if record="$(awk -v recordKey="${recordKey}" \
 	'$1 == recordKey {print $0; rc=-1; exit}
 	END{exit rc+1}' < "${VARSFILE}")"; then
@@ -423,12 +425,10 @@ WindowTiling() {
 	_lock_release "${VARSFILE}" ${mypid}
 }
 
-WindowMosaic() {
-	local windowId="${1}" \
-		ruleType="${2}" \
-		rule="${3}" \
-		val="${4}" \
-		win winCount recordKey \
+GroupEnmossay() {
+	local recordKey="${1}" \
+		val="${2}" \
+		windowId action ruleType rule \
 		wW wH w h wX wY m record desktop undecorated \
 		numRows numCols maxRows maxCols rows cols row col
 	local windowWidth windowHeight windowX windowY windowScreen
@@ -436,26 +436,41 @@ WindowMosaic() {
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
-	GetMenuBarHeight ${windowId}
-	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
-	recordKey="mosaic_${ruleType}${rule}_${desktop}"
-	if record="$(awk -v recordKey="${recordKey}" \
-	'$1 == recordKey {print $0; rc=-1; exit}
-	END{exit rc+1}' < "${VARSFILE}")"; then
-		m="$(cut -f 1 -s -d "${SEP}" <<< "${record}")${SEP}"
-		for win in $(cut -f 2- -s -d "${SEP}" <<< "${record}"); do
-			[ ${desktop} -ne $(WindowDesktop ${win} "${ruleType}" ${rule}) ] && \
-				LogPrio="warn" \
-				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowMosaic: window ${win} is not in current desktop" || \
-				m="${m}${win}${SEP}"
-		done
-		record="${m}"
-		let "winCount=$(wc -w <<< "${record}"),1"
-	else
-		winCount=1
-	fi
+	action="$(cut -f 1 -s -d '_' <<< "${recordKey}")"
+	ruleType="$(cut -f 2 -s -d '_' <<< "${recordKey}")"
+	rule="$(cut -f 3 -s -d '_' <<< "${recordKey}")"
+	desktop="$(cut -f 4 -s -d '_' <<< "${recordKey}")"
+	_lock_acquire "${VARSFILE}" ${mypid}
+	record="$(awk -v recordKey="${recordKey}" \
+	'$1 == recordKey {print $0; exit}' < "${VARSFILE}")"
+	_lock_release "${VARSFILE}" ${mypid}
+	[ -n "${record}" ] || {
+		LogPrio="err" \
+		_log "recordKey ${recordKey}:" \
+			"GroupEnmossay: record not found in vars file"
+		return ${OK}
+	}
+	m="${recordKey}${SEP}"
+	for windowId in $(cut -f 2- -s -d "${SEP}" <<< "${record}"); do
+		if [ ${desktop} -ne $(WindowDesktop ${windowId} "${ruleType}" ${rule}) ]; then
+			LogPrio="warn" \
+			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+				"GroupEnmossay: window ${windowId} is not in current desktop"
+		else
+			GetMenuBarHeight ${windowId}
+			m="${m}${windowId}${SEP}"
+		fi
+	done
+	record="${m}"
+	let "winCount=$(wc -w <<< "${record}")-1,1"
+	[ ${winCount} -gt 0 ] || {
+		LogPrio="err" \
+		_log "recordKey ${recordKey}:" \
+			"GroupEnmossay: no windows to setup"
+		return ${OK}
+	}
 	if [ ${winCount} -eq 1 ]; then
+		windowId="$(cut -f 2 -s -d "${SEP}" <<< "${record}")"
 		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 			"WindowMosaic: maximizing"
 		WindowShow ${windowId}
@@ -463,115 +478,113 @@ WindowMosaic() {
 			LogPrio="err" \
 			_log "window ${windowId} ${ruleType} ${rule}:" \
 				"error maximizing"
+		return ${OK}
+	fi
+	numRows="$(cut -f 1 -s -d ' ' <<< "${val}")"
+	numCols="$(cut -f 2 -s -d ' ' <<< "${val}")"
+	maxRows="$(cut -f 3 -s -d ' ' <<< "${val}")"
+	maxCols="$(cut -f 4 -s -d ' ' <<< "${val}")"
+	rows=0
+	cols=0
+	if [ ${numCols} -gt 0 ]; then
+		let "rows=winCount%numCols == 0 ? winCount/numCols : (winCount/numCols)+1,1"
+		[ ${maxRows} -eq 0 -o ${rows} -le ${maxRows} ] || \
+			rows=${maxRows}
+		let "cols=winCount%rows == 0 ? winCount/rows : (winCount/rows)+1,1"
+	elif [ ${numRows} -gt 0 ]; then
+		let "cols=winCount%numRows == 0 ? winCount/numRows : (winCount/numRows)+1,1"
+		[ ${maxCols} -eq 0 -o ${cols} -le ${maxCols} ] || \
+			cols=${maxCols}
+		let "rows=winCount%cols == 0 ? winCount/cols : (winCount/cols)+1,1"
 	else
-		numRows="$(cut -f 1 -s -d ' ' <<< "${val}")"
-		numCols="$(cut -f 2 -s -d ' ' <<< "${val}")"
-		maxRows="$(cut -f 3 -s -d ' ' <<< "${val}")"
-		maxCols="$(cut -f 4 -s -d ' ' <<< "${val}")"
-		rows=0
-		cols=0
-		if [ ${numCols} -ne 0 ]; then
-			let "rows=winCount%numCols == 0 ? winCount/numCols : (winCount/numCols)+1,1"
-			[ ${maxRows} -eq 0 -o ${rows} -le ${maxRows} ] || \
-				rows=${maxRows}
-			let "cols=winCount%rows == 0 ? winCount/rows : (winCount/rows)+1,1"
-		elif [ ${numRows} -ne 0 ]; then
-			let "cols=winCount%numRows == 0 ? winCount/numRows : (winCount/numRows)+1,1"
-			[ ${maxCols} -eq 0 -o ${cols} -le ${maxCols} ] || \
-				cols=${maxCols}
-			let "rows=winCount%cols == 0 ? winCount/cols : (winCount/cols)+1,1"
+		i=1
+		while [ $((j=winCount%i == 0 ? winCount/i : (winCount+(i-1))/i)) -gt ${i} ] || \
+		[ $((j*i)) -lt ${winCount} ]; do
+			let "i++,1"
+		done
+		if [ ${numCols} -lt 0 ]; then
+			rows=${i}
+			cols=${j}
+		else
+			rows=${j}
+			cols=${i}
 		fi
-		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-			"WindowMosaic: ${cols} columns, ${rows} rows"
-		DesktopSize
-		col=0
-		row=0
-		let "wW=(desktopWorkareaW/cols)-5,1"
-		let "wH=(desktopWorkareaH/rows)-5,1"
-		for win in $(cut -f 2- -s -d "${SEP}" <<< "${record}") ${windowId}; do
-			if [ ${col} -eq 0 ]; then
-				let "row++,1"
-			fi
-			let "col++,1"
-			let "wX=desktopWorkareaX+(wW+5)*(col-1),1"
-			let "wY=desktopWorkareaY+(wH+3)*(row-1),1"
-			undecorated=0
-			IsWindowUndecorated ${win} || \
-				undecorated="${?}"
-			[ ${undecorated} -ne 2 ] || \
-				continue
-			w="${wW}"
-			[ ${undecorated} -ne 0 ] && \
-				let "h=wH-(MenuBarHeight/2),1" || \
-				h=${wH}
-			WindowShow ${win}
-			if [ ${rows} -eq 1 ]; then
-				wY=-1 h=-1
-				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
+	fi
+	_log "${action} ${ruleType} ${rule} desktop ${desktop}:" \
+		"GroupMosaic: ${cols} columns, ${rows} rows"
+	DesktopSize
+	col=0
+	row=0
+	let "wW=(desktopWorkareaW/cols)-5,1"
+	let "wH=(desktopWorkareaH/rows)-5,1"
+	for windowId in $(cut -f 2- -s -d "${SEP}" <<< "${record}"); do
+		if [ ${col} -eq 0 ]; then
+			let "row++,1"
+		fi
+		let "col++,1"
+		let "wX=desktopWorkareaX+(wW+5)*(col-1),1"
+		let "wY=desktopWorkareaY+(wH+3)*(row-1),1"
+		undecorated=0
+		IsWindowUndecorated ${windowId} || \
+			undecorated="${?}"
+		[ ${undecorated} -ne 2 ] || \
+			continue
+		w="${wW}"
+		[ ${undecorated} -ne 0 ] && \
+			let "h=wH-(MenuBarHeight/2),1" || \
+			h=${wH}
+		WindowShow ${windowId}
+		if [ ${rows} -eq 1 ]; then
+			wY=-1 h=-1
+			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+				"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+			wmctrl -i -r ${windowId} -e "0,${wX},${wY},${w},${h}" || \
+				LogPrio="err" \
+				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
-				wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
-					LogPrio="err" \
-					_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-						"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
-				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowMosaic: maximizing vert"
-				wmctrl -i -r ${win} -b add,maximized_vert || \
-					LogPrio="err" \
-					_log "window ${win} ${ruleType} ${rule}:" \
-						"error maximizing vert"
-			elif [ ${cols} -eq 1 ]; then
-				wX=-1; w=-1
-				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
-				wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
-					LogPrio="err" \
-					_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-						"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
-				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowMosaic: maximizing horz"
-				wmctrl -i -r ${win} -b add,maximized_horz || \
-					LogPrio="err" \
-					_log "window ${win} ${ruleType} ${rule}:" \
-						"error maximizing horz"
-			else
-				_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
-				wmctrl -i -r ${win} -e "0,${wX},${wY},${w},${h}" || \
-						LogPrio="err" \
-						_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-							"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
-			fi
-			if WindowGeometry ${win}; then
-				xdotool mousemove --window ${win} $((windowWidth/2)) $((windowHeight/2)) || \
-					LogPrio="err" \
-					_log "window ${win} ${ruleType} ${rule} desktop ${desktop}:" \
-						"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
-			else
+			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+				"WindowMosaic: maximizing vert"
+			wmctrl -i -r ${windowId} -b add,maximized_vert || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
-					"error setting position, can't get window geometry"
-				return ${OK}
-			fi
-			if [ ${col} -ge ${cols} ]; then
-				col=0
-			fi
-		done
-	fi
-	{ awk -v recordKey="${recordKey}" \
-		'$1 != recordKey {print $0}' < "${VARSFILE}"
-	printf '%s\n' "${record:-"${recordKey}${SEP}"}${windowId}${SEP}"
-	} > "${VARSFILE}.part"
-	mv -f "${VARSFILE}.part" "${VARSFILE}"
-}
-
-WindowEnmossay() {
-	local windowId="${1}" \
-		ruleType="${2}" \
-		rule="${3}" \
-		val="${4}"
-	_lock_acquire "${VARSFILE}" ${mypid}
-	WindowMosaic ${windowId} "${ruleType}" ${rule} "${val}" || :
-	_lock_release "${VARSFILE}" ${mypid}
+					"error maximizing vert"
+		elif [ ${cols} -eq 1 ]; then
+			wX=-1; w=-1
+			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+				"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+			wmctrl -i -r ${windowId} -e "0,${wX},${wY},${w},${h}" || \
+				LogPrio="err" \
+				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+				"WindowMosaic: maximizing horz"
+			wmctrl -i -r ${windowId} -b add,maximized_horz || \
+				LogPrio="err" \
+				_log "window ${windowId} ${ruleType} ${rule}:" \
+					"error maximizing horz"
+		else
+			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+				"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+			wmctrl -i -r ${windowId} -e "0,${wX},${wY},${w},${h}" || \
+					LogPrio="err" \
+					_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+						"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+		fi
+		if WindowGeometry ${windowId}; then
+			xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
+				LogPrio="err" \
+				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
+					"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
+		else
+			LogPrio="err" \
+			_log "window ${windowId} ${ruleType} ${rule}:" \
+				"error setting position, can't get window geometry"
+			return ${OK}
+		fi
+		if [ ${col} -ge ${cols} ]; then
+			col=0
+		fi
+	done
 }
 
 WindowPosition() {
@@ -672,11 +685,12 @@ WindowSetupRule() {
 	local windowId="${1}" \
 		ruleType="${2}" \
 		rule="${3}" \
-		index action val waitForFocus
+		index action val waitForFocus desktop record recordKey
 	_log "window ${windowId} ${ruleType} ${rule}:" \
 		"setting up"
 
 	waitForFocus=""
+	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
 
 	while IFS="[= ]" read -r index action val; do
 		val="$(_unquote "${val}")"
@@ -840,7 +854,25 @@ WindowSetupRule() {
 			fi
 			;;
 		set_mosaicked)
-			WindowEnmossay ${windowId} "${ruleType}" ${rule} "${val}"
+			recordKey="Mosaic_${ruleType}_${rule}_${desktop}"
+			_lock_acquire "${VARSFILE}" ${mypid}
+			record="$(awk -v recordKey="${recordKey}" \
+			'$1 == recordKey {print $0; exit}' < "${VARSFILE}")"
+			{ awk -v recordKey="${recordKey}" \
+			'$1 != recordKey {print $0}' < "${VARSFILE}"
+			printf '%s\n' "${record:-"${recordKey}${SEP}"}${windowId}${SEP}"
+			} > "${VARSFILE}.part"
+			mv -f "${VARSFILE}.part" "${VARSFILE}"
+			_lock_release "${VARSFILE}" ${mypid}
+			if record="$(grep -swF "${recordKey}" \
+			<<< "$(tr -s "${SEP}" '\n' <<< "${PendingMosaic}")")"; then
+				[ "${val}" = "$(cut -f 2 -s -d ' ' <<< "${record}")" ] || \
+					LogPrio="err" \
+					_log "${ruleType} ${rule}:" \
+						"have defined multiple Mosaic values (${val})"
+			else
+				PendingMosaic="${PendingMosaic}${recordKey} ${val}${SEP}"
+			fi
 			;;
 		set_minimized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
@@ -1394,6 +1426,7 @@ WindowsArrange() {
 		checkGlobalRules="${2}" \
 		checkRules="${3}" \
 		checkTempRules="${4:-}" \
+		PendingMosaic="" \
 		windowId mypid
 
 	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
@@ -1401,6 +1434,11 @@ WindowsArrange() {
 		WindowArrange ${windowId} \
 			"${checkGlobalRules}" "${checkRules}" "${checkTempRules}" || :
 	done
+	if [ -n "${PendingMosaic}" ]; then
+		while read -r recordKey val; do
+			GroupEnmossay "${recordKey}" "${val}"
+		done < <(tr -s "${SEP}" '\n' <<< "${PendingMosaic}")
+	fi
 }
 
 WindowsUpdate() {
@@ -1567,18 +1605,14 @@ Main() {
 			\[0\]=\"desktoparrange\"\ \[*)
 				DesktopArrange "${txt}"
 				;;
+			MenuBarHeight=*)
+				MenuBarHeight="$(cut -f 2 -s -d '=' <<< "${txt}")"
+				;;
 			*)
 				LogPrio="err" \
 				_log "Main: pipe received invalid message \"${txt}\""
 				;;
 			esac
-			if [ -z "${MenuBarHeight}" ]; then
-				_lock_acquire "${VARSFILE}" ${$}
-				MenuBarHeight="$(awk \
-				-v var="MenuBarHeight" -F '=' \
-				'$1 == var {print $2; exit}' < "${VARSFILE}")"
-				_lock_release "${VARSFILE}" ${$}
-			fi
 		elif ! xprop -root "_NET_SUPPORTING_WM_CHECK"; then
 			exit ${OK}
 		fi

@@ -1,8 +1,12 @@
 desktoparrange (0.35) unstable; urgency=medium
 
+  * action "set mosaicked":
+    smart arrange the mosaic when one of the parameters for rows or cols are set to -1
   * action "set mosaicked", four parameters.
     maxrows maxcols are optional, if not present will assume 0
       set mosaicked rows cols [maxrows maxcols]
+  * action "set mosaicked", arrange all windows at once.
+  * pass the value of MenuBarHeight throught the communication pipe.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 18 Oct 2022 10:35:35 +0200
 
