@@ -879,9 +879,11 @@ WindowSetupRule() {
 			} > "${VARSFILE}.part"
 			mv -f "${VARSFILE}.part" "${VARSFILE}"
 			_lock_release "${VARSFILE}" ${mypid}
+			_log "window ${windowId} ${ruleType} ${rule}:" \
+				"mosaic pending"
 			if record="$(grep -swF "${recordKey}" \
 			<<< "$(tr -s "${SEP}" '\n' <<< "${PendingMosaic}")")"; then
-				[ "${val}" = "$(cut -f 2 -s -d ' ' <<< "${record}")" ] || \
+				[ "${val}" = "$(cut -f 2- -s -d ' ' <<< "${record}")" ] || \
 					LogPrio="err" \
 					_log "${ruleType} ${rule}:" \
 						"have defined multiple Mosaic values (${val})"

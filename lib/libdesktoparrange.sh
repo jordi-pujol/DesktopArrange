@@ -617,8 +617,15 @@ RuleLine() {
 				p="${prop:2}" || \
 				p="${prop}"
 			case "${p}" in
+			set_mosaicked)
+				val="-1 0"
+				;;
 			set_stop | \
-			set_mosaicked | \
+			set_focus | \
+			set_closed | \
+			set_killed)
+				val="${AFFIRMATIVE}"
+				;;
 			set_maximized | \
 			set_maximized_horz | \
 			set_maximized_vert | \
@@ -629,12 +636,8 @@ RuleLine() {
 			set_undecorated | \
 			set_pinned | \
 			set_above | \
-			set_below | \
-			set_focus | \
-			set_closed | \
-			set_killed)
+			set_below)
 				if [ "${prop:0:2}" = "un" ]; then
-					prop="${prop:2}"
 					val="${NEGATIVE}"
 				else
 					val="${AFFIRMATIVE}"
@@ -646,39 +649,51 @@ RuleLine() {
 				return ${OK}
 				;;
 			esac
-		else
-			if [ "${prop:0:2}" = "un" ]; then
-				if [ "${val:0:1}" = "!" ]; then
-					LogPrio="warn" \
-					_log "${ruleType} ${ruleNumber}: \"${prop}\"" \
-						"ignoring wrong value \"${val}\"."
-					case "${prop:2}" in
-					set_stop | \
-					set_maximized | \
-					set_maximized_horz | \
-					set_maximized_vert | \
-					set_minimized | \
-					set_fullscreen | \
-					set_sticky | \
-					set_shaded | \
-					set_undecorated | \
-					set_pinned | \
-					set_above | \
-					set_below | \
-					set_focus | \
-					set_closed | \
-					set_killed)
-						val="${NEGATIVE}"
-						;;
-					*)
-						val=""
-						;;
-					esac
-				else
-					val="!${val}"
-				fi
+			[ "${prop:0:2}" != "un" ] || \
 				prop="${prop:2}"
+		elif [ "${prop:0:2}" = "un" ]; then
+			if [ "${val:0:1}" = "!" ]; then
+				LogPrio="warn" \
+				_log "${ruleType} ${ruleNumber}: \"${prop}\"" \
+					"ignoring wrong value \"${val}\"."
+				case "${prop:2}" in
+				set_stop | \
+				set_focus | \
+				set_closed | \
+				set_killed)
+					val="${AFFIRMATIVE}"
+					;;
+				set_maximized | \
+				set_maximized_horz | \
+				set_maximized_vert | \
+				set_minimized | \
+				set_fullscreen | \
+				set_sticky | \
+				set_shaded | \
+				set_undecorated | \
+				set_pinned | \
+				set_above | \
+				set_below)
+					val="${NEGATIVE}"
+					;;
+				*)
+					val=""
+					;;
+				esac
+			else
+				case "${prop:2}" in
+				set_stop | \
+				set_focus | \
+				set_closed | \
+				set_killed)
+					val="${AFFIRMATIVE}"
+					;;
+				*)
+					val="!${val}"
+					;;
+				esac
 			fi
+			prop="${prop:2}"
 		fi
 		;;
 	*)
