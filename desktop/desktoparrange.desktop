@@ -8,5 +8,6 @@ NoDisplay=true
 Terminal=false
 Type=Application
 X-DBUS-StartupType=wait
-X-GNOME-Autostart-Phase=Initialization
+X-GNOME-Autostart-Phase=Desktop
 X-KDE-autostart-phase=1
+X-KDE-autostart-after=panel

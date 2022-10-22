@@ -298,6 +298,88 @@ WindowTapKeys() {
 	setxkbmap ${xkbmap}
 }
 
+WindowPosition() {
+	local windowId="${1}" \
+		ruleType="${2}" \
+		rule="${3}" \
+		val="${4}" \
+		x y desktop
+	local windowWidth windowHeight windowX windowY windowScreen
+	local desktopNum desktopName desktopWidth desktopHeight \
+		desktopViewPosX desktopViewPosY \
+		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
+
+	WindowShow ${windowId}
+	WindowGeometry ${windowId} || {
+		LogPrio="err" \
+		_log "window ${windowId} ${ruleType} ${rule}:" \
+			"error setting position, can't get window geometry"
+		return ${OK}
+	}
+	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
+	DesktopSize ${desktop}
+
+	GetMenuBarHeight ${windowId}
+
+	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
+	if [ "${x}" = "${x//[^-0-9]}" ]; then
+		if [ ${x} -lt ${desktopWorkareaX} ]; then
+			x="left"
+		elif [ ${x} -ge $((desktopWorkareaX+desktopWorkareaW-windowWidth)) ]; then
+			x="right"
+		fi
+	fi
+	case "${x}" in
+	left)
+		x=${desktopWorkareaX}
+		;;
+	right)
+		let "x=desktopWorkareaX+desktopWorkareaW-windowWidth,1"
+		;;
+	center)
+		let "x=desktopWorkareaX+(desktopWorkareaW-windowWidth)/2,1"
+		;;
+	esac
+
+	y="$(cut -f 2 -s -d ' ' <<< "${val}")"
+	if [ "${y}" = "${y//[^-0-9]}" ]; then
+		if [ ${y} -lt ${desktopWorkareaY} ]; then
+			y="top"
+		elif [ ${y} -ge $((desktopWorkareaY+desktopWorkareaH-windowHeight)) ]; then
+			y="bottom"
+		fi
+	fi
+	case "${y,,}" in
+	top)
+		y=${desktopWorkareaY}
+		;;
+	bottom)
+		if IsWindowUndecorated ${windowId}; then
+			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight,1"
+		else
+			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight-MenuBarHeight/2,1"
+		fi
+		;;
+	center)
+		if IsWindowUndecorated ${windowId}; then
+			let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight)/2,1"
+		else
+			let "y=desktopWorkareaY-MenuBarHeight+(desktopWorkareaH-windowHeight)/2,1"
+		fi
+		;;
+	esac
+	_log "window ${windowId} ${ruleType} ${rule}:" \
+		"moving to (${val})=(${x} ${y})"
+	xdotool windowmove ${windowId} "${x}" "${y}" || \
+		LogPrio="err" \
+		_log "window ${windowId} ${ruleType} ${rule}:" \
+			"error moving to (${val})=(${x} ${y})"
+	xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
+		LogPrio="err" \
+		_log "window ${windowId} ${ruleType} ${rule}:" \
+			"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
+}
+
 WindowTile() {
 	local windowId="${1}" \
 		ruleType="${2}" \
@@ -312,7 +394,7 @@ WindowTile() {
 	WindowShow ${windowId}
 	GetMenuBarHeight ${windowId}
 	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
-	recordKey="tile_${ruleType}_${rule}_${desktop}"
+	recordKey="Tile_${ruleType}_${rule}_${desktop}"
 	_lock_acquire "${VARSFILE}" ${mypid}
 	record="$(awk -v recordKey="${recordKey}" \
 	'$1 == recordKey {print $0; exit}' < "${VARSFILE}")"
@@ -478,7 +560,7 @@ GroupEnmossay() {
 	if [ ${winCount} -eq 1 ]; then
 		windowId="$(cut -f 2 -s -d "${SEP}" <<< "${record}")"
 		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-			"WindowMosaic: maximizing"
+			"GroupEnmossay: maximizing"
 		WindowShow ${windowId}
 		wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || \
 			LogPrio="err" \
@@ -543,13 +625,13 @@ GroupEnmossay() {
 		if [ ${rows} -eq 1 ]; then
 			wY=-1 h=-1
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-				"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			wmctrl -i -r ${windowId} -e "0,${wX},${wY},${w},${h}" || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+					"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-				"WindowMosaic: maximizing vert"
+				"GroupEnmossay: maximizing vert"
 			wmctrl -i -r ${windowId} -b add,maximized_vert || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -557,24 +639,24 @@ GroupEnmossay() {
 		elif [ ${cols} -eq 1 ]; then
 			wX=-1; w=-1
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-				"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			wmctrl -i -r ${windowId} -e "0,${wX},${wY},${w},${h}" || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-					"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+					"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-				"WindowMosaic: maximizing horz"
+				"GroupEnmossay: maximizing horz"
 			wmctrl -i -r ${windowId} -b add,maximized_horz || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
 					"error maximizing horz"
 		else
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-				"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+				"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			wmctrl -i -r ${windowId} -e "0,${wX},${wY},${w},${h}" || \
 					LogPrio="err" \
 					_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
-						"WindowMosaic: moving to (${wX} ${wY}), resizing to (${w} ${h})"
+						"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 		fi
 		if WindowGeometry ${windowId}; then
 			xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
@@ -591,74 +673,6 @@ GroupEnmossay() {
 			col=0
 		fi
 	done
-}
-
-WindowPosition() {
-	local windowId="${1}" \
-		ruleType="${2}" \
-		rule="${3}" \
-		val="${4}" \
-		x y desktop
-	local windowWidth windowHeight windowX windowY windowScreen
-	local desktopNum desktopName desktopWidth desktopHeight \
-		desktopViewPosX desktopViewPosY \
-		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
-
-	WindowShow ${windowId}
-	WindowGeometry ${windowId} || {
-		LogPrio="err" \
-		_log "window ${windowId} ${ruleType} ${rule}:" \
-			"error setting position, can't get window geometry"
-		return ${OK}
-	}
-	desktop="$(WindowDesktop ${windowId} "${ruleType}" ${rule})"
-	DesktopSize ${desktop}
-
-	GetMenuBarHeight ${windowId}
-
-	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
-	case "${x}" in
-	left)
-		x=${desktopWorkareaX}
-		;;
-	right)
-		let "x=desktopWorkareaX+desktopWorkareaW-windowWidth,1"
-		;;
-	center)
-		let "x=desktopWorkareaX+(desktopWorkareaW-windowWidth)/2,1"
-		;;
-	esac
-
-	y="$(cut -f 2 -s -d ' ' <<< "${val}")"
-	case "${y,,}" in
-	top)
-		y=${desktopWorkareaY}
-		;;
-	bottom)
-		if IsWindowUndecorated ${windowId}; then
-			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight,1"
-		else
-			let "y=desktopWorkareaY+desktopWorkareaH-windowHeight-MenuBarHeight/2,1"
-		fi
-		;;
-	center)
-		if IsWindowUndecorated ${windowId}; then
-			let "y=desktopWorkareaY+(desktopWorkareaH-windowHeight)/2,1"
-		else
-			let "y=desktopWorkareaY-MenuBarHeight+(desktopWorkareaH-windowHeight)/2,1"
-		fi
-		;;
-	esac
-	_log "window ${windowId} ${ruleType} ${rule}:" \
-		"moving to (${val})=(${x} ${y})"
-	xdotool windowmove ${windowId} "${x}" "${y}" || \
-		LogPrio="err" \
-		_log "window ${windowId} ${ruleType} ${rule}:" \
-			"error moving to (${val})=(${x} ${y})"
-	xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
-		LogPrio="err" \
-		_log "window ${windowId} ${ruleType} ${rule}:" \
-			"error setting pointer to ($((windowWidth/2)) $((windowHeight/2)))"
 }
 
 WindowWaitFocus() {
@@ -1089,6 +1103,7 @@ WindowSetup() {
 		}
 		_log "window ${windowId}: end applying temporary rule ${setupTempRules}"
 	fi
+	return ${rc}
 }
 
 WindowSelect() {
@@ -1430,7 +1445,10 @@ WindowsArrange() {
 		PendingMosaic="" \
 		windowId mypid
 
-	mypid="$(($(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")))"
+	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
+	[ $(wc -w <<< "${mypid}") -ne 1 ]; do
+		sleep .1
+	done
 	for windowId in ${windowIds}; do
 		WindowArrange ${windowId} \
 			"${checkGlobalRules}" "${checkRules}" "${checkTempRules}" || :

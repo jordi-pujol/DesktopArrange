@@ -88,7 +88,7 @@ _lock_acquire() {
 			"requests already existent lock \"${lockfile}\""
 	while (set -o noclobber;
 	! echo ${pid} > "${lockfile}") 2> /dev/null; do
-		sleep 1 &
+		sleep .1 &
 		pidw=${!}
 		[ "${Debug}" != "xtrace" ] || \
 			LogPrio="debug" \
@@ -706,16 +706,6 @@ RuleLine() {
 	select_role)
 		eval ${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}=\'${deselected}${val}\'
 		;;
-	select_desktop | \
-	select_desktops)
-		_check_natural val ${NONE} "${deselected}"
-		eval ${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}=\'${val}\'
-		;;
-	select_desktop_size | \
-	select_desktop_workarea)
-		_check_fixedsize "${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}" \
-			"${val}" "" "${deselected}"
-		;;
 	select_maximized | \
 	select_maximized_horz | \
 	select_maximized_vert | \
@@ -730,6 +720,16 @@ RuleLine() {
 			return ${ERR}
 		}
 		_check_yn "${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}"
+		;;
+	select_desktop | \
+	select_desktops)
+		_check_natural val ${NONE} "${deselected}"
+		eval ${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}=\'${val}\'
+		;;
+	select_desktop_size | \
+	select_desktop_workarea)
+		_check_fixedsize "${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}" \
+			"${val}" "" "${deselected}"
 		;;
 	select_stop)
 		[ -z "${deselected}" ] || {
