@@ -586,7 +586,7 @@ GroupEnmossay() {
 		let "rows=winCount%cols == 0 ? winCount/cols : (winCount/cols)+1,1"
 	else
 		i=1
-		while [ $((j=winCount%i == 0 ? winCount/i : (winCount+(i-1))/i)) -gt ${i} ] || \
+		while [ $((j = winCount%i == 0 ? winCount/i : (winCount+(i/2))/i)) -gt ${i} ] || \
 		[ $((j*i)) -lt ${winCount} ]; do
 			let "i++,1"
 		done

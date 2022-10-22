@@ -618,6 +618,7 @@ RuleLine() {
 				p="${prop}"
 			case "${p}" in
 			set_stop | \
+			set_mosaicked | \
 			set_maximized | \
 			set_maximized_horz | \
 			set_maximized_vert | \
@@ -771,20 +772,16 @@ RuleLine() {
 		;;
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
-		if [ $(wc -w <<< "${val}") -lt 2 -o $(wc -w <<< "${val}") -gt 4 ]; then
-			LogPrio="err" \
-			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value \"${val}\""
-			return ${ERR}
-		fi
 		val1="$(cut -f -2 -s -d ' ' <<< "${val}")"
-		_check_integer_pair val1 "0" "0"
+		_check_integer_pair val1 "-1" "0" || \
+			val1="-1 0"
 		val2="$(cut -f 3- -s -d ' ' <<< "${val}")"
 		[ $(wc -w <<< "${val2}") -eq 2 ] && \
 			_check_integer_pair val2 "0" "0" || \
 			val2="0 0"
 		val="${val1} ${val2}"
 		if [ "${val1}" = "0 0" ]; then
-			val="2 0 0 0"
+			val="-1 0 0 0"
 			LogPrio="warn" \
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value. Assuming \"${val}\""
 		fi
