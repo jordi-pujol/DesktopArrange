@@ -35,6 +35,16 @@ _unquote() {
 		sed -re "s/^([\"](.*)[\"]|['](.*)['])$/\2\3/"
 }
 
+# _cut -f 2- -s -d ' ' '[:blank:]'
+_cut() {
+	declare -a parms=("${@}")
+	local c="${#parms[@]}"
+	local sep="${parms[$((c-1))]}"
+	unset parms[$((c-1))]
+	tr -s "${sep}" "${parms[$((c-2))]}" | \
+		cut "${parms[@]}"
+}
+
 _datetime() {
 	date +'%F %X'
 }
@@ -133,11 +143,11 @@ _check_integer_pair() {
 		v="" w x y rc=${OK}
 	eval w=\"\${${n}:-}\"
 	w="$(tr -s '[:blank:],:x' ' ' <<< "${w,,}")"
-	x="$(cut -f 1 -s -d ' ' <<< "${w}")"
+	x="$(_cut -f 1 -s -d ' ' [:blank:] <<< "${w}")"
 	if [ "${x}" = "${x//[^[:digit:]-]/}" ]; then
 		_check_integer x "${d1}"
 	fi
-	y="$(cut -f 2 -s -d ' ' <<< "${w}")"
+	y="$(_cut -f 2 -s -d ' ' [:blank:] <<< "${w}")"
 	if [ "${y}" = "${y//[^[:digit:]-]/}" ]; then
 		_check_integer y "${d2}"
 	fi
@@ -787,10 +797,10 @@ RuleLine() {
 		;;
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
-		val1="$(cut -f -2 -s -d ' ' <<< "${val}")"
+		val1="$(_cut -f -2 -s -d ' ' [:blank:] <<< "${val}")"
 		_check_integer_pair val1 "-1" "0" || \
 			val1="-1 0"
-		val2="$(cut -f 3- -s -d ' ' <<< "${val}")"
+		val2="$(_cut -f 3- -s -d ' ' [:blank:] <<< "${val}")"
 		[ $(wc -w <<< "${val2}") -eq 2 ] && \
 			_check_integer_pair val2 "0" "0" || \
 			val2="0 0"

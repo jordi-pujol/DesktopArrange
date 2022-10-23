@@ -128,14 +128,14 @@ PointerMove() {
 		x y
 	local windowWidth windowHeight windowX windowY windowScreen
 	WindowGeometry ${windowId}
-	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
+	x="$(_cut -f 1 -s -d ' ' '[:blank:]' <<< "${val}")"
 	[ "${x//%}" != "${x}" ] && \
 		let "x=windowWidth*${x//%/\/100},1" || \
 		let "x=x,1"
 	[ -n "${x}" ] && \
 	[ ${x} -ge 0 -a ${x} -lt "${windowWidth}" ] || \
 		let "x=windowWidth/2,1"
-	y="$(cut -f 2 -s -d ' ' <<< "${val}")"
+	y="$(_cut -f 2 -s -d ' ' '[:blank:]' <<< "${val}")"
 	[ "${y//%}" != "${y}" ] && \
 		let "y=windowHeight*${y//%/\/100},1" || \
 		let "y=y,1"
@@ -321,7 +321,7 @@ WindowPosition() {
 
 	GetMenuBarHeight ${windowId}
 
-	x="$(cut -f 1 -s -d ' ' <<< "${val}")"
+	x="$(_cut -f 1 -s -d ' ' '[:blank:]' <<< "${val}")"
 	if [ "${x}" = "${x//[^-0-9]}" ]; then
 		if [ ${x} -lt ${desktopWorkareaX} ]; then
 			x="left"
@@ -341,7 +341,7 @@ WindowPosition() {
 		;;
 	esac
 
-	y="$(cut -f 2 -s -d ' ' <<< "${val}")"
+	y="$(_cut -f 2 -s -d ' ' '[:blank:]' <<< "${val}")"
 	if [ "${y}" = "${y//[^-0-9]}" ]; then
 		if [ ${y} -lt ${desktopWorkareaY} ]; then
 			y="top"
@@ -430,7 +430,7 @@ WindowTile() {
 			_log "window ${windowId} ${ruleType} ${rule}:" \
 				"WindowTile: ${record:-${ruleType}${rule}} ${windowId}"
 			DesktopSize ${desktop}
-			x="$(cut -f 3 -s -d ' ' <<< "${val}")"
+			x="$(_cut -f 3 -s -d ' ' '[:blank:]' <<< "${val}")"
 			if [ "${x}" = "x" ]; then
 				let "x=windowX,1"
 			else
@@ -449,7 +449,7 @@ WindowTile() {
 					let "x=windowX,1"
 				fi
 			fi
-			y="$(cut -f 4 -s -d ' ' <<< "${val}")"
+			y="$(_cut -f 4 -s -d ' ' '[:blank:]' <<< "${val}")"
 			if [ "${y}" = "y" ]; then
 				let "y=windowY,1"
 			else
@@ -478,12 +478,12 @@ WindowTile() {
 				let "y-=MenuBarHeight,1"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 				"WindowTile: tiling to" \
-				"($(cut -f 3- -s -d ' ' <<< "${val}"))=(${x} ${y})"
+				"($(_cut -f 3- -s -d ' ' '[:blank:]' <<< "${val}"))=(${x} ${y})"
 			xdotool windowmove ${windowId} ${x} ${y} || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 					"WindowTile: can't tile to" \
-					"($(cut -f 3- -s -d ' ' <<< "${val}"))=(${x} ${y})"
+					"($(_cut -f 3- -s -d ' ' '[:blank:]' <<< "${val}"))=(${x} ${y})"
 			xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
@@ -494,7 +494,7 @@ WindowTile() {
 		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 			"WindowTile: It's the first window to tile"
 		WindowPosition ${windowId} "${ruleType}" ${rule} \
-			"$(cut -f -2 -s -d ' ' <<< "${val}")"
+			"$(_cut -f -2 -s -d ' ' '[:blank:]' <<< "${val}")"
 	fi
 	_lock_acquire "${VARSFILE}" ${mypid}
 	{ awk -v recordKey="${recordKey}" \
@@ -568,10 +568,10 @@ GroupEnmossay() {
 				"error maximizing"
 		return ${OK}
 	fi
-	numRows="$(cut -f 1 -s -d ' ' <<< "${val}")"
-	numCols="$(cut -f 2 -s -d ' ' <<< "${val}")"
-	maxRows="$(cut -f 3 -s -d ' ' <<< "${val}")"
-	maxCols="$(cut -f 4 -s -d ' ' <<< "${val}")"
+	numRows="$(_cut -f 1 -s -d ' ' '[:blank:]' <<< "${val}")"
+	numCols="$(_cut -f 2 -s -d ' ' '[:blank:]' <<< "${val}")"
+	maxRows="$(_cut -f 3 -s -d ' ' '[:blank:]' <<< "${val}")"
+	maxCols="$(_cut -f 4 -s -d ' ' '[:blank:]' <<< "${val}")"
 	rows=0
 	cols=0
 	if [ ${numCols} -gt 0 ]; then
@@ -883,7 +883,7 @@ WindowSetupRule() {
 				"mosaic pending"
 			if record="$(grep -swF "${recordKey}" \
 			<<< "$(tr -s "${SEP}" '\n' <<< "${PendingMosaic}")")"; then
-				[ "${val}" = "$(cut -f 2- -s -d ' ' <<< "${record}")" ] || \
+				[ "${val}" = "$(_cut -f 2- -s -d ' ' '[:blank:]' <<< "${record}")" ] || \
 					LogPrio="err" \
 					_log "${ruleType} ${rule}:" \
 						"have defined multiple Mosaic values (${val})"
