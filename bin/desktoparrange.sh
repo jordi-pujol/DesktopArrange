@@ -1728,9 +1728,10 @@ desktoparrange)
 		CheckTempRule "${cmd}"
 		if [ -n "${rule}" ] && \
 		ListRules "Temprule" "${rule}" | \
-		sed -e "\|^Temprule${rule}_|s||Temprule_|"&& \
+		sed -e "\|^Temprule${rule}_|s||Temprule_|" && \
 		[ -z "${msg}" ]; then
 			printf '%s\n' "${cmd}" >> "${PIPE}"
+			echo "info: interactive command has been submitted" >&2
 		else
 			[ -z "${msg}" ] || \
 				printf '%s\n' "${msg}" >&2
