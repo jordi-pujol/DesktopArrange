@@ -1526,24 +1526,22 @@ TempRuleLine() {
 	fi
 	grep -swEe '^(select|deselect|set|unset)' <<< "${line}" && \
 	RuleLine "${ruleType}" "${rule}" "${line}" || {
+		msg="DesktopArrange: invalid command: \"${line}\""
 		LogPrio="err" \
-		_log "DesktopArrange: invalid command: \"${line}\""
+		_log "${msg}"
 		return ${ERR}
 	}
 	line=""
 }
 
-DesktopArrange() {
+CheckTempRule() {
 	local cmd="${1}" \
 		ruleType="Temprule" \
 		indexTempruleSet indexTempruleSelect \
-		rule line ParmsArray i \
-		winIds
-
-	LogPrio="debug" \
-	_log "DesktopArrange: received command \"${cmd}\""
+		line ParmsArray i
 
 	rule=""
+	msg=""
 	indexTempruleSelect=0
 	indexTempruleSet=0
 
@@ -1560,10 +1558,22 @@ DesktopArrange() {
 	done
 	TempRuleLine || \
 		return ${OK}
-
-	[ -n "${rule}" ] || \
+	[ -n "${rule}" ] || {
+		msg="DesktopArrange: line does not contain any command"
 		LogPrio="warn" \
-		_log "DesktopArrange: line does not contain any command"
+		_log "${msg}"
+	}
+}
+
+DesktopArrange() {
+	local cmd="${1}" \
+		rule msg \
+		winIds
+
+	LogPrio="debug" \
+	_log "DesktopArrange: received command \"${cmd}\""
+
+	CheckTempRule "${cmd}"
 
 	winIds="$(wmctrl -l | \
 		awk -v desktop="$(DesktopCurrent)" \
@@ -1711,9 +1721,21 @@ status)
 desktoparrange)
 	if pid="$(AlreadyRunning)"; then
 		echo "info: Interactive command: ${@}" >&2
-		declare -p ARGV | \
-			sed -re '\|^declare -ar ARGV=\((.*)\)$|s||\1|' \
-			>> "${PIPE}"
+		rule=""
+		msg=""
+		cmd="$(declare -p ARGV | \
+			sed -re '\|^declare -ar ARGV=\((.*)\)$|s||\1|')"
+		CheckTempRule "${cmd}"
+		if [ -n "${rule}" ] && \
+		ListRules "Temprule" "${rule}" && \
+		[ -z "${msg}" ]; then
+			printf '%s\n' "${cmd}" >> "${PIPE}"
+		else
+			[ -z "${msg}" ] || \
+				printf '%s\n' "${msg}" >&2
+			echo "err: ${APPNAME} invalid command \"${cmd}\"" >&2
+			exit ${ERR}
+		fi
 	else
 		echo "err: ${APPNAME} is not running for this session" >&2
 		exit ${ERR}

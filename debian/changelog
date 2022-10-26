@@ -1,6 +1,11 @@
 desktoparrange (0.36) unstable; urgency=medium
 
-  * l
+  * lock files just before and after reading or writing.
+  * the function _cut is a wrapper for the cut utility
+    to accept any kind of space as separator.
+  * interactive commands to arrange desktops:
+    - interactive checking the command line
+      and list the temporary rule on the terminal.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Thu, 20 Oct 2022 08:07:22 +0200
 

@@ -945,6 +945,40 @@ ReadConfig() {
 	}
 }
 
+ListRules() {
+	local ruleType="${1}" \
+		checkRules="${2:-}" \
+		rule
+
+	[ -n "${checkRules}" ] || \
+	checkRules="$(echo \
+		$(seq 1 "$( \
+			[ "${ruleType}" = "Rule" ] \
+			&& echo ${Rules} \
+			|| echo ${GlobalRules})"))"
+
+	for rule in ${checkRules}; do
+		echo
+		if ! set | \
+		grep -sEe "^${ruleType}${rule}_[[:digit:]]+_set_.*=" | \
+		sort --numeric --field-separator="_" --key 2,2; then
+			eval "${ruleType}${rule}_0_select_noactions='y'"
+			msg="${ruleType} ${rule}: hasn't defined any property to set"
+			LogPrio="warn" \
+			_log "${msg}"
+		fi
+		if ! set | \
+		grep -sEe "^${ruleType}${rule}_[[:digit:]]+_select_.*=" | \
+		sort --numeric --field-separator="_" --key 2,2; then
+			msg="${ruleType} ${rule}: hasn't defined any property to select"
+			LogPrio="err" \
+			_log "${msg}"
+			return ${ERR}
+		fi
+	done
+	echo
+}
+
 LoadConfig() {
 	local rule dbg config emptylist windowinfo \
 		msg="Loading configuration"
@@ -1052,54 +1086,16 @@ LoadConfig() {
 		LogPrio="warn" \
 		_log "Have not configured any global rule"
 	else
-		rule=${NONE}
-		while [ $((rule++)) -lt ${GlobalRules} ]; do
-			echo
-			if ! set | \
-			grep -sEe "^Globalrule${rule}_[[:digit:]]+_set_.*=" | \
-			sort --numeric --field-separator="_" --key 2,2; then
-				eval Globalrule${rule}_0_select_noactions='y'
-				LogPrio="warn" \
-				_log "global rule ${rule}:" \
-					"hasn't defined any property to set"
-			fi
-			if ! set | \
-			grep -sEe "^Globalrule${rule}_[[:digit:]]+_select_.*=" | \
-			sort --numeric --field-separator="_" --key 2,2; then
-				LogPrio="err" \
-				_log "global rule ${rule}:" \
-					"hasn't defined any property to select"
-				exit ${ERR}
-			fi
-		done
-		echo
+		ListRules "Globalrule" || \
+			exit ${ERR}
 	fi >> "${LOGFILE}"
 
 	if [ ${Rules} -eq ${NONE} ]; then
 		LogPrio="warn" \
 		_log "Have not configured any rule"
 	else
-		rule=${NONE}
-		while [ $((rule++)) -lt ${Rules} ]; do
-			echo
-			if ! set | \
-			grep -sEe "^Rule${rule}_[[:digit:]]+_set_.*=" | \
-			sort --numeric --field-separator="_" --key 2,2; then
-				eval Rule${rule}_0_select_noactions='y'
-				LogPrio="warn" \
-				_log "rule ${rule}:" \
-					"hasn't defined any property to set"
-			fi
-			if ! set | \
-			grep -sEe "^Rule${rule}_[[:digit:]]+_select_.*=" | \
-			sort --numeric --field-separator="_" --key 2,2; then
-				LogPrio="err" \
-				_log "${ruleName} ${rule}:" \
-					"hasn't defined any property to select"
-				exit ${ERR}
-			fi
-		done
-		echo
+		ListRules "Rule" || \
+			exit ${ERR}
 	fi >> "${LOGFILE}"
 
 	_log "Configuration reloaded"
