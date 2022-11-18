@@ -859,12 +859,12 @@ ReadConfig() {
 			continue
 		if grep -qsxiEe 'parameters[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
 			printf '%s\n' "Parameters {"
-			[ -z "${foundRule}" -a -z  "${foundGlobalRule}" ] || \
+			[ -z "${foundParm}" -a -z "${foundRule}" -a -z "${foundGlobalRule}" ] || \
 				return ${ERR}
 			foundParm="y"
 		elif grep -qsxiEe 'rule[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
 			printf '%s\n' "Rule {"
-			[ -z "${foundParm}" -a -z  "${foundGlobalRule}" ] || \
+			[ -z "${foundParm}" -a -z "${foundRule}" -a -z "${foundGlobalRule}" ] || \
 				return ${ERR}
 			foundRule="y"
 			let Rules++,1
@@ -872,7 +872,7 @@ ReadConfig() {
 			indexRuleSelect=0
 		elif grep -qsxiEe 'global[[:blank:]]*rule[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
 			printf '%s\n' "Global Rule {"
-			[ -z "${foundParm}" -a -z "${foundRule}" ] || \
+			[ -z "${foundParm}" -a -z "${foundRule}" -a -z "${foundGlobalRule}" ] || \
 				return ${ERR}
 			foundGlobalRule="y"
 			let GlobalRules++,1
@@ -880,6 +880,8 @@ ReadConfig() {
 			indexGlobalruleSelect=0
 		elif grep -qsxiEe '\}[[:blank:]]*' <<< "${line,,}"; then
 			printf '%s\n' "}" ""
+			[ -n "${foundParm}" -o -n "${foundRule}" -o -n "${foundGlobalRule}" ] || \
+				return ${ERR}
 			foundParm=""
 			foundRule=""
 			foundGlobalRule=""
@@ -968,7 +970,7 @@ ListRules() {
 }
 
 LoadConfig() {
-	local rule dbg globalConfig config emptylist windowinfo \
+	local rule dbg systemConfig config emptylist windowinfo \
 		msg="Loading configuration"
 
 	# config variables, default values
@@ -978,7 +980,7 @@ LoadConfig() {
 	emptylist=""
 	WindowInfo=""
 	windowinfo=""
-	globalConfig="/etc/${APPNAME}/config.txt"
+	systemConfig="/etc/${APPNAME}/config.txt"
 	config="${HOME}/.config/${APPNAME}/config.txt"
 	unset $(awk -F '=' \
 		'$1 ~ "^(Globalrule|Rule|Temprule)[[:digit:]]*_" {print $1}' \
@@ -1031,11 +1033,11 @@ LoadConfig() {
 	rm -f "${VARSFILE}"*
 	: > "${VARSFILE}"
 
-	if [ -f "${globalConfig}" -a -s "${globalConfig}" ] \
-	&& ! ReadConfig "${globalConfig}"; then
+	if [ -f "${systemConfig}" -a -s "${systemConfig}" ] \
+	&& ! ReadConfig "${systemConfig}"; then
 		LogPrio="err" \
 		_log "Syntax error in config file:" \
-			"\"${globalConfig}\""
+			"\"${systemConfig}\""
 		exit ${ERR}
 	fi
 

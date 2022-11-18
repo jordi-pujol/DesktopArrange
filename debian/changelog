@@ -1,6 +1,6 @@
 desktoparrange (0.38) unstable; urgency=medium
 
-  * global configuration file /etc/desktoparrange/config.txt
+  * system configuration file /etc/desktoparrange/config.txt
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Fri, 18 Nov 2022 04:16:36 +0100
 
