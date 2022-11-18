@@ -1,8 +1,13 @@
+desktoparrange (0.38) unstable; urgency=medium
+
+  * global configuration file /etc/desktoparrange/config.txt
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Fri, 18 Nov 2022 04:16:36 +0100
+
 desktoparrange (0.37) unstable; urgency=medium
 
-  * remove function _cut,
+  * remove function _cut, because is not needed.
     previously introduced as a wrapper for the cut utility
-    because is not needed.
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Wed, 26 Oct 2022 06:31:10 +0200
 

@@ -2,3 +2,4 @@ bin/desktoparrange.sh			usr/bin
 lib/desktoparrange-endwaiting.sh			usr/lib/desktoparrange
 lib/libdesktoparrange.sh			usr/lib/desktoparrange
 desktop/desktoparrange.desktop				etc/xdg/autostart
+conf/config.txt					etc/desktoparrange

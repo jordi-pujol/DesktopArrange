@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.37 $
+#  $Revision: 0.38 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -845,14 +845,14 @@ RuleLine() {
 }
 
 ReadConfig() {
-	local foundParm="" foundRule="" foundGlobalRule="" \
-	indexRuleSet indexRuleSelect \
-	indexGlobalruleSet indexGlobalruleSelect
+	local config="${1}" \
+		foundParm="" foundRule="" foundGlobalRule="" \
+		indexRuleSet indexRuleSelect \
+		indexGlobalruleSet indexGlobalruleSelect
 
-	Rules=${NONE}
-	GlobalRules=${NONE}
-	rm -f "${VARSFILE}"*
-	: > "${VARSFILE}"
+	_log "Reading config file" \
+		"\"${config}\""
+
 	while read -r line; do
 		[ -n "${line}" ] && \
 		[ "${line:0:1}" != "#" ] || \
@@ -951,14 +951,14 @@ ListRules() {
 		grep -sEe "^${ruleType}${rule}_[[:digit:]]+_set_.*=" | \
 		sort --numeric --field-separator="_" --key 2,2; then
 			eval "${ruleType}${rule}_0_select_noactions='y'"
-			msg="${ruleType} ${rule}: hasn't defined any property to set"
+			msg="${ruleType} ${rule}: have not defined any property to set"
 			LogPrio="warn" \
 			_log "${msg}"
 		fi
 		if ! set | \
 		grep -sEe "^${ruleType}${rule}_[[:digit:]]+_select_.*=" | \
 		sort --numeric --field-separator="_" --key 2,2; then
-			msg="${ruleType} ${rule}: hasn't defined any property to select"
+			msg="${ruleType} ${rule}: have not defined any property to select"
 			LogPrio="err" \
 			_log "${msg}"
 			return ${ERR}
@@ -968,7 +968,7 @@ ListRules() {
 }
 
 LoadConfig() {
-	local rule dbg config emptylist windowinfo \
+	local rule dbg globalConfig config emptylist windowinfo \
 		msg="Loading configuration"
 
 	# config variables, default values
@@ -978,6 +978,7 @@ LoadConfig() {
 	emptylist=""
 	WindowInfo=""
 	windowinfo=""
+	globalConfig="/etc/${APPNAME}/config.txt"
 	config="${HOME}/.config/${APPNAME}/config.txt"
 	unset $(awk -F '=' \
 		'$1 ~ "^(Globalrule|Rule|Temprule)[[:digit:]]*_" {print $1}' \
@@ -1025,7 +1026,20 @@ LoadConfig() {
 		exit ${ERR}
 	}
 
-	ReadConfig || {
+	Rules=${NONE}
+	GlobalRules=${NONE}
+	rm -f "${VARSFILE}"*
+	: > "${VARSFILE}"
+
+	if [ -f "${globalConfig}" -a -s "${globalConfig}" ] \
+	&& ! ReadConfig "${globalConfig}"; then
+		LogPrio="err" \
+		_log "Syntax error in config file:" \
+			"\"${globalConfig}\""
+		exit ${ERR}
+	fi
+
+	ReadConfig "${config}" || {
 		LogPrio="err" \
 		_log "Syntax error in config file:" \
 			"\"${config}\""

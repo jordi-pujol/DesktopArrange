@@ -14,7 +14,7 @@ Standards-Version: 4.5.1
 
 Package: desktoparrange
 Architecture: all
-Description: #  Arrange Linux worskpaces
+Description: Arrange Linux worskpaces
  according to a set of configurable rules.
 Depends: ${misc:Depends},
  gawk,
