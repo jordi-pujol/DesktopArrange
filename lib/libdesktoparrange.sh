@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.38 $
+#  $Revision: 0.39 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -714,6 +714,7 @@ RuleLine() {
 	}
 	case "${prop}" in
 	select_title | \
+	select_name | \
 	select_state | \
 	select_type | \
 	select_app_name | \
@@ -737,7 +738,12 @@ RuleLine() {
 		}
 		_check_yn "${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}" "${val}"
 		;;
-	select_desktop | \
+	select_desktop)
+		[ "${val}" = "current" ] && \
+			val="${deselected}${val}" || \
+			_check_natural val ${NONE} "${deselected}"
+		eval ${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}=\'${val}\'
+		;;
 	select_desktops)
 		_check_natural val ${NONE} "${deselected}"
 		eval ${ruleType}${ruleNumber}_$((++indexToSelect))_${prop}=\'${val}\'

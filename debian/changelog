@@ -1,3 +1,17 @@
+desktoparrange (0.39) unstable; urgency=medium
+
+  * new desktoparrange option 'execute':
+    - interactive command: execute
+    Describes a temporary rule that must be executed
+    on every window of this session
+  * rules:
+    - select/deselect name 'regexp'
+      select windows by title checking the regular expression 'regexp'
+  * rules, 'select desktop current':
+    - special value 'current' to select/deselect windows by desktop number
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Fri, 18 Nov 2022 15:16:19 +0100
+
 desktoparrange (0.38) unstable; urgency=medium
 
   * system configuration file /etc/desktoparrange/config.txt

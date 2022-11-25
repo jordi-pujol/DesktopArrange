@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.38 $
+#  $Revision: 0.39 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -1152,6 +1152,27 @@ WindowSelect() {
 				fi
 				continue
 			fi
+			if [ "${prop}" = "select_name" ]; then
+				deselected=""
+				[ "${val:0:1}" != "!" ] || {
+					deselected="!"
+					val="${val:1}"
+				}
+				if grep -qs -iEe "${val}" <<< "$(WindowTitle ${windowId})"; then
+					_log "window ${windowId} ${ruleType} ${rule}:" \
+						"${deselected:+"does not "}match" \
+						"name \"${deselected}${val}\""
+					[ -z "${deselected}" ] || \
+						rc=""
+				else
+					_log "window ${windowId} ${ruleType} ${rule}:" \
+						"$([ -n "${deselected}" ] || echo "does not ")match" \
+						"name \"${deselected}${val}\""
+					[ -n "${deselected}" ] || \
+						rc=""
+				fi
+				continue
+			fi
 			val="$(_trim "${val,,}")"
 			deselected=""
 			[ "${val:0:1}" != "!" ] || {
@@ -1558,11 +1579,8 @@ CheckTempRule() {
 	done
 	TempRuleLine || \
 		return ${OK}
-	[ -n "${rule}" ] || {
+	[ -n "${rule}" ] || \
 		msg="DesktopArrange: line does not contain any command"
-		LogPrio="warn" \
-		_log "${msg}"
-	}
 }
 
 DesktopArrange() {
@@ -1574,19 +1592,50 @@ DesktopArrange() {
 	_log "DesktopArrange: received command \"${cmd}\""
 
 	CheckTempRule "${cmd}"
+	[ -n "${rule}" -a -z "${msg}" ] || {
+		LogPrio="warn" \
+		_log "${msg:-"DesktopArrange: line does not contain any command"}"
+		return ${OK}
+	}
 
-	winIds="$(wmctrl -l | \
-		awk -v desktop="$(DesktopCurrent)" \
-		'BEGIN{ORS="\t"}
-		$2 == desktop {print $1; rc=-1}
-		END{exit rc+1}')" || \
-			return ${OK}
+	case "${cmd}" in
+	\[0\]=\"desktoparrange\"\ \[*)
+		winIds="$(wmctrl -l | \
+			awk -v desktop="$(DesktopCurrent)" \
+			'BEGIN{ORS="\t"}
+			$2 == desktop {print $1; rc=-1}
+			END{exit rc+1}')" || {
+				LogPrio="err" \
+				_log "DesktopArrange: no windows in current desktop"
+				return ${OK}
+			}
+		;;
+	\[0\]=\"execute\"\ \[*)
+		winIds="$(wmctrl -l | \
+			awk \
+			'BEGIN{ORS="\t"}
+			$2 != -1 {print $1; rc=-1}
+			END{exit rc+1}')" || {
+				LogPrio="err" \
+				_log "DesktopArrange: no windows"
+				return ${OK}
+			}
+		;;
+	*)
+		LogPrio="err" \
+		_log "DesktopArrange: invalid command"
+		return ${OK}
+		;;
+	esac
 
 	winIds="$(xprop -root "_NET_CLIENT_LIST_STACKING" | \
 		cut -f 2- -s -d '#' | \
 		tr -s '[:space:],' '\n' | \
-		grep -swF "$(printf '0x%0x\n' ${winIds})")" || \
+		grep -swF "$(printf '0x%0x\n' ${winIds})")" || {
+			LogPrio="err" \
+			_log "DesktopArrange: no windows in stack"
 			return ${OK}
+		}
 
 	WindowsArrange "${winIds}" "Globalrule" "" "${rule}" &
 }
@@ -1637,7 +1686,8 @@ Main() {
 			reload)
 				LoadConfig "${@}"
 				;;
-			\[0\]=\"desktoparrange\"\ \[*)
+			\[0\]=\"desktoparrange\"\ \[* | \
+			\[0\]=\"execute\"\ \[*)
 				DesktopArrange "${txt}"
 				;;
 			MenuBarHeight=*)
@@ -1718,7 +1768,8 @@ status)
 		exit ${ERR}
 	fi
 	;;
-desktoparrange)
+desktoparrange | \
+execute)
 	if pid="$(AlreadyRunning)"; then
 		echo "info: Interactive command: ${@}" >&2
 		rule=""
@@ -1787,7 +1838,7 @@ windowinfo)
 *)
 	echo "err: wrong action." >&2
 	echo "info: valid actions are:" >&2
-	echo "start|stop|restart|reload|status|windowinfo|desktoparrange" >&2
+	echo "start|stop|restart|reload|status|windowinfo|desktoparrange|execute" >&2
 	exit ${ERR}
 	;;
 esac
