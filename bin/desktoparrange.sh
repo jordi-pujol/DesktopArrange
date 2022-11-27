@@ -1113,7 +1113,7 @@ WindowSelect() {
 		ruleType="${2}" \
 		checkRules="${3:-}" \
 		rules rule propName netState \
-		index prop val \
+		index prop val val1 \
 		deselected selectNoactions rc
 
 	[ -n "${checkRules}" ] || \
@@ -1272,7 +1272,17 @@ WindowSelect() {
 				fi
 				;;
 			select_desktop)
-				if [ "${val}" = "$(WindowDesktop ${windowId} "${ruleType}" ${rule})" ]; then
+				if [ "${val}" = "${val//[^0-9]}" ]; then
+					val1="${val}"
+				elif [ "${val}" = "current" ]; then
+					val1="$(DesktopCurrent)"
+				else
+					LogPrio="err" \
+					_log "window ${windowId} ${ruleType} ${rule}:" \
+						"can't select invalid desktop \"${val}\""
+					continue
+				fi
+				if [ ${val1} -eq $(WindowDesktop ${windowId} "${ruleType}" ${rule}) ]; then
 					_log "window ${windowId} ${ruleType} ${rule}:" \
 						"${deselected:+"does not "}match" \
 						"desktop \"${deselected}${val}\""
@@ -1623,7 +1633,7 @@ DesktopArrange() {
 		;;
 	*)
 		LogPrio="err" \
-		_log "DesktopArrange: invalid command"
+		_log "DesktopArrange: invalid command \"${cmd}\""
 		return ${OK}
 		;;
 	esac
