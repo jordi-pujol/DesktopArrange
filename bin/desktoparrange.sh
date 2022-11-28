@@ -561,6 +561,7 @@ GroupEnmossay() {
 		windowId="$(cut -f 2 -s -d "${SEP}" <<< "${record}")"
 		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 			"GroupEnmossay: maximizing"
+		WindowWaitFocus ${windowId} "${ruleType}" ${rule}
 		WindowShow ${windowId}
 		wmctrl -i -r ${windowId} -b add,maximized_horz,maximized_vert || \
 			LogPrio="err" \
@@ -621,6 +622,7 @@ GroupEnmossay() {
 		[ ${undecorated} -ne 0 ] && \
 			let "h=wH-(MenuBarHeight/2),1" || \
 			h=${wH}
+		WindowWaitFocus ${windowId} "${ruleType}" ${rule}
 		WindowShow ${windowId}
 		if [ ${rows} -eq 1 ]; then
 			wY=-1 h=-1
@@ -679,7 +681,7 @@ WindowWaitFocus() {
 	local windowId="${1}" \
 		ruleType="${2}" \
 		rule="${3}" \
-		waitForFocus="${4}"
+		waitForFocus="${4:-}"
 	[[ $(WindowActive) -ne ${windowId} ]] || \
 		return ${OK}
 	if [ -z "${waitForFocus}" ]; then
@@ -709,6 +711,7 @@ WindowSetupRule() {
 
 	while IFS="[= ]" read -r index action val; do
 		val="$(_unquote "${val}")"
+		[ "${action}" = "set_mosaicked" ] || \
 		! ActionNeedsFocus "${action}" || {
 			WindowWaitFocus ${windowId} "${ruleType}" ${rule} "${waitForFocus}"
 			waitForFocus=""
