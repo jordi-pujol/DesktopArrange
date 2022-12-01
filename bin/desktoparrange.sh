@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.39 $
+#  $Revision: 0.40 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -514,9 +514,8 @@ WindowTiling() {
 }
 
 GroupEnmossay() {
-	local recordKey="${1}" \
-		val="${2}" \
-		windowId action ruleType rule \
+	local record="${1}" \
+		windowIds windowId action pid ruleType rule val \
 		wW wH w h wX wY m record desktop undecorated \
 		numRows numCols maxRows maxCols rows cols row col
 	local windowWidth windowHeight windowX windowY windowScreen
@@ -524,41 +523,35 @@ GroupEnmossay() {
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
-	action="$(cut -f 1 -s -d '_' <<< "${recordKey}")"
-	ruleType="$(cut -f 2 -s -d '_' <<< "${recordKey}")"
-	rule="$(cut -f 3 -s -d '_' <<< "${recordKey}")"
-	desktop="$(cut -f 4 -s -d '_' <<< "${recordKey}")"
-	_lock_acquire "${VARSFILE}" ${mypid}
-	record="$(awk -v recordKey="${recordKey}" \
-	'$1 == recordKey {print $0; exit}' < "${VARSFILE}")"
-	_lock_release "${VARSFILE}" ${mypid}
-	[ -n "${record}" ] || {
-		LogPrio="err" \
-		_log "recordKey ${recordKey}:" \
-			"GroupEnmossay: record not found in vars file"
-		return ${OK}
-	}
-	m="${recordKey}${SEP}"
-	for windowId in $(cut -f 2- -s -d "${SEP}" <<< "${record}"); do
+	action="$(cut -f 1 -s -d '_' <<< "${record}")"
+	pid="$(cut -f 2 -s -d '_' <<< "${record}")"
+	ruleType="$(cut -f 3 -s -d '_' <<< "${record}")"
+	rule="$(cut -f 4 -s -d '_' <<< "${record}")"
+	desktop="$(cut -f 5 -s -d '_' <<< "${record}")"
+	val="$(cut -f 2 -s -d "${SEP}" <<< "${record}")"
+	windowIds=""
+
+	windowIds=""
+	winCount=0
+	for windowId in $(cut -f 3- -s -d "${SEP}" <<< "${record}"); do
 		if [ ${desktop} -ne $(WindowDesktop ${windowId} "${ruleType}" ${rule}) ]; then
 			LogPrio="warn" \
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 				"GroupEnmossay: window ${windowId} is not in current desktop"
-		else
-			GetMenuBarHeight ${windowId}
-			m="${m}${windowId}${SEP}"
+			continue
 		fi
+		GetMenuBarHeight ${windowId}
+		windowIds="${windowIds}${windowId}${SEP}"
+		let "winCount++,1"
 	done
-	record="${m}"
-	let "winCount=$(wc -w <<< "${record}")-1,1"
 	[ ${winCount} -gt 0 ] || {
 		LogPrio="err" \
-		_log "recordKey ${recordKey}:" \
-			"GroupEnmossay: no windows to setup"
+		_log "GroupEnmossay ${ruleType} ${rule} desktop ${desktop}:" \
+			"no windows to setup"
 		return ${OK}
 	}
 	if [ ${winCount} -eq 1 ]; then
-		windowId="$(cut -f 2 -s -d "${SEP}" <<< "${record}")"
+		windowId="$(cut -f 1 -s -d "${SEP}" <<< "${windowIds}")"
 		_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 			"GroupEnmossay: maximizing"
 		WindowWaitFocus ${windowId} "${ruleType}" ${rule}
@@ -606,7 +599,7 @@ GroupEnmossay() {
 	row=0
 	let "wW=(desktopWorkareaW/cols)-5,1"
 	let "wH=(desktopWorkareaH/rows)-5,1"
-	for windowId in $(cut -f 2- -s -d "${SEP}" <<< "${record}"); do
+	for windowId in ${windowIds}; do
 		if [ ${col} -eq 0 ]; then
 			let "row++,1"
 		fi
@@ -872,27 +865,26 @@ WindowSetupRule() {
 			fi
 			;;
 		set_mosaicked)
-			recordKey="Mosaic_${ruleType}_${rule}_${desktop}"
+			recordKey="Mosaic_${pidWindowsArrange}_${ruleType}_${rule}_${desktop}"
 			_lock_acquire "${VARSFILE}" ${mypid}
-			record="$(awk -v recordKey="${recordKey}" \
-			'$1 == recordKey {print $0; exit}' < "${VARSFILE}")"
+			if record="$(awk -v recordKey="${recordKey}" \
+			'$1 == recordKey {print $0; rc=-1; exit}
+			END{exit rc+1}' < "${VARSFILE}")"; then
+				[ "${val}" = "$(cut -f 2 -s -d "${SEP}" <<< "${record}")" ] || \
+					LogPrio="err" \
+					_log "${ruleType} ${rule}:" \
+						"have defined multiple Mosaic values (${val})"
+			else
+				record="${recordKey}${SEP}${val}${SEP}"
+			fi
 			{	awk -v recordKey="${recordKey}" \
 				'$1 != recordKey {print $0}' < "${VARSFILE}"
-				printf '%s\n' "${record:-"${recordKey}${SEP}"}${windowId}${SEP}"
+				printf '%s\n' "${record}${windowId}${SEP}"
 			} > "${VARSFILE}.part"
 			mv -f "${VARSFILE}.part" "${VARSFILE}"
 			_lock_release "${VARSFILE}" ${mypid}
 			_log "window ${windowId} ${ruleType} ${rule}:" \
 				"mosaic pending"
-			if record="$(grep -swF "${recordKey}" \
-			<<< "$(tr -s "${SEP}" '\n' <<< "${PendingMosaic}")")"; then
-				[ "${val}" = "$(cut -f 2- -s -d ' ' <<< "${record}")" ] || \
-					LogPrio="err" \
-					_log "${ruleType} ${rule}:" \
-						"have defined multiple Mosaic values (${val})"
-			else
-				PendingMosaic="${PendingMosaic}${recordKey} ${val}${SEP}"
-			fi
 			;;
 		set_minimized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
@@ -1066,7 +1058,13 @@ WindowSetup() {
 		setupGlobalRules="${2}" \
 		setupRules="${3}" \
 		setupTempRules="${4}" \
-		rule rc=${OK}
+		rule mypid rc=${OK}
+
+	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
+	[ $(wc -w <<< "${mypid}") -ne 1 ]; do
+		sleep .1
+	done
+	mypid=$((mypid))
 
 	if [ -n "${setupGlobalRules}" ]; then
 		_log "window ${windowId}: applying global rules" \
@@ -1465,11 +1463,10 @@ WindowArrange() {
 			WindowSelect ${windowId} "Temprule" "${checkTempRules}"
 	if [ -n "${setupGlobalRules}" -o -n "${setupRules}" -o -n "${setupTempRules}" ]; then
 		WindowSetup ${windowId} \
-		"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" || \
-			LogPrio="err" \
-			_log "WindowArrange: window ${windowId}: WindowSetup returns error"
+			"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" &
 	else
 		_log "window ${windowId}: there is nothing to do"
+		return ${ERR}
 	fi
 }
 
@@ -1478,21 +1475,53 @@ WindowsArrange() {
 		checkGlobalRules="${2}" \
 		checkRules="${3}" \
 		checkTempRules="${4:-}" \
-		PendingMosaic="" \
-		windowId mypid
+		windowId mypid pidWindowsArrange pid pidsChildren \
+		record records
 
 	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
 	[ $(wc -w <<< "${mypid}") -ne 1 ]; do
 		sleep .1
 	done
+	mypid=$((mypid))
+	pidWindowsArrange="${mypid}"
+
+	pidsChildren=""
 	for windowId in ${windowIds}; do
-		WindowArrange ${windowId} \
-			"${checkGlobalRules}" "${checkRules}" "${checkTempRules}" || :
+		if pid="$(_lock_active "${LOGDIR}${windowId}")"; then
+			LogPrio="err" \
+			_log "WindowsArrange: window ${windowId}: is locked by process ${pid}"
+			continue
+		fi
+		_lock_acquire "${LOGDIR}${windowId}" ${mypid}
+		if WindowArrange ${windowId} \
+		"${checkGlobalRules}" "${checkRules}" "${checkTempRules}"; then
+			pidsChildren="y"
+		else
+			_lock_release "${LOGDIR}${windowId}" ${mypid}
+		fi
 	done
-	[ -z "${PendingMosaic}" ] || \
-		while read -r recordKey val; do
-			GroupEnmossay "${recordKey}" "${val}"
-		done < <(tr -s "${SEP}" '\n' <<< "${PendingMosaic}")
+
+	if [ -n "${pidsChildren}" ]; then
+		pidsChildren=""; _ps_children ${mypid};
+		while pidsChildren="$(_pids_active ${pidsChildren})"; do
+			wait ${pidsChildren} || :
+		done
+
+		_lock_acquire "${VARSFILE}" ${mypid}
+		records="$(awk -v recordKey="Mosaic_${mypid}_" \
+			'$1 ~ recordKey {print $0}' < "${VARSFILE}")"
+		_lock_release "${VARSFILE}" ${mypid}
+		while read -r record; do
+			GroupEnmossay "${record}"
+		done <<< "${records}"
+
+		for windowId in ${windowIds}; do
+			if [ "$(_lock_active "${LOGDIR}${windowId}")" = ${mypid} ]; then
+				_lock_release "${LOGDIR}${windowId}" ${mypid}
+			fi
+		done
+	fi
+
 	if [ -n "${checkTempRules}" ]; then
 		_lock_acquire "${VARSFILE}" ${mypid}
 		sed -i -e "\|_Temprule_${checkTempRules}_|d" "${VARSFILE}"
@@ -1724,14 +1753,18 @@ readonly ARGC=${#}
 
 # constants
 readonly NAME="$(basename "${0}")" \
-	APPNAME="desktoparrange" \
+	APPNAME="desktoparrange"
+
+readonly LOGDIR="/tmp/${APPNAME}/${USER}/"
+
 XROOT="$(GetXroot)" || \
 	exit ${ERR}
+
 readonly XROOT \
-	LOGFILE="/tmp/${APPNAME}/${USER}/${XROOT}" \
-	PIDFILE="/tmp/${APPNAME}/${USER}/${XROOT}.pid" \
-	PIPE="/tmp/${APPNAME}/${USER}/${XROOT}.pipe" \
-	VARSFILE="/tmp/${APPNAME}/${USER}/${XROOT}.vars"
+	LOGFILE="${LOGDIR}${XROOT}" \
+	PIDFILE="${LOGDIR}${XROOT}.pid" \
+	PIPE="${LOGDIR}${XROOT}.pipe" \
+	VARSFILE="${LOGDIR}${XROOT}.vars"
 
 cmd="${1:-}"
 case "${cmd,,}" in

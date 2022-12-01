@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.39 $
+#  $Revision: 0.40 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -37,6 +37,17 @@ _unquote() {
 
 _datetime() {
 	date +'%F %X'
+}
+
+_pids_active() {
+	local p rc=${ERR}
+	for p in "${@}"; do
+		if kill -s 0 ${p} 2> /dev/null; then
+			printf '%d\t' ${p}
+			rc=${OK}
+		fi
+	done
+	return ${rc}
 }
 
 _ps_children() {
@@ -102,6 +113,14 @@ _lock_acquire() {
 		}
 		wait ${pidw} || :
 	done
+}
+
+_lock_active() {
+	local lockfile="${1}.lock"
+	[ -e "${lockfile}" ] && \
+	kill -s 0 $(cat "${lockfile}") 2> /dev/null || \
+		return ${ERR}
+	cat "${lockfile}"
 }
 
 _check_integer() {
