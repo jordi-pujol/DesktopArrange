@@ -1,6 +1,6 @@
 desktoparrange (0.40) unstable; urgency=medium
 
-  * when desktoparrange is processing lock windows by their Ids
+  * lock a window by his Id when desktoparrange is processing each window
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 29 Nov 2022 15:52:53 +0100
 
@@ -12,7 +12,7 @@ desktoparrange (0.39) unstable; urgency=medium
     on every window of this session
   * rules:
     - select/deselect name 'regexp'
-      select windows by title checking the regular expression 'regexp'
+    select windows by title checking the regular expression 'regexp'
   * rules, 'select desktop current':
     - special value 'current' to select/deselect windows by desktop number
 

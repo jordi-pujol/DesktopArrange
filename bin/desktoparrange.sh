@@ -298,6 +298,28 @@ WindowTapKeys() {
 	setxkbmap ${xkbmap}
 }
 
+WindowWaitFocus() {
+	local windowId="${1}" \
+		ruleType="${2}" \
+		rule="${3}" \
+		waitForFocus="${4:-}"
+	sleep 0.1
+	[[ $(WindowActive) -ne ${windowId} ]] || \
+		return ${OK}
+	if [ -z "${waitForFocus}" ]; then
+		_log "window ${windowId} ${ruleType} ${rule}:" \
+			"setting up focus"
+		WindowActivate ${windowId} "${ruleType}" ${rule} || :
+		return ${OK}
+	fi
+	LogPrio="info" \
+	_log "window ${windowId} ${ruleType} ${rule}:" \
+		"waiting to get focus"
+	(export windowId LOGFILE Debug BASH_XTRACEFD
+	$(CmdWaitFocus ${windowId})) &
+	wait ${!} || :
+}
+
 WindowPosition() {
 	local windowId="${1}" \
 		ruleType="${2}" \
@@ -627,6 +649,7 @@ GroupEnmossay() {
 					"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 				"GroupEnmossay: maximizing vert"
+			WindowWaitFocus ${windowId} "${ruleType}" ${rule}
 			wmctrl -i -r ${windowId} -b add,maximized_vert || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -641,6 +664,7 @@ GroupEnmossay() {
 					"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 				"GroupEnmossay: maximizing horz"
+			WindowWaitFocus ${windowId} "${ruleType}" ${rule}
 			wmctrl -i -r ${windowId} -b add,maximized_horz || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -668,27 +692,6 @@ GroupEnmossay() {
 			col=0
 		fi
 	done
-}
-
-WindowWaitFocus() {
-	local windowId="${1}" \
-		ruleType="${2}" \
-		rule="${3}" \
-		waitForFocus="${4:-}"
-	[[ $(WindowActive) -ne ${windowId} ]] || \
-		return ${OK}
-	if [ -z "${waitForFocus}" ]; then
-		_log "window ${windowId} ${ruleType} ${rule}:" \
-			"setting up focus"
-		WindowActivate ${windowId} "${ruleType}" ${rule} || :
-		return ${OK}
-	fi
-	LogPrio="info" \
-	_log "window ${windowId} ${ruleType} ${rule}:" \
-		"waiting to get focus"
-	(export windowId LOGFILE Debug BASH_XTRACEFD
-	$(CmdWaitFocus ${windowId})) &
-	wait ${!} || :
 }
 
 WindowSetupRule() {
@@ -1679,7 +1682,7 @@ DesktopArrange() {
 			return ${OK}
 		}
 
-	WindowsArrange "${winIds}" "Globalrule" "" "${rule}" &
+	WindowsArrange "${winIds}" "Globalrule" "" ${rule} &
 }
 
 Main() {
