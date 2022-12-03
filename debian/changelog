@@ -1,3 +1,9 @@
+desktoparrange (0.41) unstable; urgency=medium
+
+  * also will start the daemon when running on the session manager
+
+ -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 03 Dec 2022 10:00:52 +0100
+
 desktoparrange (0.40) unstable; urgency=medium
 
   * lock a window by his Id when desktoparrange is processing each window

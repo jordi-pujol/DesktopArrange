@@ -6,7 +6,7 @@
 #  Arrange Linux worskpaces
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.40 $
+#  $Revision: 0.41 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -1795,7 +1795,11 @@ start)
 		echo "error: ${APPNAME} is already running for this session" >&2
 		exit ${ERR}
 	fi
-	if [ $(ps -o ppid= ${$}) -eq 1 ]; then
+	export starting=${starting:-0}
+	ppid="$(ps -o ppid= ${$})"
+	if [ ${ppid} -eq 1 ] || \
+	ps -o cmd= ${ppid} | grep -qsF 'session' || \
+	[ $((++starting)) -gt 1 ]; then
 		shift
 		echo "info: ${APPNAME} start ${@}" >&2
 		Main "${@}"
