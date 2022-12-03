@@ -1061,13 +1061,16 @@ WindowSetup() {
 		setupGlobalRules="${2}" \
 		setupRules="${3}" \
 		setupTempRules="${4}" \
-		rule mypid rc=${OK}
+		mypid="${5:-}" \
+		rule rc=${OK}
 
-	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
-	[ $(wc -w <<< "${mypid}") -ne 1 ]; do
-		sleep .1
-	done
-	mypid=$((mypid))
+	if [ -z "${mypid}" ]; then
+		while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
+		[ $(wc -w <<< "${mypid}") -ne 1 ]; do
+			sleep .1
+		done
+		mypid=$((mypid))
+	fi
 
 	if [ -n "${setupGlobalRules}" ]; then
 		_log "window ${windowId}: applying global rules" \
@@ -1118,7 +1121,7 @@ WindowSelect() {
 		checkRules="${3:-}" \
 		rules rule propName netState \
 		index prop val val1 \
-		deselected selectNoactions rc
+		deselected selectNoactions selectActions rc action
 
 	[ -n "${checkRules}" ] || \
 		checkRules="$(echo \
@@ -1130,6 +1133,7 @@ WindowSelect() {
 	for rule in ${checkRules}; do
 		rc="${AFFIRMATIVE}"
 		selectNoactions=""
+		selectActions=""
 		_log "window ${windowId} ${ruleType} ${rule}:" \
 			"checking"
 		while [ -n "${rc}" ] && \
@@ -1388,6 +1392,9 @@ WindowSelect() {
 				_log "window ${windowId} ${ruleType} ${rule}:" \
 					"enabling \"select noactions\""
 				;;
+			select_actions)
+				selectActions="${val}"
+				;;
 			*)
 				LogPrio="err" \
 				_log "${ruleType} ${rule}:" \
@@ -1422,6 +1429,10 @@ WindowSelect() {
 					"invalid ruleType"
 					;;
 				esac
+				for action in ${selectActions}; do
+					[ "${actionsRule}" != "${actionsRule//${action}/}" ] || \
+						actionsRule="${actionsRule}${action}${SEP}"
+				done
 			fi
 			[ -z "${selectStop}" ] || \
 				break
@@ -1465,8 +1476,13 @@ WindowArrange() {
 		[ -n "${selectStop}" ] || \
 			WindowSelect ${windowId} "Temprule" "${checkTempRules}"
 	if [ -n "${setupGlobalRules}" -o -n "${setupRules}" -o -n "${setupTempRules}" ]; then
-		WindowSetup ${windowId} \
-			"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" &
+		if [ "${actionsRule}" = "${actionsRule//tiled/}" ]; then
+			WindowSetup ${windowId} \
+				"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" &
+		else
+			WindowSetup ${windowId} \
+				"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" ${mypid}
+		fi
 	else
 		_log "window ${windowId}: there is nothing to do"
 		return ${ERR}
@@ -1479,7 +1495,7 @@ WindowsArrange() {
 		checkRules="${3}" \
 		checkTempRules="${4:-}" \
 		windowId mypid pidWindowsArrange pid pidsChildren \
-		record records
+		record records actionsRule
 
 	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
 	[ $(wc -w <<< "${mypid}") -ne 1 ]; do
@@ -1488,7 +1504,7 @@ WindowsArrange() {
 	mypid=$((mypid))
 	pidWindowsArrange="${mypid}"
 
-	pidsChildren=""
+	actionsRule=""
 	for windowId in ${windowIds}; do
 		if pid="$(_lock_active "${LOGDIR}${windowId}")"; then
 			LogPrio="err" \
@@ -1496,20 +1512,17 @@ WindowsArrange() {
 			continue
 		fi
 		_lock_acquire "${LOGDIR}${windowId}" ${mypid}
-		if WindowArrange ${windowId} \
-		"${checkGlobalRules}" "${checkRules}" "${checkTempRules}"; then
-			pidsChildren="y"
-		else
+		WindowArrange ${windowId} \
+		"${checkGlobalRules}" "${checkRules}" "${checkTempRules}" || \
 			_lock_release "${LOGDIR}${windowId}" ${mypid}
-		fi
 	done
 
-	if [ -n "${pidsChildren}" ]; then
-		pidsChildren=""; _ps_children ${mypid};
-		while pidsChildren="$(_pids_active ${pidsChildren})"; do
-			wait ${pidsChildren} || :
-		done
+	pidsChildren=""; _ps_children ${mypid};
+	while pidsChildren="$(_pids_active ${pidsChildren})"; do
+		wait ${pidsChildren} || :
+	done
 
+	if [ "${actionsRule}" != "${actionsRule//mosaicked/}" ]; then
 		_lock_acquire "${VARSFILE}" ${mypid}
 		records="$(awk -v recordKey="Mosaic_${mypid}_" \
 			'$1 ~ recordKey {print $0}' < "${VARSFILE}")"
@@ -1517,13 +1530,13 @@ WindowsArrange() {
 		while read -r record; do
 			GroupEnmossay "${record}"
 		done <<< "${records}"
-
-		for windowId in ${windowIds}; do
-			if [ "$(_lock_active "${LOGDIR}${windowId}")" = ${mypid} ]; then
-				_lock_release "${LOGDIR}${windowId}" ${mypid}
-			fi
-		done
 	fi
+
+	for windowId in ${windowIds}; do
+		if [ "$(_lock_active "${LOGDIR}${windowId}")" = ${mypid} ]; then
+			_lock_release "${LOGDIR}${windowId}" ${mypid}
+		fi
+	done
 
 	if [ -n "${checkTempRules}" ]; then
 		_lock_acquire "${VARSFILE}" ${mypid}
@@ -1603,13 +1616,14 @@ TempRuleLine() {
 CheckTempRule() {
 	local cmd="${1}" \
 		ruleType="Temprule" \
-		indexTempruleSet indexTempruleSelect \
+		indexTempruleSet indexTempruleSelect actionsRule \
 		line ParmsArray i
 
 	rule=""
 	msg=""
 	indexTempruleSelect=0
 	indexTempruleSet=0
+	actionsRule=""
 
 	declare -A ParmsArray
 	eval ParmsArray=(${cmd})
@@ -1624,8 +1638,13 @@ CheckTempRule() {
 	done
 	TempRuleLine || \
 		return ${OK}
-	[ -n "${rule}" ] || \
+	
+	if [ -n "${rule}" ]; then
+		[ -z "${actionsRule}" ] || \
+			eval Temprule${rule}_0_select_actions=\'${actionsRule}\'
+	else
 		msg="DesktopArrange: line does not contain any command"
+	fi
 }
 
 DesktopArrange() {

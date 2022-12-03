@@ -1,6 +1,7 @@
 desktoparrange (0.40) unstable; urgency=medium
 
   * lock a window by his Id when desktoparrange is processing each window
+  * setup windows in separate subprocesses, when allowed
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Tue, 29 Nov 2022 15:52:53 +0100
 

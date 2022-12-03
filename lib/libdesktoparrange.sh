@@ -639,7 +639,6 @@ RuleLine() {
 			set_mosaicked)
 				val="-1 0"
 				;;
-			set_stop | \
 			set_focus | \
 			set_closed | \
 			set_killed)
@@ -676,7 +675,6 @@ RuleLine() {
 				_log "${ruleType} ${ruleNumber}: \"${prop}\"" \
 					"ignoring wrong value \"${val}\"."
 				case "${prop:2}" in
-				set_stop | \
 				set_focus | \
 				set_closed | \
 				set_killed)
@@ -701,7 +699,6 @@ RuleLine() {
 				esac
 			else
 				case "${prop:2}" in
-				set_stop | \
 				set_focus | \
 				set_closed | \
 				set_killed)
@@ -809,6 +806,8 @@ RuleLine() {
 			return ${ERR}
 		fi
 		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+		[ "${actionsRule}" != "${actionsRule//tiled/}" ] || \
+			actionsRule="${actionsRule}tiled${SEP}"
 		;;
 	set_mosaicked)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
@@ -826,6 +825,8 @@ RuleLine() {
 			_log "${ruleType} ${ruleNumber}: Property \"${prop}\" invalid value. Assuming \"${val}\""
 		fi
 		eval ${ruleType}${ruleNumber}_$((++indexToSet))_${prop}=\'${val}\'
+		[ "${actionsRule}" != "${actionsRule//mosaicked/}" ] || \
+			actionsRule="${actionsRule}mosaicked${SEP}"
 		;;
 	set_pointer)
 		val="$(tr -s '[:blank:],' ' ' <<< "${val,,}")"
@@ -873,7 +874,8 @@ ReadConfig() {
 	local config="${1}" \
 		foundParm="" foundRule="" foundGlobalRule="" \
 		indexRuleSet indexRuleSelect \
-		indexGlobalruleSet indexGlobalruleSelect
+		indexGlobalruleSet indexGlobalruleSelect \
+		actionsRule
 
 	_log "Reading config file" \
 		"\"${config}\""
@@ -895,6 +897,7 @@ ReadConfig() {
 			let Rules++,1
 			indexRuleSet=0
 			indexRuleSelect=0
+			actionsRule=""
 		elif grep -qsxiEe 'global[[:blank:]]*rule[[:blank:]]*\{[[:blank:]]*' <<< "${line}"; then
 			printf '%s\n' "Global Rule {"
 			[ -z "${foundParm}" -a -z "${foundRule}" -a -z "${foundGlobalRule}" ] || \
@@ -903,10 +906,18 @@ ReadConfig() {
 			let GlobalRules++,1
 			indexGlobalruleSet=0
 			indexGlobalruleSelect=0
+			actionsRule=""
 		elif grep -qsxiEe '\}[[:blank:]]*' <<< "${line,,}"; then
 			printf '%s\n' "}" ""
 			[ -n "${foundParm}" -o -n "${foundRule}" -o -n "${foundGlobalRule}" ] || \
 				return ${ERR}
+			if [ -n "${foundRule}" ]; then
+				[ -z "${actionsRule}" ] || \
+					eval Rule${Rules}_0_select_actions=\'${actionsRule}\'
+			elif [ -n "${foundGlobalRule}" ]; then
+				[ -z "${actionsRule}" ] || \
+					eval Globalrule${GlobalRules}_0_select_actions=\'${actionsRule}\'
+			fi
 			foundParm=""
 			foundRule=""
 			foundGlobalRule=""
