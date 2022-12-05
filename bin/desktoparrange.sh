@@ -1479,6 +1479,7 @@ WindowArrange() {
 		if [ "${actionsRule}" = "${actionsRule//tiled/}" ]; then
 			WindowSetup ${windowId} \
 				"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" &
+			pidsChildren="${pidsChildren}${!}${SEP}"
 		else
 			WindowSetup ${windowId} \
 				"${setupGlobalRules}" "${setupRules}" "${setupTempRules}" ${mypid}
@@ -1494,7 +1495,7 @@ WindowsArrange() {
 		checkGlobalRules="${2}" \
 		checkRules="${3}" \
 		checkTempRules="${4:-}" \
-		windowId mypid pidWindowsArrange pid pidsChildren \
+		windowId mypid pidWindowsArrange pid pids pidsChildren \
 		record records actionsRule
 
 	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
@@ -1505,6 +1506,7 @@ WindowsArrange() {
 	pidWindowsArrange="${mypid}"
 
 	actionsRule=""
+	pidsChildren=""
 	for windowId in ${windowIds}; do
 		if pid="$(_lock_active "${LOGDIR}${windowId}")"; then
 			LogPrio="err" \
@@ -1517,9 +1519,12 @@ WindowsArrange() {
 			_lock_release "${LOGDIR}${windowId}" ${mypid}
 	done
 
-	pidsChildren=""; _ps_children ${mypid};
-	while pidsChildren="$(_pids_active ${pidsChildren})"; do
-		wait ${pidsChildren} || :
+	while [ -n "${pidsChildren}" ]; do
+		pidsChildren="$(for pid in ${pidsChildren}; do
+				pids="${pid} $(pgrep -P ${pid})"
+				wait ${pids} || :
+				_pids_active ${pids} || :
+			done)"
 	done
 
 	if [ "${actionsRule}" != "${actionsRule//mosaicked/}" ]; then
