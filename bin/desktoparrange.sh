@@ -188,6 +188,7 @@ WindowShow() {
 		LogPrio="err" \
 		_log "window ${windowId}:" \
 			"Can't remove,maximized_horz,maximized_vert,shaded,hidden,above,below,fullscreen"
+	sleep 0.1
 }
 
 WindowUndecorate() {
@@ -254,6 +255,7 @@ WindowActivate() {
 			WindowExists ${windowId} || \
 				return ${ERR}
 	xdotool mousemove --window ${windowId} 0 0 || :
+	sleep 0.1
 }
 
 WindowTapKeys() {
@@ -303,7 +305,6 @@ WindowWaitFocus() {
 		ruleType="${2}" \
 		rule="${3}" \
 		waitForFocus="${4:-}"
-	sleep 0.1
 	[[ $(WindowActive) -ne ${windowId} ]] || \
 		return ${OK}
 	if [ -z "${waitForFocus}" ]; then
@@ -396,6 +397,7 @@ WindowPosition() {
 		LogPrio="err" \
 		_log "window ${windowId} ${ruleType} ${rule}:" \
 			"error moving to (${val})=(${x} ${y})"
+	sleep 0.1
 	xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
 		LogPrio="err" \
 		_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -506,6 +508,7 @@ WindowTile() {
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 					"WindowTile: can't tile to" \
 					"($(cut -f 3- -s -d ' ' <<< "${val}"))=(${x} ${y})"
+			sleep 0.1
 			xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
@@ -649,7 +652,7 @@ GroupEnmossay() {
 					"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 				"GroupEnmossay: maximizing vert"
-			WindowWaitFocus ${windowId} "${ruleType}" ${rule}
+			sleep 0.1
 			wmctrl -i -r ${windowId} -b add,maximized_vert || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -664,7 +667,7 @@ GroupEnmossay() {
 					"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 				"GroupEnmossay: maximizing horz"
-			WindowWaitFocus ${windowId} "${ruleType}" ${rule}
+			sleep 0.1
 			wmctrl -i -r ${windowId} -b add,maximized_horz || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -1496,7 +1499,7 @@ WindowsArrange() {
 		checkRules="${3}" \
 		checkTempRules="${4:-}" \
 		windowId mypid pidWindowsArrange pid pids pidsChildren \
-		record records actionsRule
+		record actionsRule
 
 	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
 	[ $(wc -w <<< "${mypid}") -ne 1 ]; do
@@ -1528,13 +1531,14 @@ WindowsArrange() {
 	done
 
 	if [ "${actionsRule}" != "${actionsRule//mosaicked/}" ]; then
-		_lock_acquire "${VARSFILE}" ${mypid}
-		records="$(awk -v recordKey="Mosaic_${mypid}_" \
-			'$1 ~ recordKey {print $0}' < "${VARSFILE}")"
-		_lock_release "${VARSFILE}" ${mypid}
 		while read -r record; do
 			GroupEnmossay "${record}"
-		done <<< "${records}"
+		done < <(
+			_lock_acquire "${VARSFILE}" ${mypid}
+			awk -v recordKey="Mosaic_${mypid}_" \
+				'$1 ~ recordKey {print $0}' < "${VARSFILE}"
+			_lock_release "${VARSFILE}" ${mypid}
+			)
 	fi
 
 	for windowId in ${windowIds}; do
