@@ -1,6 +1,11 @@
 desktoparrange (0.41) unstable; urgency=medium
 
-  * also will start the daemon when running on the session manager
+  * the daemon will start also when running on the session manager
+  * wait 0.1 seconds for completion of consecutive window operations
+  * WindowSetup:
+    When setting up windows in separate subprocesses
+    save a pid list of setup subprocesses,
+    therefore this list is used to wait for their completion
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 03 Dec 2022 10:00:52 +0100
 

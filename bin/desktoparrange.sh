@@ -554,7 +554,6 @@ GroupEnmossay() {
 	rule="$(cut -f 4 -s -d '_' <<< "${record}")"
 	desktop="$(cut -f 5 -s -d '_' <<< "${record}")"
 	val="$(cut -f 2 -s -d "${SEP}" <<< "${record}")"
-	windowIds=""
 
 	windowIds=""
 	winCount=0
@@ -1418,13 +1417,13 @@ WindowSelect() {
 			else
 				case "${ruleType}" in
 				Rule)
-					setupRules="${setupRules}${rule}${TAB}"
+					setupRules="${setupRules}${rule}${SEP}"
 					;;
 				Globalrule)
-					setupGlobalRules="${setupGlobalRules}${rule}${TAB}"
+					setupGlobalRules="${setupGlobalRules}${rule}${SEP}"
 					;;
 				Temprule)
-					setupTempRules="${setupTempRules}${rule}${TAB}"
+					setupTempRules="${setupTempRules}${rule}${SEP}"
 					;;
 				*)
 					LogPrio="err" \
@@ -1675,7 +1674,7 @@ DesktopArrange() {
 	\[0\]=\"desktoparrange\"\ \[*)
 		winIds="$(wmctrl -l | \
 			awk -v desktop="$(DesktopCurrent)" \
-			'BEGIN{ORS="\t"}
+			'BEGIN{ORS="${SEP}"}
 			$2 == desktop {print $1; rc=-1}
 			END{exit rc+1}')" || {
 				LogPrio="err" \
@@ -1686,7 +1685,7 @@ DesktopArrange() {
 	\[0\]=\"execute\"\ \[*)
 		winIds="$(wmctrl -l | \
 			awk \
-			'BEGIN{ORS="\t"}
+			'BEGIN{ORS="${SEP}"}
 			$2 != -1 {print $1; rc=-1}
 			END{exit rc+1}')" || {
 				LogPrio="err" \
@@ -1881,7 +1880,7 @@ windowinfo)
 		case "${1,,}" in
 		all)
 			winIds="$(wmctrl -l | \
-				awk 'BEGIN{ORS="\t"}
+				awk 'BEGIN{ORS="${SEP}"}
 				$2 != -1 {print $1; rc=-1}
 				END{exit rc+1}')" || {
 					echo "err: no open windows" >&2

@@ -57,7 +57,7 @@ _ps_children() {
 	for pid in $(pgrep -P ${ppid} | \
 	grep -svwEe "${excl}"); do
 		_ps_children ${pid} "${excl}"
-		pidsChildren="${pidsChildren}${pid}${TAB}"
+		pidsChildren="${pidsChildren}${pid}${SEP}"
 	done
 }
 
@@ -295,7 +295,7 @@ DesktopSetCurrent() {
 
 WindowStateAction() {
 	local state="${1}"
-	awk -v state="${state}" -v s="${TAB}" \
+	awk -v state="${state}" -v s="${SEP}" \
 		'BEGIN{RS=s}
 		$2 == state {print $1; rc=-1; exit}
 		END{exit rc+1}' <<< "${ACTIONSTATES}"
@@ -1142,7 +1142,7 @@ LoadConfig() {
 	return ${OK}
 }
 
-readonly LF=$'\n' TAB=$'\t' SEP=$'\t' OK=0 ERR=1 NONE=0 \
+readonly LF=$'\n' SEP=$'\t' OK=0 ERR=1 NONE=0 \
 	PATTERN_YES="^(y.*|true|on|1|enable.*)$" \
 	PATTERN_NO="^(n.*|false|off|0|disable.*)$" \
 	PATTERN_FIXEDSIZE="^[0-9]+x[0-9]+$" \
