@@ -99,7 +99,7 @@ _lock_acquire() {
 			"requests already existent lock \"${lockfile}\""
 	while (set -o noclobber;
 	! echo ${pid} > "${lockfile}") 2> /dev/null; do
-		sleep .1 &
+		sleep 0.1 &
 		pidw=${!}
 		[ "${Debug}" != "xtrace" ] || \
 			LogPrio="debug" \
@@ -875,7 +875,7 @@ ReadConfig() {
 		foundParm="" foundRule="" foundGlobalRule="" \
 		indexRuleSet indexRuleSelect \
 		indexGlobalruleSet indexGlobalruleSelect \
-		actionsRule
+		actionsRule line x
 
 	_log "Reading config file" \
 		"\"${config}\""
@@ -924,7 +924,8 @@ ReadConfig() {
 		else
 			printf '\t%s\n' "${line}"
 			if [ -n "${foundParm}" ]; then
-				case "$(_unquote "$(_trim "${line,,}")")" in
+				x="$(_unquote "$(_trim "${line,,}")")"
+				case "${x}" in
 				silent)
 					Debug="info"
 					;;
@@ -942,6 +943,9 @@ ReadConfig() {
 					;;
 				windowinfo)
 					windowinfo="y"
+					;;
+				xdelay=*)
+					xdelay="${x#xdelay=}"
 					;;
 				*)
 					LogPrio="err" \
@@ -1016,6 +1020,8 @@ LoadConfig() {
 	emptylist=""
 	WindowInfo=""
 	windowinfo=""
+	Xdelay=0.1
+	xdelay=""
 	systemConfig="/etc/${APPNAME}/config.txt"
 	config="${HOME}/.config/${APPNAME}/config.txt"
 	unset $(awk -F '=' \
@@ -1048,6 +1054,9 @@ LoadConfig() {
 				;;
 			emptylist)
 				emptylist="y"
+				;;
+			xdelay=*)
+				xdelay="$(cut -f 2- -s -d '=' <<< "${option}")"
 				;;
 			*)
 				LogPrio="warn" \
@@ -1087,6 +1096,7 @@ LoadConfig() {
 	Debug="${dbg:-${Debug:-}}"
 	EmptyList="${emptylist:-${EmptyList:-}}"
 	WindowInfo="${windowinfo:-${WindowInfo:-}}"
+	Xdelay="${xdelay:-${Xdelay:-}}"
 	case "${Debug}" in
 	debug | \
 	xtrace)

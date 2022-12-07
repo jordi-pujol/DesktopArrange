@@ -188,7 +188,7 @@ WindowShow() {
 		LogPrio="err" \
 		_log "window ${windowId}:" \
 			"Can't remove,maximized_horz,maximized_vert,shaded,hidden,above,below,fullscreen"
-	sleep 0.1
+	sleep ${Xdelay}
 }
 
 WindowUndecorate() {
@@ -250,12 +250,15 @@ WindowActivate() {
 		$(WindowDesktop ${windowId} "${ruleType}" ${rule}) || :
 	WindowUnminimize ${windowId} "${ruleType}" ${rule}
 	WindowUnshade ${windowId} "${ruleType}" ${rule}
-	[[ $(WindowActive) -eq ${windowId} ]] || \
-		xdotool windowactivate ${windowId} || \
+	sleep ${Xdelay}
+	[[ $(WindowActive) -eq ${windowId} ]] || {
+		xdotool windowactivate ${windowId}
+		sleep ${Xdelay}
+		} || \
 			WindowExists ${windowId} || \
 				return ${ERR}
 	xdotool mousemove --window ${windowId} 0 0 || :
-	sleep 0.1
+	sleep ${Xdelay}
 }
 
 WindowTapKeys() {
@@ -397,7 +400,7 @@ WindowPosition() {
 		LogPrio="err" \
 		_log "window ${windowId} ${ruleType} ${rule}:" \
 			"error moving to (${val})=(${x} ${y})"
-	sleep 0.1
+	sleep ${Xdelay}
 	xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
 		LogPrio="err" \
 		_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -508,7 +511,7 @@ WindowTile() {
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 					"WindowTile: can't tile to" \
 					"($(cut -f 3- -s -d ' ' <<< "${val}"))=(${x} ${y})"
-			sleep 0.1
+			sleep ${Xdelay}
 			xdotool mousemove --window ${windowId} $((windowWidth/2)) $((windowHeight/2)) || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
@@ -651,7 +654,7 @@ GroupEnmossay() {
 					"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 				"GroupEnmossay: maximizing vert"
-			sleep 0.1
+			sleep ${Xdelay}
 			wmctrl -i -r ${windowId} -b add,maximized_vert || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -666,7 +669,7 @@ GroupEnmossay() {
 					"GroupEnmossay: moving to (${wX} ${wY}), resizing to (${w} ${h})"
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
 				"GroupEnmossay: maximizing horz"
-			sleep 0.1
+			sleep ${Xdelay}
 			wmctrl -i -r ${windowId} -b add,maximized_horz || \
 				LogPrio="err" \
 				_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -757,7 +760,7 @@ WindowSetupRule() {
 				c=0
 				while [ $((c++)) -lt 5 ]; do
 					[ ${c} -eq 1 ] || \
-						sleep 1
+						sleep ${Xdelay}
 					[ ${val} -ne $(WindowDesktop ${windowId} "${ruleType}" ${rule}) ] || \
 						break
 					_log "window ${windowId} ${ruleType} ${rule}:" \
@@ -1674,7 +1677,8 @@ DesktopArrange() {
 	\[0\]=\"desktoparrange\"\ \[*)
 		winIds="$(wmctrl -l | \
 			awk -v desktop="$(DesktopCurrent)" \
-			'BEGIN{ORS="${SEP}"}
+			-v s="${SEP}" \
+			'BEGIN{ORS=s}
 			$2 == desktop {print $1; rc=-1}
 			END{exit rc+1}')" || {
 				LogPrio="err" \
@@ -1684,8 +1688,8 @@ DesktopArrange() {
 		;;
 	\[0\]=\"execute\"\ \[*)
 		winIds="$(wmctrl -l | \
-			awk \
-			'BEGIN{ORS="${SEP}"}
+			awk -v s="${SEP}" \
+			'BEGIN{ORS=s}
 			$2 != -1 {print $1; rc=-1}
 			END{exit rc+1}')" || {
 				LogPrio="err" \
@@ -1880,7 +1884,8 @@ windowinfo)
 		case "${1,,}" in
 		all)
 			winIds="$(wmctrl -l | \
-				awk 'BEGIN{ORS="${SEP}"}
+				awk -v s="${SEP}" \
+				'BEGIN{ORS=s}
 				$2 != -1 {print $1; rc=-1}
 				END{exit rc+1}')" || {
 					echo "err: no open windows" >&2

@@ -6,6 +6,9 @@ desktoparrange (0.41) unstable; urgency=medium
     When setting up windows in separate subprocesses
     save a pid list of setup subprocesses,
     therefore this list is used to wait for their completion
+  * New daemon parameter: xdelay=N
+    Time in seconds to wait for completion of the X commands
+    Default: xdelay=0.1
 
  -- Jordi Pujol Palomer <jordipujolp@gmail.com>  Sat, 03 Dec 2022 10:00:52 +0100
 
