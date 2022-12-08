@@ -3,7 +3,8 @@
 #************************************************************************
 #  DesktopArrange
 #
-#  Arrange Linux worskpaces
+#  Arrange Linux worskpaces.
+#  Sets the layout of current desktops and newly emerging windows
 #  according to a set of configurable rules.
 #
 #  $Revision: 0.41 $
@@ -431,8 +432,8 @@ WindowTile() {
 		win="$(awk 'NF > 1 {print $NF; rc=-1}
 		END{exit rc+1}' <<< "${record}")" && \
 		[ ${desktop} -ne $(WindowDesktop ${win} ${ruleType} ${rule}) ]; do
-			record="$(awk -v s="${SEP}" -v windowId="${win}" \
-			'BEGIN{FS=s; OFS=s}
+			record="$(awk -v sep="${SEP}" -v windowId="${win}" \
+			'BEGIN{FS=sep; OFS=sep}
 			{for (i=2; i <= NF; i++)
 				if ($i == windowId) {
 					for (j=i; j < NF; j++)
@@ -1578,8 +1579,8 @@ WindowsUpdate() {
 			LogPrio="debug" \
 				_log "window ${windowId}: Tile info:" \
 					"$(grep -swF "${windowId}" < "${VARSFILE}")"
-			awk -v s="${SEP}" -v windowId="${windowId}" \
-			'BEGIN{FS=s; OFS=s}
+			awk -v sep="${SEP}" -v windowId="${windowId}" \
+			'BEGIN{FS=sep; OFS=sep}
 			{for (i=2; i <= NF; i++)
 				if ($i == windowId) {
 					for (j=i; j < NF; j++)
@@ -1677,8 +1678,8 @@ DesktopArrange() {
 	\[0\]=\"desktoparrange\"\ \[*)
 		winIds="$(wmctrl -l | \
 			awk -v desktop="$(DesktopCurrent)" \
-			-v s="${SEP}" \
-			'BEGIN{ORS=s}
+			-v sep="${SEP}" \
+			'BEGIN{ORS=sep}
 			$2 == desktop {print $1; rc=-1}
 			END{exit rc+1}')" || {
 				LogPrio="err" \
@@ -1688,8 +1689,8 @@ DesktopArrange() {
 		;;
 	\[0\]=\"execute\"\ \[*)
 		winIds="$(wmctrl -l | \
-			awk -v s="${SEP}" \
-			'BEGIN{ORS=s}
+			awk -v sep="${SEP}" \
+			'BEGIN{ORS=sep}
 			$2 != -1 {print $1; rc=-1}
 			END{exit rc+1}')" || {
 				LogPrio="err" \
@@ -1884,8 +1885,8 @@ windowinfo)
 		case "${1,,}" in
 		all)
 			winIds="$(wmctrl -l | \
-				awk -v s="${SEP}" \
-				'BEGIN{ORS=s}
+				awk -v sep="${SEP}" \
+				'BEGIN{ORS=sep}
 				$2 != -1 {print $1; rc=-1}
 				END{exit rc+1}')" || {
 					echo "err: no open windows" >&2

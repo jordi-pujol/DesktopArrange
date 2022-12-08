@@ -1,7 +1,7 @@
 [Desktop Entry]
 Comment=Arrange Linux worskpaces according to a set of configurable rules.
 Exec=/usr/bin/desktoparrange.sh start
-GenericName=DesktopArrange
+GenericName=Arrange Linux worskpaces
 Name=DesktopArrange
 StartupNotify=true
 NoDisplay=true

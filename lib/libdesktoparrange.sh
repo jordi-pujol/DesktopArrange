@@ -3,7 +3,8 @@
 #************************************************************************
 #  DesktopArrange
 #
-#  Arrange Linux worskpaces
+#  Arrange Linux worskpaces.
+#  Sets the layout of current desktops and newly emerging windows
 #  according to a set of configurable rules.
 #
 #  $Revision: 0.41 $
@@ -295,8 +296,8 @@ DesktopSetCurrent() {
 
 WindowStateAction() {
 	local state="${1}"
-	awk -v state="${state}" -v s="${SEP}" \
-		'BEGIN{RS=s}
+	awk -v state="${state}" -v sep="${SEP}" \
+		'BEGIN{RS=sep}
 		$2 == state {print $1; rc=-1; exit}
 		END{exit rc+1}' <<< "${ACTIONSTATES}"
 }

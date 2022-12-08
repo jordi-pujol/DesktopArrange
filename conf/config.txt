@@ -1,7 +1,8 @@
 #************************************************************************
 #  DesktopArrange
 #
-#  Arrange Linux worskpaces
+#  Arrange Linux worskpaces.
+#  Sets the layout of current desktops and newly emerging windows
 #  according to a set of configurable rules.
 #
 #  $Revision: 0.41 $
