@@ -534,14 +534,6 @@ WindowTile() {
 	_lock_release "${VARSFILE}" ${mypid}
 }
 
-WindowTiling() {
-	local windowId="${1}" \
-		ruleType="${2}" \
-		rule="${3}" \
-		val="${4}"
-	WindowTile ${windowId} "${ruleType}" ${rule} "${val}"
-}
-
 GroupEnmossay() {
 	local record="${1}" \
 		windowIds windowId action pid ruleType rule val \
@@ -787,7 +779,7 @@ WindowSetupRule() {
 					"error setting size to ${val}"
 			;;
 		set_tiled)
-			WindowTiling ${windowId} "${ruleType}" ${rule} "${val}"
+			WindowTile ${windowId} "${ruleType}" ${rule} "${val}"
 			;;
 		set_maximized)
 			if [ "${val}" = "${AFFIRMATIVE}" ]; then
@@ -1581,14 +1573,18 @@ WindowsUpdate() {
 					"$(grep -swF "${windowId}" < "${VARSFILE}")"
 			awk -v sep="${SEP}" -v windowId="${windowId}" \
 			'BEGIN{FS=sep; OFS=sep}
-			{for (i=2; i <= NF; i++)
-				if ($i == windowId) {
-					for (j=i; j < NF; j++)
-						$j=$(j+1)
-					NF--
-					break
-				}
-			print $0}' < "${VARSFILE}" > "${VARSFILE}.part"
+			{	found=""
+				for (i=2; i <= NF; i++)
+					if ($i == windowId) {
+						for (j=i; j < NF; j++)
+							$j=$(j+1)
+						NF--
+						found=1
+						break
+					}
+				if ((! found) || (found && $2))
+					print $0
+			}' < "${VARSFILE}" > "${VARSFILE}.part"
 			mv -f "${VARSFILE}.part" "${VARSFILE}"
 		fi
 		_lock_release "${VARSFILE}" ${$}

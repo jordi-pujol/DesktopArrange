@@ -14,7 +14,8 @@ Standards-Version: 4.5.1
 
 Package: desktoparrange
 Architecture: all
-Description: Arrange Linux worskpaces
+Description: Arrange Linux worskpaces.
+ Sets the layout of current desktops and newly emerging windows
  according to a set of configurable rules.
 Depends: ${misc:Depends},
  gawk,
