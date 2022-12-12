@@ -535,25 +535,22 @@ WindowTile() {
 }
 
 GroupEnmossay() {
-	local record="${1}" \
-		windowIds windowId action pid ruleType rule val \
-		wW wH w h wX wY m record desktop undecorated \
+	local action="${1}" \
+		ruleType="${2}" \
+		rule="${3}" \
+		desktop="${4}" \
+		val="${5}" \
+		winIds="${6}"
+	local windowIds windowId wW wH w h wX wY m undecorated \
 		numRows numCols maxRows maxCols rows cols row col
 	local windowWidth windowHeight windowX windowY windowScreen
 	local desktopNum desktopName desktopWidth desktopHeight \
 		desktopViewPosX desktopViewPosY \
 		desktopWorkareaX desktopWorkareaY desktopWorkareaW desktopWorkareaH
 
-	action="$(cut -f 1 -s -d '_' <<< "${record}")"
-	pid="$(cut -f 2 -s -d '_' <<< "${record}")"
-	ruleType="$(cut -f 3 -s -d '_' <<< "${record}")"
-	rule="$(cut -f 4 -s -d '_' <<< "${record}")"
-	desktop="$(cut -f 5 -s -d '_' <<< "${record}")"
-	val="$(cut -f 2 -s -d "${SEP}" <<< "${record}")"
-
 	windowIds=""
 	winCount=0
-	for windowId in $(cut -f 3- -s -d "${SEP}" <<< "${record}"); do
+	for windowId in ${winIds}; do
 		if [ ${desktop} -ne $(WindowDesktop ${windowId} "${ruleType}" ${rule}) ]; then
 			LogPrio="warn" \
 			_log "window ${windowId} ${ruleType} ${rule} desktop ${desktop}:" \
@@ -866,7 +863,11 @@ WindowSetupRule() {
 			fi
 			;;
 		set_mosaicked)
-			recordKey="Mosaic_${pidWindowsArrange}_${ruleType}_${rule}_${desktop}"
+			if [ "${ruleType}" = "Temprule" ]; then
+				recordKey="Mosaic_${pidWindowsArrange}_${ruleType}_${rule}_${desktop}"
+			else
+				recordKey="Mosaic_${ruleType}_${rule}_${desktop}"
+			fi
 			_lock_acquire "${VARSFILE}" ${mypid}
 			if record="$(awk -v recordKey="${recordKey}" \
 			'$1 == recordKey {print $0; rc=-1; exit}
@@ -1458,9 +1459,10 @@ WindowArrange() {
 	[ -z "${WindowInfo}" ] || \
 		PrintWindowInfo ${windowId} >> "${LOGFILE}"
 
-	# checking properties of this window
-	# we'll set up only the first rule that match,
-	# unless that this rule contains the command "select others"
+	# checking properties of this window.
+	# We'll set up the rules that match,
+	# Will stop checking when a matching rule
+	#   contains the command "select stop"
 	setupGlobalRules=""
 	setupRules=""
 	setupTempRules=""
@@ -1501,7 +1503,7 @@ WindowsArrange() {
 		sleep .1
 	done
 	mypid=$((mypid))
-	pidWindowsArrange="${mypid}"
+	pidWindowsArrange="${checkTempRules:+"${mypid}"}"
 
 	actionsRule=""
 	pidsChildren=""
@@ -1526,12 +1528,34 @@ WindowsArrange() {
 	done
 
 	if [ "${actionsRule}" != "${actionsRule//mosaicked/}" ]; then
+		if [ -n "${checkTempRules}" ]; then
+			while read -r record; do
+				GroupEnmossay \
+					"$(cut -f 1 -s -d '_' <<< "${record}")" \
+					"$(cut -f 3 -s -d '_' <<< "${record}")" \
+					"$(cut -f 4 -s -d '_' <<< "${record}")" \
+					"$(cut -f 5 -s -d '_' <<< "${record}")" \
+					"$(cut -f 2 -s -d "${SEP}" <<< "${record}")" \
+					"$(cut -f 3- -s -d "${SEP}" <<< "${record}")"
+			done < <(
+				_lock_acquire "${VARSFILE}" ${mypid}
+				awk -v recordKey="Mosaic_${mypid}_" \
+					'$1 ~ recordKey {print $0}' < "${VARSFILE}"
+				_lock_release "${VARSFILE}" ${mypid}
+				)
+		fi
 		while read -r record; do
-			GroupEnmossay "${record}"
+			GroupEnmossay \
+				"$(cut -f 1 -s -d '_' <<< "${record}")" \
+				"$(cut -f 2 -s -d '_' <<< "${record}")" \
+				"$(cut -f 3 -s -d '_' <<< "${record}")" \
+				"$(cut -f 4 -s -d '_' <<< "${record}")" \
+				"$(cut -f 2 -s -d "${SEP}" <<< "${record}")" \
+				"$(cut -f 3- -s -d "${SEP}" <<< "${record}")"
 		done < <(
 			_lock_acquire "${VARSFILE}" ${mypid}
-			awk -v recordKey="Mosaic_${mypid}_" \
-				'$1 ~ recordKey {print $0}' < "${VARSFILE}"
+			grep -sEe "Mosaic_(Globalrule|Rule)_" < "${VARSFILE}" | \
+				grep -swF "$(printf '0x%0x\n' ${windowIds})" || :
 			_lock_release "${VARSFILE}" ${mypid}
 			)
 	fi
@@ -1877,45 +1901,42 @@ execute)
 	;;
 windowinfo)
 	shift
-	if [ -n "${1:-}" ]; then
-		case "${1,,}" in
-		all)
-			winIds="$(wmctrl -l | \
-				awk -v sep="${SEP}" \
-				'BEGIN{ORS=sep}
-				$2 != -1 {print $1; rc=-1}
-				END{exit rc+1}')" || {
-					echo "err: no open windows" >&2
-					exit ${ERR}
-				}
-			;;
-		select)
-			select winId in $(wmctrl -l | \
-			awk '$2 != -1 {print $0}' | \
-			tr -s '[:blank:]' '_'); do
-				[ -n "${winId}" ] || \
-					exit ${OK}
-				winIds="$(cut -f 1 -s -d '_' <<< "${winId}")"
-				break
-			done
-			;;
-		*)
-			winIds="${@}"
-			;;
-		esac
-		for winId in ${winIds}; do
-			if windowId="$(printf '0x%0x' "${winId}" 2> /dev/null)" && \
-			WindowExists "${windowId}"; then
-				PrintWindowInfo "${windowId}"
-				echo
-			else
-				echo "err: window \"${winId}\" doesn't exist" >&2
-			fi
+	winIds="${1:-"all"}"
+	winIds="${winIds,,}"
+	case "${winIds}" in
+	all)
+		winIds="$(wmctrl -l | \
+			awk -v sep="${SEP}" \
+			'BEGIN{ORS=sep}
+			$2 != -1 {print $1; rc=-1}
+			END{exit rc+1}')" || {
+				echo "err: no open windows" >&2
+				exit ${ERR}
+			}
+		;;
+	select)
+		select winId in $(wmctrl -l | \
+		awk '$2 != -1 {print $0}' | \
+		tr -s '[:blank:]' '_'); do
+			[ -n "${winId}" ] || \
+				exit ${OK}
+			winIds="$(cut -f 1 -s -d '_' <<< "${winId}")"
+			break
 		done
-	else
-		echo "err: must specify a window ID" >&2
-		exit ${ERR}
-	fi
+		;;
+	*)
+		winIds="${@}"
+		;;
+	esac
+	for winId in ${winIds}; do
+		if windowId="$(printf '0x%0x' "${winId}" 2> /dev/null)" && \
+		WindowExists "${windowId}"; then
+			PrintWindowInfo "${windowId}"
+			echo
+		else
+			echo "err: window \"${winId}\" doesn't exist" >&2
+		fi
+	done
 	;;
 *)
 	echo "err: wrong action." >&2
