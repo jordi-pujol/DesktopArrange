@@ -7,7 +7,7 @@
 #  Sets the layout of current desktops and newly emerging windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.41 $
+#  $Revision: 0.42 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
@@ -693,7 +693,9 @@ WindowSetupRule() {
 	local windowId="${1}" \
 		ruleType="${2}" \
 		rule="${3}" \
-		index action val waitForFocus desktop record recordKey
+		index action val waitForFocus desktop \
+		record recordKey listKey keyList
+
 	_log "window ${windowId} ${ruleType} ${rule}:" \
 		"setting up"
 
@@ -863,12 +865,9 @@ WindowSetupRule() {
 			fi
 			;;
 		set_mosaicked)
-			if [ "${ruleType}" = "Temprule" ]; then
-				recordKey="Mosaic_${pidWindowsArrange}_${ruleType}_${rule}_${desktop}"
-			else
-				recordKey="Mosaic_${ruleType}_${rule}_${desktop}"
-			fi
 			_lock_acquire "${VARSFILE}" ${mypid}
+
+			recordKey="Mosaic_${ruleType}_${rule}_${desktop}"
 			if record="$(awk -v recordKey="${recordKey}" \
 			'$1 == recordKey {print $0; rc=-1; exit}
 			END{exit rc+1}' < "${VARSFILE}")"; then
@@ -884,6 +883,20 @@ WindowSetupRule() {
 				printf '%s\n' "${record}${windowId}${SEP}"
 			} > "${VARSFILE}.part"
 			mv -f "${VARSFILE}.part" "${VARSFILE}"
+
+			listKey="KeyList_${pidWindowsArrange}"
+			keyList="$(awk -v listKey="${listKey}" \
+			'$1 == listKey {print $0; rc=-1; exit}
+			END{exit rc+1}' < "${VARSFILE}")" || \
+				keyList="${listKey}${SEP}"
+			if ! grep -qswF "${recordKey}" <<< "${keyList}"; then
+				{	awk -v listKey="${listKey}" \
+					'$1 != listKey {print $0}' < "${VARSFILE}"
+					printf '%s\n' "${keyList}${recordKey}${SEP}"
+				} > "${VARSFILE}.part"
+				mv -f "${VARSFILE}.part" "${VARSFILE}"
+			fi
+
 			_lock_release "${VARSFILE}" ${mypid}
 			_log "window ${windowId} ${ruleType} ${rule}:" \
 				"mosaic pending"
@@ -1496,14 +1509,14 @@ WindowsArrange() {
 		checkRules="${3}" \
 		checkTempRules="${4:-}" \
 		windowId mypid pidWindowsArrange pid pids pidsChildren \
-		record actionsRule
+		record actionsRule listKey recordKey
 
 	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
 	[ $(wc -w <<< "${mypid}") -ne 1 ]; do
 		sleep .1
 	done
 	mypid=$((mypid))
-	pidWindowsArrange="${checkTempRules:+"${mypid}"}"
+	pidWindowsArrange="${mypid}"
 
 	actionsRule=""
 	pidsChildren=""
@@ -1528,36 +1541,40 @@ WindowsArrange() {
 	done
 
 	if [ "${actionsRule}" != "${actionsRule//mosaicked/}" ]; then
-		if [ -n "${checkTempRules}" ]; then
+		while read -r recordKey; do
 			while read -r record; do
 				GroupEnmossay \
 					"$(cut -f 1 -s -d '_' <<< "${record}")" \
+					"$(cut -f 2 -s -d '_' <<< "${record}")" \
 					"$(cut -f 3 -s -d '_' <<< "${record}")" \
 					"$(cut -f 4 -s -d '_' <<< "${record}")" \
-					"$(cut -f 5 -s -d '_' <<< "${record}")" \
 					"$(cut -f 2 -s -d "${SEP}" <<< "${record}")" \
 					"$(cut -f 3- -s -d "${SEP}" <<< "${record}")"
 			done < <(
 				_lock_acquire "${VARSFILE}" ${mypid}
-				awk -v recordKey="Mosaic_${mypid}_" \
-					'$1 ~ recordKey {print $0}' < "${VARSFILE}"
+				grep -swF "${recordKey}" < "${VARSFILE}" || :
 				_lock_release "${VARSFILE}" ${mypid}
 				)
-		fi
-		while read -r record; do
-			GroupEnmossay \
-				"$(cut -f 1 -s -d '_' <<< "${record}")" \
-				"$(cut -f 2 -s -d '_' <<< "${record}")" \
-				"$(cut -f 3 -s -d '_' <<< "${record}")" \
-				"$(cut -f 4 -s -d '_' <<< "${record}")" \
-				"$(cut -f 2 -s -d "${SEP}" <<< "${record}")" \
-				"$(cut -f 3- -s -d "${SEP}" <<< "${record}")"
 		done < <(
 			_lock_acquire "${VARSFILE}" ${mypid}
-			grep -sEe "Mosaic_(Globalrule|Rule)_" < "${VARSFILE}" | \
-				grep -swF "$(printf '0x%0x\n' ${windowIds})" || :
+			awk -v sep="${SEP}" \
+				-v listKey="KeyList_${mypid}" \
+				'BEGIN{FS=sep; OFS=sep}
+				$1 == listKey {
+					for (i=2; i <= NF; i++)
+						if ($i ~ "Mosaic")
+							print $i
+					exit}' < "${VARSFILE}"
 			_lock_release "${VARSFILE}" ${mypid}
 			)
+
+		_lock_acquire "${VARSFILE}" ${mypid}
+		awk -v sep="${SEP}" \
+			-v listKey="KeyList_${mypid}" \
+			'BEGIN{FS=sep; OFS=sep}
+			$1 != listKey {print $0}' < "${VARSFILE}" > "${VARSFILE}.part"
+		mv -f "${VARSFILE}.part" "${VARSFILE}"
+		_lock_release "${VARSFILE}" ${mypid}
 	fi
 
 	for windowId in ${windowIds}; do
