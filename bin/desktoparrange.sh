@@ -694,7 +694,7 @@ WindowSetupRule() {
 		ruleType="${2}" \
 		rule="${3}" \
 		index action val waitForFocus desktop \
-		record recordKey listKey keyList
+		record recordKey keylistKey keyList
 
 	_log "window ${windowId} ${ruleType} ${rule}:" \
 		"setting up"
@@ -884,14 +884,14 @@ WindowSetupRule() {
 			} > "${VARSFILE}.part"
 			mv -f "${VARSFILE}.part" "${VARSFILE}"
 
-			listKey="KeyList_${pidWindowsArrange}"
-			keyList="$(awk -v listKey="${listKey}" \
-			'$1 == listKey {print $0; rc=-1; exit}
+			keylistKey="KeyList_${pidWindowsArrange}"
+			keyList="$(awk -v keylistKey="${keylistKey}" \
+			'$1 == keylistKey {print $0; rc=-1; exit}
 			END{exit rc+1}' < "${VARSFILE}")" || \
-				keyList="${listKey}${SEP}"
+				keyList="${keylistKey}${SEP}"
 			if ! grep -qswF "${recordKey}" <<< "${keyList}"; then
-				{	awk -v listKey="${listKey}" \
-					'$1 != listKey {print $0}' < "${VARSFILE}"
+				{	awk -v keylistKey="${keylistKey}" \
+					'$1 != keylistKey {print $0}' < "${VARSFILE}"
 					printf '%s\n' "${keyList}${recordKey}${SEP}"
 				} > "${VARSFILE}.part"
 				mv -f "${VARSFILE}.part" "${VARSFILE}"
@@ -1509,7 +1509,7 @@ WindowsArrange() {
 		checkRules="${3}" \
 		checkTempRules="${4:-}" \
 		windowId mypid pidWindowsArrange pid pids pidsChildren \
-		record actionsRule listKey recordKey
+		record actionsRule keylistKey recordKey
 
 	while mypid="$(ps -o ppid= -C "ps -o ppid= -C ps -o ppid=")";
 	[ $(wc -w <<< "${mypid}") -ne 1 ]; do
@@ -1558,9 +1558,9 @@ WindowsArrange() {
 		done < <(
 			_lock_acquire "${VARSFILE}" ${mypid}
 			awk -v sep="${SEP}" \
-				-v listKey="KeyList_${mypid}" \
+				-v keylistKey="KeyList_${mypid}" \
 				'BEGIN{FS=sep; OFS=sep}
-				$1 == listKey {
+				$1 == keylistKey {
 					for (i=2; i <= NF; i++)
 						if ($i ~ "Mosaic")
 							print $i
@@ -1570,9 +1570,9 @@ WindowsArrange() {
 
 		_lock_acquire "${VARSFILE}" ${mypid}
 		awk -v sep="${SEP}" \
-			-v listKey="KeyList_${mypid}" \
+			-v keylistKey="KeyList_${mypid}" \
 			'BEGIN{FS=sep; OFS=sep}
-			$1 != listKey {print $0}' < "${VARSFILE}" > "${VARSFILE}.part"
+			$1 != keylistKey {print $0}' < "${VARSFILE}" > "${VARSFILE}.part"
 		mv -f "${VARSFILE}.part" "${VARSFILE}"
 		_lock_release "${VARSFILE}" ${mypid}
 	fi

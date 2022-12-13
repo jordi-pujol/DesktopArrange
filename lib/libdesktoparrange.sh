@@ -7,7 +7,7 @@
 #  Sets the layout of current desktops and newly emerging windows
 #  according to a set of configurable rules.
 #
-#  $Revision: 0.41 $
+#  $Revision: 0.42 $
 #
 #  Copyright (C) 2022-2022 Jordi Pujol <jordipujolp AT gmail DOT com>
 #
