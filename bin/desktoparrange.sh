@@ -1262,7 +1262,7 @@ WindowSelect() {
 				fi
 				;;
 			select_class)
-				if grep -qs -iwEe "${val}" <<< "$(WindowClass ${windowId})" ; then
+				if grep -qs -iEe "${val}" <<< "$(WindowClass ${windowId})" ; then
 					_log "window ${windowId} ${ruleType} ${rule}:" \
 						"${deselected:+"does not "}match" \
 						"class \"${deselected}${val}\""
@@ -1919,8 +1919,7 @@ execute)
 windowinfo)
 	shift
 	winIds="${1:-"all"}"
-	winIds="${winIds,,}"
-	case "${winIds}" in
+	case "${winIds,,}" in
 	all)
 		winIds="$(wmctrl -l | \
 			awk -v sep="${SEP}" \

@@ -9,8 +9,8 @@ buildstamp="debian/debhelper-build-stamp"
 changed=
 if [ -n "${changed:="$(find . -type f -cnewer "${buildstamp}")"}" ]; then
 	printf '%s\n' "Changed files:" ${changed} ""
-	debuild -tc
-	: > "${buildstamp}"
+	! debuild -tc || \
+		: > "${buildstamp}"
 else
 	echo "Nothing to do" >&2
 fi
