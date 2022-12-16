@@ -526,11 +526,15 @@ WindowTile() {
 			"$(cut -f -2 -s -d ' ' <<< "${val}")"
 	fi
 	_lock_acquire "${VARSFILE}" ${mypid}
-	{ awk -v recordKey="${recordKey}" \
-	'$1 != recordKey {print $0}' < "${VARSFILE}"
-	printf '%s\n' "${record:-"${recordKey}${SEP}"}${windowId}${SEP}"
-	} > "${VARSFILE}.part"
-	mv -f "${VARSFILE}.part" "${VARSFILE}"
+	if [ -z "${record}" ]; then
+		printf '%s\n' "${recordKey}${SEP}${windowId}${SEP}" >> "${VARSFILE}"
+	else
+		{	awk -v recordKey="${recordKey}" \
+			'$1 != recordKey {print $0}' < "${VARSFILE}"
+			printf '%s\n' "${record}${windowId}${SEP}"
+		} > "${VARSFILE}.part"
+		mv -f "${VARSFILE}.part" "${VARSFILE}"
+	fi
 	_lock_release "${VARSFILE}" ${mypid}
 }
 
@@ -694,7 +698,7 @@ WindowSetupRule() {
 		ruleType="${2}" \
 		rule="${3}" \
 		index action val waitForFocus desktop \
-		record recordKey keylistKey keyList
+		record recordKey keylistKey keyList found
 
 	_log "window ${windowId} ${ruleType} ${rule}:" \
 		"setting up"
@@ -871,30 +875,42 @@ WindowSetupRule() {
 			if record="$(awk -v recordKey="${recordKey}" \
 			'$1 == recordKey {print $0; rc=-1; exit}
 			END{exit rc+1}' < "${VARSFILE}")"; then
+				found="y"
 				[ "${val}" = "$(cut -f 2 -s -d "${SEP}" <<< "${record}")" ] || \
 					LogPrio="err" \
 					_log "${ruleType} ${rule}:" \
 						"have defined multiple Mosaic values (${val})"
 			else
+				found=""
 				record="${recordKey}${SEP}${val}${SEP}"
 			fi
-			{	awk -v recordKey="${recordKey}" \
-				'$1 != recordKey {print $0}' < "${VARSFILE}"
-				printf '%s\n' "${record}${windowId}${SEP}"
-			} > "${VARSFILE}.part"
-			mv -f "${VARSFILE}.part" "${VARSFILE}"
-
-			keylistKey="KeyList_${pidWindowsArrange}"
-			keyList="$(awk -v keylistKey="${keylistKey}" \
-			'$1 == keylistKey {print $0; rc=-1; exit}
-			END{exit rc+1}' < "${VARSFILE}")" || \
-				keyList="${keylistKey}${SEP}"
-			if ! grep -qswF "${recordKey}" <<< "${keyList}"; then
-				{	awk -v keylistKey="${keylistKey}" \
-					'$1 != keylistKey {print $0}' < "${VARSFILE}"
-					printf '%s\n' "${keyList}${recordKey}${SEP}"
+			if [ -z "${found}" ]; then
+				printf '%s\n' "${record}${windowId}${SEP}" >> "${VARSFILE}"
+			else
+				{	awk -v recordKey="${recordKey}" \
+					'$1 != recordKey {print $0}' < "${VARSFILE}"
+					printf '%s\n' "${record}${windowId}${SEP}"
 				} > "${VARSFILE}.part"
 				mv -f "${VARSFILE}.part" "${VARSFILE}"
+			fi
+
+			keylistKey="KeyList_${pidWindowsArrange}"
+			found=""
+			keyList="$(awk -v keylistKey="${keylistKey}" \
+			'$1 == keylistKey {print $0; rc=-1; exit}
+			END{exit rc+1}' < "${VARSFILE}")" && \
+				found="y" || \
+				keyList="${keylistKey}${SEP}"
+			if ! grep -qswF "${recordKey}" <<< "${keyList}"; then
+				if [ -z "${found}" ]; then
+					printf '%s\n' "${keyList}${recordKey}${SEP}" >> "${VARSFILE}"
+				else
+					{	awk -v keylistKey="${keylistKey}" \
+						'$1 != keylistKey {print $0}' < "${VARSFILE}"
+						printf '%s\n' "${keyList}${recordKey}${SEP}"
+					} > "${VARSFILE}.part"
+					mv -f "${VARSFILE}.part" "${VARSFILE}"
+				fi
 			fi
 
 			_lock_release "${VARSFILE}" ${mypid}
