@@ -698,7 +698,7 @@ WindowSetupRule() {
 		ruleType="${2}" \
 		rule="${3}" \
 		index action val waitForFocus desktop \
-		record recordKey keylistKey keyList found
+		record recordKey keylistKey keyList
 
 	_log "window ${windowId} ${ruleType} ${rule}:" \
 		"setting up"
@@ -875,17 +875,14 @@ WindowSetupRule() {
 			if record="$(awk -v recordKey="${recordKey}" \
 			'$1 == recordKey {print $0; rc=-1; exit}
 			END{exit rc+1}' < "${VARSFILE}")"; then
-				found="y"
 				[ "${val}" = "$(cut -f 2 -s -d "${SEP}" <<< "${record}")" ] || \
 					LogPrio="err" \
 					_log "${ruleType} ${rule}:" \
 						"have defined multiple Mosaic values (${val})"
-			else
-				found=""
-				record="${recordKey}${SEP}${val}${SEP}"
 			fi
-			if [ -z "${found}" ]; then
-				printf '%s\n' "${record}${windowId}${SEP}" >> "${VARSFILE}"
+			if [ -z "${record}" ]; then
+				printf '%s\n' "${recordKey}${SEP}${val}${SEP}${windowId}${SEP}" \
+					>> "${VARSFILE}"
 			else
 				{	awk -v recordKey="${recordKey}" \
 					'$1 != recordKey {print $0}' < "${VARSFILE}"
@@ -895,22 +892,16 @@ WindowSetupRule() {
 			fi
 
 			keylistKey="KeyList_${pidWindowsArrange}"
-			found=""
 			keyList="$(awk -v keylistKey="${keylistKey}" \
-			'$1 == keylistKey {print $0; rc=-1; exit}
-			END{exit rc+1}' < "${VARSFILE}")" && \
-				found="y" || \
-				keyList="${keylistKey}${SEP}"
-			if ! grep -qswF "${recordKey}" <<< "${keyList}"; then
-				if [ -z "${found}" ]; then
-					printf '%s\n' "${keyList}${recordKey}${SEP}" >> "${VARSFILE}"
-				else
-					{	awk -v keylistKey="${keylistKey}" \
-						'$1 != keylistKey {print $0}' < "${VARSFILE}"
-						printf '%s\n' "${keyList}${recordKey}${SEP}"
-					} > "${VARSFILE}.part"
-					mv -f "${VARSFILE}.part" "${VARSFILE}"
-				fi
+			'$1 == keylistKey {print $0; exit}' < "${VARSFILE}")"
+			if [ -z "${keyList}" ]; then
+				printf '%s\n' "${keylistKey}${SEP}${recordKey}${SEP}" >> "${VARSFILE}"
+			elif ! grep -qswF "${recordKey}" <<< "${keyList}"; then
+				{	awk -v keylistKey="${keylistKey}" \
+					'$1 != keylistKey {print $0}' < "${VARSFILE}"
+					printf '%s\n' "${keyList}${recordKey}${SEP}"
+				} > "${VARSFILE}.part"
+				mv -f "${VARSFILE}.part" "${VARSFILE}"
 			fi
 
 			_lock_release "${VARSFILE}" ${mypid}
