@@ -879,29 +879,29 @@ WindowSetupRule() {
 					LogPrio="err" \
 					_log "${ruleType} ${rule}:" \
 						"have defined multiple Mosaic values (${val})"
-			fi
-			if [ -z "${record}" ]; then
-				printf '%s\n' "${recordKey}${SEP}${val}${SEP}${windowId}${SEP}" \
-					>> "${VARSFILE}"
-			else
 				{	awk -v recordKey="${recordKey}" \
 					'$1 != recordKey {print $0}' < "${VARSFILE}"
 					printf '%s\n' "${record}${windowId}${SEP}"
 				} > "${VARSFILE}.part"
 				mv -f "${VARSFILE}.part" "${VARSFILE}"
+			else
+				printf '%s\n' "${recordKey}${SEP}${val}${SEP}${windowId}${SEP}" \
+					>> "${VARSFILE}"
 			fi
 
 			keylistKey="KeyList_${pidWindowsArrange}"
-			keyList="$(awk -v keylistKey="${keylistKey}" \
-			'$1 == keylistKey {print $0; exit}' < "${VARSFILE}")"
-			if [ -z "${keyList}" ]; then
+			if keyList="$(awk -v keylistKey="${keylistKey}" \
+			'$1 == keylistKey {print $0; rc=-1; exit}
+			END{exit rc+1}' < "${VARSFILE}")"; then
+				if ! grep -qswF "${recordKey}" <<< "${keyList}"; then
+					{	awk -v keylistKey="${keylistKey}" \
+						'$1 != keylistKey {print $0}' < "${VARSFILE}"
+						printf '%s\n' "${keyList}${recordKey}${SEP}"
+					} > "${VARSFILE}.part"
+					mv -f "${VARSFILE}.part" "${VARSFILE}"
+				fi
+			else
 				printf '%s\n' "${keylistKey}${SEP}${recordKey}${SEP}" >> "${VARSFILE}"
-			elif ! grep -qswF "${recordKey}" <<< "${keyList}"; then
-				{	awk -v keylistKey="${keylistKey}" \
-					'$1 != keylistKey {print $0}' < "${VARSFILE}"
-					printf '%s\n' "${keyList}${recordKey}${SEP}"
-				} > "${VARSFILE}.part"
-				mv -f "${VARSFILE}.part" "${VARSFILE}"
 			fi
 
 			_lock_release "${VARSFILE}" ${mypid}
